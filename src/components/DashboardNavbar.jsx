@@ -8,11 +8,17 @@ const DashboardNavbar = () => {
       {/* Left: Logo & Hide Button */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded flex items-center justify-center text-white font-bold">
-            S
-          </div>
+          
+          {/* --- CHANGE START: Replaced S box with Image --- */}
+          <img 
+            src="/logo.png"   // Make sure this file exists in your public folder
+            alt="Talk N Type Logo" 
+            className="w-8 h-8 object-contain" 
+          />
+          {/* --- CHANGE END --- */}
+
           <div className="flex flex-col leading-none">
-            <span className="font-bold text-slate-800 text-sm">SUPER STENO</span>
+            <span className="font-bold text-slate-800 text-sm">Talk N Type</span>
             <span className="text-[10px] text-slate-500">Your Personal Virtual Assistant</span>
           </div>
         </div>
@@ -44,5 +50,4 @@ const DashboardNavbar = () => {
     </nav>
   );
 };
-
 export default DashboardNavbar;
