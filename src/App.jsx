@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
+import Preloader from './components/Preloader';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Features from './components/Features';
@@ -16,6 +16,7 @@ import Register from './components/Register';  // Import the new Login page
 const LandingPage = () => {
   return (
     <>
+    <Preloader />
       <Navbar />
       <Hero />
       <Features />
