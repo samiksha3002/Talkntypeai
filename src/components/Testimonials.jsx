@@ -10,7 +10,7 @@ const Testimonials = () => {
           What Our Users Say
         </h2>
         <p className="text-lg text-slate-500 mb-16 max-w-2xl mx-auto">
-          Join thousands of professionals who trust SuperSteno for their documentation needs.
+          Join thousands of professionals who trust TalknType for their documentation needs.
         </p>
 
         {/* Testimonials Grid */}
@@ -21,7 +21,7 @@ const Testimonials = () => {
             name="Sarah Jenkins"
             role="Content Creator"
             image="https://randomuser.me/api/portraits/women/44.jpg"
-            text="SuperSteno has completely changed how I write my scripts. The accuracy in English and Hindi is mind-blowing. I save hours every week!"
+            text="TalknType has completely changed how I write my scripts. The accuracy in English and Hindi is mind-blowing. I save hours every week!"
           />
 
           {/* User 2 */}

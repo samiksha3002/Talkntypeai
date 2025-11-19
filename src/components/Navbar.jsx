@@ -2,22 +2,20 @@ import React from 'react';
 
 const Navbar = () => {
   return (
-    <nav className="w-full bg-white py-4 px-6 md:px-12 flex justify-between items-center shadow-sm z-50 relative">
+    // --- CHANGE 1: Fixed height (h-20) and Zero padding (py-0) ---
+    <nav className="w-full bg-white h-20 py-0 px-6 md:px-12 flex justify-between items-center shadow-sm z-50 relative overflow-hidden">
+      
       {/* Logo Section */}
       <div className="flex items-center gap-2">
         
-        {/* --- CHANGE START: Image Logo --- */}
+        {/* --- CHANGE 2: Negative Margin (-my-6) --- */}
+        {/* '-my-6' image ke upar/niche ka extra space kha jayega */}
         <img 
-          src="/logo.png"  // Replace with your actual file name
+          src="/logo.png" 
           alt="Talk N Type Logo" 
-          className="w-10 h-10 object-contain" 
+          className="w-48 h-auto object-contain -my-6" 
         />
-        {/* --- CHANGE END --- */}
-
-        <div className="flex flex-col">
-          <span className="font-bold text-slate-800 text-lg leading-none tracking-wide">Talk N Type</span>
-          <span className="text-[10px] text-slate-500 font-medium tracking-wider">Your Personal Virtual Assistant</span>
-        </div>
+        
       </div>
 
       {/* Navigation Links */}
