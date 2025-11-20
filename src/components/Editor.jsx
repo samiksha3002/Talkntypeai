@@ -4,8 +4,8 @@ const Editor = () => {
   return (
     <div className="flex-1 h-full p-4 flex flex-col overflow-hidden">
       
-      {/* Top Icon Bar (Actions) - Same as before */}
-      <div className="flex justify-end gap-2 mb-2">
+      {/* Top Icon Bar (Actions) */}
+      <div className="flex justify-end gap-2 mb-2 overflow-x-auto pb-1">
         <ActionIcon icon="↺" /> 
         <ActionIcon icon="💬" /> 
         <ActionIcon icon="A" />  
@@ -53,20 +53,17 @@ const Editor = () => {
           </div>
         </div>
 
-        {/* Text Area - flex-1 rakha hai taaki baki jagah le le */}
+        {/* Text Area */}
         <textarea 
           className="flex-1 w-full p-6 outline-none resize-none text-gray-800 font-sans text-base leading-relaxed"
           placeholder="Start speaking or typing here..."
         ></textarea>
 
-        {/* --- MOVING TEXT STRIP (Added Here) --- */}
+        {/* Moving Text Strip */}
         <div className="h-8 bg-yellow-100 border-t border-yellow-300 flex items-center overflow-hidden relative">
-            {/* Static Label (Optional) */}
             <div className="bg-yellow-400 text-yellow-900 text-xs font-bold px-3 h-full flex items-center z-10 shadow-md">
                 NOTICE:
             </div>
-            
-            {/* Animated Text Wrapper */}
             <div className="whitespace-nowrap overflow-hidden w-full">
                 <div className="inline-block animate-marquee text-sm text-yellow-800 font-medium">
                     Welcome to SuperSteno! Please ensure your microphone is connected for speech input. • New languages added: Marathi & Gujarati! • Contact support for license renewal.
@@ -76,7 +73,7 @@ const Editor = () => {
 
       </div>
 
-      {/* CSS for Animation (Is file ke andar hi inject kar diya for easy setup) */}
+      {/* CSS for Marquee Animation */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(100%); }
@@ -84,7 +81,7 @@ const Editor = () => {
         }
         .animate-marquee {
           animation: marquee 15s linear infinite;
-          padding-left: 100%; /* Starts from outside */
+          padding-left: 100%; 
         }
       `}</style>
 
@@ -92,7 +89,7 @@ const Editor = () => {
   );
 };
 
-// --- Helper Components Same as before ---
+// --- Helper Components ---
 const ActionIcon = ({ icon, bg = "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" }) => (
   <button className={`w-9 h-9 rounded border flex items-center justify-center shadow-sm transition ${bg}`}>
     <span className="text-sm font-bold">{icon}</span>
@@ -108,4 +105,4 @@ const ToolBtn = ({ symbol, bold, italic, underline, strike }) => {
   return <button className={classes}>{symbol}</button>;
 };
 
-export default Editor;  
+export default Editor;

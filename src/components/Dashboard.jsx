@@ -2,6 +2,7 @@ import React from 'react';
 import DashboardNavbar from './DashboardNavbar';
 import Sidebar from './Sidebar';
 import Editor from './Editor';
+import FooterButtons from './FooterButtons';
 
 const Dashboard = () => {
   return (
@@ -10,10 +11,11 @@ const Dashboard = () => {
       
       <div className="pt-16 flex"> {/* pt-16 to account for fixed navbar */}
         <Sidebar />
-        
+         <FooterButtons />
         {/* Main Content Area */}
-        <main className="ml-72 flex-1 h-[calc(100vh-64px)]">
+        <main className="ml-72 flex-1 h-[calc(100vh-128px)]">
           <Editor />
+      
         </main>
       </div>
     </div>

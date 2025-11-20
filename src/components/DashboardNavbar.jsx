@@ -9,23 +9,17 @@ const DashboardNavbar = () => {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           
-          {/* --- CHANGE START: Replaced S box with Image --- */}
+          {/* --- UPDATED LOGO STYLE (From Home Screen) --- */}
+          {/* Replaced small icon + text with the large logo image style */}
           <img 
-            src="/logo.png"   // Make sure this file exists in your public folder
+            src="/logo.png" 
             alt="Talk N Type Logo" 
-            className="w-8 h-8 object-contain" 
+            className="w-48 h-auto object-contain -my-6" 
           />
-          {/* --- CHANGE END --- */}
-
-          <div className="flex flex-col leading-none">
-            <span className="font-bold text-slate-800 text-sm">Talk N Type</span>
-            <span className="text-[10px] text-slate-500">Your Personal Virtual Assistant</span>
-          </div>
+          
         </div>
         
-        <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-sm font-medium flex items-center gap-1 transition">
-          <span>&lt;</span> Hide
-        </button>
+        
       </div>
 
       {/* Right: Info & Logout */}
@@ -50,4 +44,5 @@ const DashboardNavbar = () => {
     </nav>
   );
 };
+
 export default DashboardNavbar;

@@ -2,7 +2,9 @@ import React from 'react';
 
 const Sidebar = () => {
   return (
-    <aside className="w-72 bg-white h-[calc(100vh-64px)] border-r border-gray-200 p-4 overflow-y-auto fixed left-0 top-16">
+    // --- CHANGE: Height reduced to [calc(100vh-128px)] to leave space for footer ---
+    // 64px (Header) + 64px (Footer) = 128px
+    <aside className="w-72 bg-white h-[calc(100vh-128px)] border-r border-gray-200 p-4 overflow-y-auto fixed left-0 top-16">
       
       {/* Speech Input Card */}
       <ToolCard title="SPEECH INPUT" icon="🎙️">
