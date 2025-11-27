@@ -6,18 +6,33 @@ import FooterButtons from './FooterButtons';
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <DashboardNavbar />
+    <div className="h-screen bg-gray-50 font-sans overflow-hidden flex flex-col">
       
-      <div className="pt-16 flex"> {/* pt-16 to account for fixed navbar */}
+      {/* --- TOP: NAVBAR --- */}
+      {/* h-16: Space reserve karega */}
+      <div className="flex-none z-50 h-16 w-full">
+        <DashboardNavbar />
+      </div>
+      
+      {/* --- MIDDLE: SIDEBAR + EDITOR --- */}
+      <div className="flex flex-1 overflow-hidden relative"> 
+        
+        {/* Sidebar Left Side */}
         <Sidebar />
-         <FooterButtons />
-        {/* Main Content Area */}
-        <main className="ml-72 flex-1 h-[calc(100vh-128px)]">
-          <Editor />
-      
+        
+        {/* Editor Right Side */}
+        {/* CHANGE: 'pb-2' add kiya hai. Isse Editor footer se thoda upar uthega */}
+        {/* 'h-full' hata kar sirf 'flex-1' rakha hai taaki overflow na ho */}
+        <main className="flex-1 ml-72 flex flex-col relative pb-2 min-h-0"> 
+           <Editor />
         </main>
       </div>
+
+      {/* --- BOTTOM: GLOBAL FOOTER --- */}
+      <div className="flex-none w-full bg-white border-t border-gray-200 z-50">
+         <FooterButtons />
+      </div>
+
     </div>
   );
 };

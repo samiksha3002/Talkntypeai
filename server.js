@@ -1,0 +1,223 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: './.env.local' });
+
+const app = express();
+const PORT = 5000;
+
+app.use(cors());
+app.use(express.json());
+
+// --- DATABASE CONNECTION ---
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/talkntype')
+  .then(async () => {
+    console.log('✅ MongoDB Connected Successfully');
+    try {
+      // Remove old indexes to prevent conflicts
+      await mongoose.connection.collection('users').dropIndex('username_1');
+    } catch (error) {}
+  })
+  .catch(err => console.log('❌ MongoDB Connection Error:', err));
+
+// --- USER MODEL ---
+const UserSchema = new mongoose.Schema({
+  fullName: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  state: String,
+  city: String,
+  phone: String,
+  executive: String, 
+  password: { type: String, required: true },
+  role: { type: String, default: 'user' }, 
+  subscription: {
+    plan: { type: String, default: 'demo' }, 
+    startDate: { type: Date },
+    expiryDate: { type: Date }, 
+    // Default is FALSE to ensure new users must be approved
+    isActive: { type: Boolean, default: false } 
+  }
+}, { timestamps: true });
+
+const User = mongoose.model('User', UserSchema);
+
+// --- 1. REGISTER ROUTE (Force Inactive) ---
+app.post('/api/create-user', async (req, res) => {
+  try {
+    const { fullName, email, state, city, phone, executive, password } = req.body;
+
+    // Admin Email Security Block
+    if (email === 'admin@talkntype.com') {
+      return res.status(400).json({ message: 'This email is reserved for Admin. Use Login page.' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const newUser = new User({
+      fullName,
+      email,
+      state,
+      city,
+      phone,
+      executive,
+      password: hashedPassword,
+      role: 'user',
+      // Force Subscription Object to be Inactive
+      subscription: {
+        isActive: false, // User cannot login until Admin toggles this to true
+        plan: 'demo',
+        startDate: null,
+        expiryDate: null
+      }
+    });
+    
+    await newUser.save();
+    res.status(201).json({ message: 'Registration successful! Wait for admin approval.' });
+
+  } catch (error) {
+    console.error("Registration Error:", error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+});
+
+// --- 2. LOGIN ROUTE (Strict Approval Check) ---
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // A. STATIC ADMIN LOGIN (Hardcoded Backdoor)
+    if (email === 'admin@talkntype.com' && password === 'admin123') {
+      return res.status(200).json({
+        message: 'Welcome Boss!',
+        user: {
+          id: 'admin-static-id',
+          fullName: 'Super Admin',
+          email: 'admin@talkntype.com',
+          role: 'admin', 
+          subscription: { isActive: true, plan: 'unlimited' }
+        }
+      });
+    }
+
+    // B. NORMAL USER CHECK
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+
+    // --- SECURITY CHECK: IS ACCOUNT ACTIVE? ---
+    // This enforces the rule. If Admin hasn't approved, Server rejects login.
+    if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
+       return res.status(403).json({ 
+         message: '⛔ Account Pending Approval. Contact Admin.' 
+       });
+    }
+
+    res.status(200).json({
+      message: 'Login successful!',
+      user: {
+        _id: user._id, 
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        subscription: user.subscription
+      }
+    });
+
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+});
+
+// --- 3. ADMIN: GET ALL USERS ---
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    // Fetch only normal users, sort by newest first
+    const users = await User.find({ role: 'user' }).sort({ createdAt: -1 }).select('-password');
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching users' });
+  }
+});
+
+// --- 4. ADMIN: TOGGLE STATUS (Approve/Block User) ---
+app.put('/api/admin/update-status/:id', async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { 'subscription.isActive': isActive },
+      { new: true }
+    );
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating status' });
+  }
+});
+// DELETE USER ROUTE (Corrected for server.js)
+// Note: Ensure 'app' is used instead of 'router'
+app.delete('/api/admin/delete-user/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Logic to delete user from MongoDB
+    // Make sure 'User' model is imported at the top of your file
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// --- 5. ADMIN: UPDATE SUBSCRIPTION (Start & End Date) ---
+app.put('/api/admin/update-subscription/:id', async (req, res) => {
+  try {
+    const { startDate, expiryDate } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { 
+        'subscription.startDate': startDate,
+        'subscription.expiryDate': expiryDate 
+      },
+      { new: true }
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({ success: true, message: "Dates updated", user });
+  } catch (error) {
+    console.error("Date Update Error:", error);
+    res.status(500).json({ message: 'Error updating dates' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
+
+// Localhost ke liye ye part rakhein
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+// ADD THIS AT THE VERY END
+module.exports = app;
