@@ -212,11 +212,15 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
 
-// Localhost ke liye ye part rakhein
+// ... Upar ka code same rahega ...
+
+// Localhost ke liye (Vercel isse ignore karega)
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running locally on port ${PORT}`);
   });
 }
-export default app;    // ✅ Ye likh dein
+
+// ZAROORI: Vercel ke liye export
+export default app;
