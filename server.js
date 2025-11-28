@@ -10,31 +10,24 @@ dotenv.config({ path: './.env.local' });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- CORRECT CORS CONFIGURATION ---
-// 1. Define allowed origins
-const allowedOrigins = [
-  "https://www.talkntype.com",
-  "https://talkntype.com",
-  "http://localhost:5173",
-  "http://localhost:5174"
-];
-
-// 2. Configure CORS Middleware
+// --- 1. CORRECT CORS CONFIGURATION (Express 5 Stable) ---
+// We removed 'app.options' because it causes the "PathError" crash in Express 5.
+// "origin: true" automatically allows the connecting domain (Vercel/Localhost).
 app.use(cors({
-  origin: allowedOrigins,
+  origin: true, 
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Added OPTIONS here
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
-
-// 3. Handle Preflight Requests (Crucial for Render/Vercel communication)
-app.options('*', cors());
 
 // Middleware to parse JSON
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/talkntype')
+// We check for both MONGODB_URI (standard) and MONGO_URI (common typo) just in case
+const dbURI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/talkntype';
+
+mongoose.connect(dbURI)
   .then(async () => {
     console.log('✅ MongoDB Connected Successfully');
   })
@@ -61,6 +54,13 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
+
+// --- ROUTES ---
+
+// Health Check (To confirm server is running)
+app.get('/', (req, res) => {
+  res.send('TalkNType Server is Running!');
+});
 
 // --- 1. REGISTER ROUTE (Force Inactive) ---
 app.post('/api/create-user', async (req, res) => {

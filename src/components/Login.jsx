@@ -19,7 +19,7 @@ const Login = () => {
 
     try {
       // ↓↓↓ THIS LINE IS CRITICAL. IT MUST BE EXACTLY LIKE THIS ↓↓↓
-      const response = await fetch('https://talkntype.onrender.com/api/login', {
+      const response = await fetch('https://tnt-gi49.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
