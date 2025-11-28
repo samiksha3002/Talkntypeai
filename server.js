@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+const cors = require('cors'); 
 
 dotenv.config({ path: './.env.local' });
 
@@ -13,6 +14,16 @@ app.use(cors());
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
+app.use(cors({
+  origin: [
+    "https://talkntype.com",       // Allow your main domain
+    "https://www.talkntype.com",   // Allow www version
+    "http://localhost:5173",       // Allow your local dev environment
+    "http://localhost:5000"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/talkntype')
   .then(async () => {
     console.log('✅ MongoDB Connected Successfully');
