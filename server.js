@@ -13,13 +13,14 @@ const PORT = process.env.PORT || 5000;
 // --- CORRECT CORS CONFIGURATION ---
 app.use(cors({
   origin: [
-    "https://talkntype.com",       // Your Live Frontend
-    "https://www.talkntype.com",   // Your Live Frontend (www)
-    "http://localhost:5173",       // Your Local React
-    "http://localhost:5000"        // Your Local Backend
+    "https://www.talkntype.com",
+    "https://talkntype.com",
+    "http://localhost:5173",
+    "http://localhost:5174"
   ],
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 // Middleware to parse JSON
