@@ -1,14 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-const Editor = () => {
+const Editor = ({ speechText }) => {
+  const [manualText, setManualText] = useState('');
+  
+  // Logic: Jab bhi naya speechText aaye, use existing text me add karo
+  useEffect(() => {
+    if (speechText) {
+      setManualText((prev) => prev ? prev + ' ' + speechText : speechText);
+    }
+  }, [speechText]);
+
+  const handleChange = (e) => {
+    setManualText(e.target.value);
+  };
+
   return (
-    // CHANGE 1: p-4 ko p-2 kiya taaki upar se gap kam ho aur editor "proper place" par aaye
-    // CHANGE 2: w-full add kiya taaki width poori cover ho
-    <div className="flex-1 h-full w-full p-2 flex flex-col overflow-hidden">
+    // FIX: Removed 'ml-72' and 'mt-16'. Added 'w-full'.
+    <div className="flex-1 w-full h-full p-4 flex flex-col overflow-hidden">
       
       {/* Top Icon Bar (Actions) */}
-      {/* CHANGE 3: 'flex-none' add kiya taaki ye shrink na ho */}
-      <div className="flex-none flex justify-end gap-2 mb-2 overflow-x-auto pb-1">
+      <div className="flex justify-end gap-2 mb-2 overflow-x-auto pb-1 flex-none">
         <ActionIcon icon="↺" /> 
         <ActionIcon icon="💬" /> 
         <ActionIcon icon="A" />  
@@ -26,16 +37,15 @@ const Editor = () => {
       </div>
 
       {/* Main Editor Container */}
-      {/* CHANGE 4: 'flex-1' ensure karega ki ye bachi hui height le le, par overflow na ho */}
       <div className="flex-1 bg-white rounded-lg border border-blue-500 flex flex-col shadow-sm overflow-hidden relative">
         
         {/* Toolbar Row */}
         <div className="bg-gray-50 border-b border-gray-200 p-2 flex items-center gap-3 flex-wrap text-gray-700 text-sm flex-none">
-          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs outline-none">
+          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs">
             <option>Sans Serif</option>
             <option>Serif</option>
           </select>
-          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs outline-none">
+          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs">
             <option>Normal</option>
             <option>Heading 1</option>
           </select>
@@ -58,14 +68,15 @@ const Editor = () => {
         </div>
 
         {/* Text Area */}
-        {/* CHANGE 5: resize-none important hai taaki layout na toote */}
         <textarea 
-          className="flex-1 w-full p-6 outline-none resize-none text-gray-800 font-sans text-base leading-relaxed overflow-y-auto"
+          value={manualText}
+          onChange={handleChange}
+          className="flex-1 w-full p-6 outline-none resize-none text-gray-800 font-sans text-base leading-relaxed"
           placeholder="Start speaking or typing here..."
         ></textarea>
 
         {/* Moving Text Strip */}
-        <div className="h-8 flex-none bg-yellow-100 border-t border-yellow-300 flex items-center overflow-hidden relative">
+        <div className="h-8 bg-yellow-100 border-t border-yellow-300 flex items-center overflow-hidden relative flex-none">
             <div className="bg-yellow-400 text-yellow-900 text-xs font-bold px-3 h-full flex items-center z-10 shadow-md">
                 NOTICE:
             </div>
@@ -94,15 +105,15 @@ const Editor = () => {
   );
 };
 
-// --- Helper Components (Same as before) ---
+// --- Helper Components ---
 const ActionIcon = ({ icon, bg = "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" }) => (
-  <button className={`w-9 h-9 rounded border flex items-center justify-center shadow-sm transition flex-shrink-0 ${bg}`}>
+  <button className={`w-9 h-9 rounded border flex items-center justify-center shadow-sm transition ${bg}`}>
     <span className="text-sm font-bold">{icon}</span>
   </button>
 );
 
 const ToolBtn = ({ symbol, bold, italic, underline, strike }) => {
-  let classes = "hover:text-blue-600 transition px-1 cursor-pointer flex items-center justify-center h-6 w-6";
+  let classes = "hover:text-blue-600 transition px-1 cursor-pointer";
   if (bold) classes += " font-bold";
   if (italic) classes += " italic font-serif";
   if (underline) classes += " underline";
