@@ -11,17 +11,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- CORRECT CORS CONFIGURATION ---
+// 1. Define allowed origins
+const allowedOrigins = [
+  "https://www.talkntype.com",
+  "https://talkntype.com",
+  "http://localhost:5173",
+  "http://localhost:5174"
+];
+
+// 2. Configure CORS Middleware
 app.use(cors({
-  origin: [
-    "https://www.talkntype.com",
-    "https://talkntype.com",
-    "http://localhost:5173",
-    "http://localhost:5174"
-  ],
+  origin: allowedOrigins,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Added OPTIONS here
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
+
+// 3. Handle Preflight Requests (Crucial for Render/Vercel communication)
+app.options('*', cors());
 
 // Middleware to parse JSON
 app.use(express.json());
@@ -30,12 +37,6 @@ app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/talkntype')
   .then(async () => {
     console.log('✅ MongoDB Connected Successfully');
-    try {
-        // Optional: Maintenance for removing old indexes if needed
-        // await mongoose.connection.collection('users').dropIndex('username_1');
-    } catch (error) {
-        // Ignore index errors
-    }
   })
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
@@ -54,7 +55,6 @@ const UserSchema = new mongoose.Schema({
     plan: { type: String, default: 'demo' }, 
     startDate: { type: Date },
     expiryDate: { type: Date }, 
-    // Default is FALSE to ensure new users must be approved
     isActive: { type: Boolean, default: false } 
   }
 }, { timestamps: true });
@@ -67,7 +67,6 @@ app.post('/api/create-user', async (req, res) => {
   try {
     const { fullName, email, state, city, phone, executive, password } = req.body;
 
-    // Admin Email Security Block
     if (email === 'admin@talkntype.com') {
       return res.status(400).json({ message: 'This email is reserved for Admin. Use Login page.' });
     }
@@ -88,9 +87,8 @@ app.post('/api/create-user', async (req, res) => {
       executive,
       password: hashedPassword,
       role: 'user',
-      // Force Subscription Object to be Inactive
       subscription: {
-        isActive: false, // User cannot login until Admin toggles this to true
+        isActive: false,
         plan: 'demo',
         startDate: null,
         expiryDate: null
@@ -111,7 +109,7 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // A. STATIC ADMIN LOGIN (Hardcoded Backdoor)
+    // A. STATIC ADMIN LOGIN
     if (email === 'admin@talkntype.com' && password === 'admin123') {
       return res.status(200).json({
         message: 'Welcome Boss!',
@@ -133,7 +131,6 @@ app.post('/api/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     // --- SECURITY CHECK: IS ACCOUNT ACTIVE? ---
-    // This enforces the rule. If Admin hasn't approved, Server rejects login.
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
        return res.status(403).json({ 
          message: '⛔ Account Pending Approval. Contact Admin.' 
@@ -160,7 +157,6 @@ app.post('/api/login', async (req, res) => {
 // --- 3. ADMIN: GET ALL USERS ---
 app.get('/api/admin/users', async (req, res) => {
   try {
-    // Fetch only normal users, sort by newest first
     const users = await User.find({ role: 'user' }).sort({ createdAt: -1 }).select('-password');
     res.json(users);
   } catch (error) {
@@ -224,7 +220,6 @@ app.put('/api/admin/update-subscription/:id', async (req, res) => {
 });
 
 // --- SERVER LISTEN ---
-// This handles both Localhost and Render automatically
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
