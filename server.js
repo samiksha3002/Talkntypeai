@@ -3,36 +3,41 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
-const cors = require('cors'); 
 
+// Load environment variables
 dotenv.config({ path: './.env.local' });
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
-
-// --- DATABASE CONNECTION ---
+// --- CORRECT CORS CONFIGURATION ---
 app.use(cors({
   origin: [
-    "https://talkntype.com",       // Allow your main domain
-    "https://www.talkntype.com",   // Allow www version
-    "http://localhost:5173",       // Allow your local dev environment
-    "http://localhost:5000"
+    "https://talkntype.com",       // Your Live Frontend
+    "https://www.talkntype.com",   // Your Live Frontend (www)
+    "http://localhost:5173",       // Your Local React
+    "http://localhost:5000"        // Your Local Backend
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
+
+// Middleware to parse JSON
+app.use(express.json());
+
+// --- DATABASE CONNECTION ---
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/talkntype')
   .then(async () => {
     console.log('✅ MongoDB Connected Successfully');
     try {
-      // Remove old indexes to prevent conflicts
-      await mongoose.connection.collection('users').dropIndex('username_1');
-    } catch (error) {}
+        // Optional: Maintenance for removing old indexes if needed
+        // await mongoose.connection.collection('users').dropIndex('username_1');
+    } catch (error) {
+        // Ignore index errors
+    }
   })
-  .catch(err => console.log('❌ MongoDB Connection Error:', err));
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+
 
 // --- USER MODEL ---
 const UserSchema = new mongoose.Schema({
@@ -54,6 +59,7 @@ const UserSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const User = mongoose.model('User', UserSchema);
+
 
 // --- 1. REGISTER ROUTE (Force Inactive) ---
 app.post('/api/create-user', async (req, res) => {
@@ -175,14 +181,11 @@ app.put('/api/admin/update-status/:id', async (req, res) => {
     res.status(500).json({ message: 'Error updating status' });
   }
 });
-// DELETE USER ROUTE (Corrected for server.js)
-// Note: Ensure 'app' is used instead of 'router'
+
+// --- 5. ADMIN: DELETE USER ---
 app.delete('/api/admin/delete-user/:id', async (req, res) => {
   try {
     const userId = req.params.id;
-    
-    // Logic to delete user from MongoDB
-    // Make sure 'User' model is imported at the top of your file
     const deletedUser = await User.findByIdAndDelete(userId);
 
     if (!deletedUser) {
@@ -196,7 +199,7 @@ app.delete('/api/admin/delete-user/:id', async (req, res) => {
   }
 });
 
-// --- 5. ADMIN: UPDATE SUBSCRIPTION (Start & End Date) ---
+// --- 6. ADMIN: UPDATE SUBSCRIPTION (Start & End Date) ---
 app.put('/api/admin/update-subscription/:id', async (req, res) => {
   try {
     const { startDate, expiryDate } = req.body;
@@ -219,19 +222,8 @@ app.put('/api/admin/update-subscription/:id', async (req, res) => {
   }
 });
 
+// --- SERVER LISTEN ---
+// This handles both Localhost and Render automatically
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
-
-// ... Upar ka code same rahega ...
-
-// Localhost ke liye (Vercel isse ignore karega)
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`Server running locally on port ${PORT}`);
-  });
-}
-
-// ZAROORI: Vercel ke liye export
-export default app;
