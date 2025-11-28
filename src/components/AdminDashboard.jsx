@@ -31,7 +31,7 @@ const AdminDashboard = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('https://https://talkntype.onrender.com/api/admin/users');
+      const response = await fetch('https://talkntype.onrender.com/api/admin/users');
       const data = await response.json();
       setUsers(data);
       setLoading(false);
