@@ -21,7 +21,7 @@ const Register = () => {
     }
 
     try {
-      const response = await fetch('https://api.talkntype.com/api/create-user', {
+      const response = await fetch('https://https://talkntype.onrender.com/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
