@@ -12,13 +12,14 @@ const Login = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 3. Handle Login Logic with APPROVAL CHECK
+  // 3. Handle Login Logic
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus({ type: 'loading', message: 'Verifying credentials...' });
 
     try {
-      const response = await fetch('https://https://talkntype.onrender.com/api/login', {
+      // ↓↓↓ THIS LINE IS CRITICAL. IT MUST BE EXACTLY LIKE THIS ↓↓↓
+      const response = await fetch('https://talkntype.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -64,7 +65,8 @@ const Login = () => {
         setStatus({ type: 'error', message: data.message || 'Invalid Email or Password' });
       }
     } catch (error) {
-      // Fallback for testing
+      console.error("Login Error:", error);
+      // Fallback for testing (Optional - remove if not needed in production)
       if(formData.email === "admin@test.com") {
           localStorage.setItem('user', JSON.stringify({ role: 'admin' }));
           navigate('/admin');
