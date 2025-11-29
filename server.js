@@ -1,8 +1,11 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+
+// Note: We are keeping bcryptjs import in case you want to revert to security later, 
+// but we are NOT using it in the logic below as per your request for plain text passwords.
+import bcrypt from 'bcryptjs'; 
 
 // Load environment variables
 dotenv.config({ path: './.env.local' });
@@ -10,9 +13,7 @@ dotenv.config({ path: './.env.local' });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- 1. CORRECT CORS CONFIGURATION (Express 5 Stable) ---
-// We removed 'app.options' because it causes the "PathError" crash in Express 5.
-// "origin: true" automatically allows the connecting domain (Vercel/Localhost).
+// --- 1. CORS CONFIGURATION ---
 app.use(cors({
   origin: true, 
   credentials: true,
@@ -24,7 +25,6 @@ app.use(cors({
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
-// We check for both MONGODB_URI (standard) and MONGO_URI (common typo) just in case
 const dbURI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/talkntype';
 
 mongoose.connect(dbURI)
@@ -42,7 +42,7 @@ const UserSchema = new mongoose.Schema({
   city: String,
   phone: String,
   executive: String, 
-  password: { type: String, required: true },
+  password: { type: String, required: true }, // Storing Plain Text now
   role: { type: String, default: 'user' }, 
   subscription: {
     plan: { type: String, default: 'demo' }, 
@@ -57,12 +57,12 @@ const User = mongoose.model('User', UserSchema);
 
 // --- ROUTES ---
 
-// Health Check (To confirm server is running)
+// Health Check
 app.get('/', (req, res) => {
   res.send('TalkNType Server is Running!');
 });
 
-// --- 1. REGISTER ROUTE (Force Inactive) ---
+// --- 1. REGISTER ROUTE (UPDATED: PLAIN TEXT PASSWORD) ---
 app.post('/api/create-user', async (req, res) => {
   try {
     const { fullName, email, state, city, phone, executive, password } = req.body;
@@ -76,8 +76,10 @@ app.post('/api/create-user', async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // ❌ REMOVED HASHING LOGIC
+    // const hashedPassword = await bcrypt.hash(password, 10);
     
+    // ✅ SAVING PLAIN TEXT PASSWORD
     const newUser = new User({
       fullName,
       email,
@@ -85,7 +87,7 @@ app.post('/api/create-user', async (req, res) => {
       city,
       phone,
       executive,
-      password: hashedPassword,
+      password: password, // Direct string save
       role: 'user',
       subscription: {
         isActive: false,
@@ -104,7 +106,7 @@ app.post('/api/create-user', async (req, res) => {
   }
 });
 
-// --- 2. LOGIN ROUTE (Strict Approval Check) ---
+// --- 2. LOGIN ROUTE (UPDATED: PLAIN TEXT CHECK) ---
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -127,8 +129,13 @@ app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+    // ❌ REMOVED BCRYPT COMPARE
+    // const isMatch = await bcrypt.compare(password, user.password);
+
+    // ✅ DIRECT COMPARISON (Since we saved it as plain text)
+    if (user.password !== password) {
+         return res.status(400).json({ message: 'Invalid credentials' });
+    }
 
     // --- SECURITY CHECK: IS ACCOUNT ACTIVE? ---
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
@@ -154,17 +161,18 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// --- 3. ADMIN: GET ALL USERS ---
+// --- 3. ADMIN: GET ALL USERS (UPDATED: SHOW PASSWORD) ---
 app.get('/api/admin/users', async (req, res) => {
   try {
-    const users = await User.find({ role: 'user' }).sort({ createdAt: -1 }).select('-password');
+    // ❌ Removed .select('-password') so password is NOW INCLUDED
+    const users = await User.find({ role: 'user' }).sort({ createdAt: -1 });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users' });
   }
 });
 
-// --- 4. ADMIN: TOGGLE STATUS (Approve/Block User) ---
+// --- 4. ADMIN: TOGGLE STATUS ---
 app.put('/api/admin/update-status/:id', async (req, res) => {
   try {
     const { isActive } = req.body;
@@ -196,7 +204,7 @@ app.delete('/api/admin/delete-user/:id', async (req, res) => {
   }
 });
 
-// --- 6. ADMIN: UPDATE SUBSCRIPTION (Start & End Date) ---
+// --- 6. ADMIN: UPDATE SUBSCRIPTION ---
 app.put('/api/admin/update-subscription/:id', async (req, res) => {
   try {
     const { startDate, expiryDate } = req.body;
