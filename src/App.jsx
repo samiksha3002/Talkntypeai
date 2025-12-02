@@ -12,7 +12,7 @@ import Footer from './components/Footer';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Register from './components/Register';
-import AdminDashboard from './components/AdminDashboard';
+import AdminPanel from './components/AdminPanel';
 
 // --- LANDING PAGE COMPONENT ---
 const LandingPage = () => {
@@ -91,7 +91,7 @@ function App() {
               path="/admin" 
               element={
                 <AdminRoute>
-                  <AdminDashboard />
+                  <AdminPanel />
                 </AdminRoute>
               } 
             />
