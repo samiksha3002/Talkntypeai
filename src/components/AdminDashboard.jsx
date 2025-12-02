@@ -14,6 +14,10 @@ const SearchIcon = () => (
 const EyeIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
 );
+// NEW: Warning Icon for Expiring Plans
+const WarningIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+);
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -132,6 +136,22 @@ const AdminDashboard = () => {
     }
   };
 
+  // --- NEW: Helper to check if expiring soon (<= 15 days) ---
+  const getExpiryStatus = (expiryString) => {
+      if (!expiryString) return null;
+      const today = new Date();
+      const expiry = new Date(expiryString);
+      const diffTime = expiry - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // If expired
+      if (diffDays < 0) return { label: 'Expired', isUrgent: false, isExpired: true };
+      // If expiring within 15 days
+      if (diffDays <= 15) return { label: 'Expiring Soon', isUrgent: true, isExpired: false, days: diffDays };
+      
+      return { label: 'Active', isUrgent: false, isExpired: false };
+  };
+
   // Filter Users
   const filteredUsers = users.filter(user => 
     user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -207,7 +227,11 @@ const AdminDashboard = () => {
                 ) : filteredUsers.length === 0 ? (
                   <tr><td colSpan="5" className="p-8 text-center text-slate-500">No users found matching "{searchTerm}"</td></tr>
                 ) : (
-                  filteredUsers.map((user) => (
+                  filteredUsers.map((user) => {
+                    // Calculate expiry status for this user
+                    const expiryStatus = getExpiryStatus(user.subscription?.expiryDate);
+
+                    return (
                     <tr key={user._id} className="group hover:bg-slate-50 transition duration-150">
                       
                       {/* Name & Contact */}
@@ -223,7 +247,7 @@ const AdminDashboard = () => {
                         </div>
                       </td>
 
-                      {/* Executive ID Column (NEW) */}
+                      {/* Executive ID Column */}
                       <td className="p-4">
                         {user.executive ? (
                            <span className="inline-block bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded border border-blue-100">
@@ -234,14 +258,30 @@ const AdminDashboard = () => {
                         )}
                       </td>
 
-                      {/* Subscription Info */}
+                      {/* Subscription Info (UPDATED WITH EXPIRING SOON LOGIC) */}
                       <td className="p-4">
                          {user.subscription?.expiryDate ? (
-                            <div className="flex flex-col">
-                               <span className="text-xs text-slate-500 uppercase font-semibold">Expires</span>
-                               <span className={`text-sm font-medium ${new Date(user.subscription.expiryDate) < new Date() ? 'text-red-600' : 'text-slate-700'}`}>
+                            <div className="flex flex-col gap-1">
+                               {/* Date Display */}
+                               <span className={`text-sm font-medium ${expiryStatus?.isExpired ? 'text-red-600' : 'text-slate-700'}`}>
                                   {new Date(user.subscription.expiryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                </span>
+
+                               {/* --- NEW: Expiring Soon Badge --- */}
+                               {expiryStatus?.isUrgent && (
+                                   <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-700 w-fit border border-amber-200 animate-pulse">
+                                       <WarningIcon />
+                                       Expiring Soon ({expiryStatus.days} days)
+                                   </div>
+                               )}
+                               
+                               {/* Label for regular dates */}
+                               {!expiryStatus?.isUrgent && !expiryStatus?.isExpired && (
+                                   <span className="text-xs text-slate-400 font-medium">Active Plan</span>
+                               )}
+                               {expiryStatus?.isExpired && (
+                                   <span className="text-xs text-red-400 font-medium">Plan Expired</span>
+                               )}
                             </div>
                          ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
@@ -287,7 +327,8 @@ const AdminDashboard = () => {
                         </div>
                       </td>
                     </tr>
-                  ))
+                   );
+                  })
                 )}
               </tbody>
             </table>
@@ -384,15 +425,15 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="flex gap-2 mb-2">
-                       <button onClick={() => setDuration(1)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
-                         + 1 Month
-                       </button>
-                       <button onClick={() => setDuration(3)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
-                         + 3 Months
-                       </button>
-                       <button onClick={() => setDuration(12)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
-                         + 1 Year
-                       </button>
+                        <button onClick={() => setDuration(1)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
+                          + 1 Month
+                        </button>
+                        <button onClick={() => setDuration(3)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
+                          + 3 Months
+                        </button>
+                        <button onClick={() => setDuration(12)} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium py-2 rounded shadow-sm transition">
+                          + 1 Year
+                        </button>
                     </div>
                 </div>
 
@@ -438,9 +479,9 @@ const StatCard = ({ title, value, color }) => {
                     <h3 className="text-3xl font-bold text-slate-800 mt-2">{value}</h3>
                 </div>
                 <div className={`p-2 rounded-lg ${colorStyles[color]} border`}>
-                   {color === 'indigo' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
-                   {color === 'green' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                   {color === 'amber' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    {color === 'indigo' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
+                    {color === 'green' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    {color === 'amber' && <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 </div>
             </div>
         </div>

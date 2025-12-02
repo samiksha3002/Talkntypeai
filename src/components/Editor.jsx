@@ -1,124 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Editor = ({ speechText }) => {
   const [manualText, setManualText] = useState('');
-  
-  // Logic: Jab bhi naya speechText aaye, use existing text me add karo
+  const lastSpeechRef = useRef(''); 
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+
+  // --- 1. HANDLE SPEECH INPUT ---
   useEffect(() => {
-    if (speechText) {
-      setManualText((prev) => prev ? prev + ' ' + speechText : speechText);
+    // Logic: Only append if text is new and not empty
+    if (speechText && speechText !== lastSpeechRef.current) {
+      setManualText((prev) => (prev ? prev + ' ' + speechText : speechText));
+      lastSpeechRef.current = speechText;
     }
-  }, [speechText]);
+  }, [speechText]); // Run whenever speechText changes
 
   const handleChange = (e) => {
     setManualText(e.target.value);
   };
 
+  const handleAiAction = (action) => {
+      alert(`AI Feature '${action}' coming soon in Phase 2!`);
+  };
+
   return (
-    // FIX: Removed 'ml-72' and 'mt-16'. Added 'w-full'.
-    <div className="flex-1 w-full h-full p-4 flex flex-col overflow-hidden">
+    <div className="flex-1 w-full h-full p-4 flex flex-col overflow-hidden bg-gray-50">
       
-      {/* Top Icon Bar (Actions) */}
-      <div className="flex justify-end gap-2 mb-2 overflow-x-auto pb-1 flex-none">
-        <ActionIcon icon="↺" /> 
-        <ActionIcon icon="💬" /> 
-        <ActionIcon icon="A" />  
-        <ActionIcon icon="📋" /> 
-        <ActionIcon icon="🖨️" /> 
-        <ActionIcon icon="✅" bg="bg-emerald-500 text-white border-emerald-600" /> 
-        <ActionIcon icon="✏️" bg="bg-emerald-500 text-white border-emerald-600" /> 
-        <ActionIcon icon="⤢" /> 
-        <ActionIcon icon="📄" /> 
-        <ActionIcon icon=">_" /> 
-        <ActionIcon icon="🗑️" bg="bg-red-100 text-red-500 border-red-200" /> 
-        <ActionIcon icon="🔊" /> 
-        <ActionIcon icon="💾" /> 
-        <ActionIcon icon="💾" bg="bg-indigo-600 text-white border-indigo-700" /> 
+      {/* Toolbar */}
+      <div className="flex justify-between items-center mb-2 flex-none">
+        <h2 className="text-xl font-bold text-indigo-900">📄 Legal Draft</h2>
+        <div className="flex gap-2">
+            <button className="p-2 bg-white border rounded shadow-sm">💾</button>
+            <button className="p-2 bg-white border rounded shadow-sm">🖨️</button>
+            <button 
+                onClick={() => setManualText('')} 
+                className="p-2 bg-red-100 text-red-600 border border-red-200 rounded shadow-sm"
+            >🗑️</button>
+        </div>
       </div>
 
-      {/* Main Editor Container */}
-      <div className="flex-1 bg-white rounded-lg border border-blue-500 flex flex-col shadow-sm overflow-hidden relative">
+      <div className="flex-1 bg-white rounded-xl border border-indigo-100 flex flex-col shadow-lg overflow-hidden relative">
         
-        {/* Toolbar Row */}
-        <div className="bg-gray-50 border-b border-gray-200 p-2 flex items-center gap-3 flex-wrap text-gray-700 text-sm flex-none">
-          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs">
-            <option>Sans Serif</option>
-            <option>Serif</option>
-          </select>
-          <select className="bg-transparent border border-gray-300 rounded px-2 py-1 text-xs">
-            <option>Normal</option>
-            <option>Heading 1</option>
-          </select>
-          <div className="h-4 w-px bg-gray-300 mx-1"></div>
-          <div className="flex gap-2 text-gray-600">
-            <ToolBtn symbol="B" bold />
-            <ToolBtn symbol="I" italic />
-            <ToolBtn symbol="U" underline />
-            <ToolBtn symbol="S" strike />
-          </div>
-          <div className="h-4 w-px bg-gray-300 mx-1"></div>
-          <ToolBtn symbol="A" />
-          <ToolBtn symbol="Highlighter" />
-          <div className="h-4 w-px bg-gray-300 mx-1"></div>
-          <div className="flex gap-2">
-            <ToolBtn symbol="≡" /> 
-            <ToolBtn symbol="≣" /> 
-            <ToolBtn symbol="≡" /> 
-          </div>
+        {/* AI Toolbar */}
+        <div className="bg-indigo-50 border-b border-indigo-100 p-2 flex items-center gap-2">
+           <span className="text-xs font-bold text-indigo-400 uppercase">AI Tools:</span>
+           <AiButton onClick={() => handleAiAction('grammar')} label="✨ Fix Grammar" color="blue" />
+           <AiButton onClick={() => handleAiAction('tone')} label="⚖️ Legal Tone" color="purple" />
+           <AiButton onClick={() => handleAiAction('expand')} label="↔️ Expand" color="green" />
         </div>
 
-        {/* Text Area */}
+        {/* TEXT AREA */}
         <textarea 
           value={manualText}
           onChange={handleChange}
-          className="flex-1 w-full p-6 outline-none resize-none text-gray-800 font-sans text-base leading-relaxed"
-          placeholder="Start speaking or typing here..."
+          className="flex-1 w-full p-8 outline-none resize-none text-gray-800 font-sans text-lg leading-relaxed"
+          placeholder="Start speaking via the Sidebar or type here..."
         ></textarea>
 
-        {/* Moving Text Strip */}
-        <div className="h-8 bg-yellow-100 border-t border-yellow-300 flex items-center overflow-hidden relative flex-none">
-            <div className="bg-yellow-400 text-yellow-900 text-xs font-bold px-3 h-full flex items-center z-10 shadow-md">
-                NOTICE:
-            </div>
-            <div className="whitespace-nowrap overflow-hidden w-full">
-                <div className="inline-block animate-marquee text-sm text-yellow-800 font-medium">
-                    Welcome to SuperSteno! Please ensure your microphone is connected for speech input. • New languages added: Marathi & Gujarati! • Contact support for license renewal.
-                </div>
-            </div>
+        {/* Status */}
+        <div className="h-8 bg-sky-50 border-t border-sky-100 flex items-center px-4">
+            <span className="text-xs text-sky-700 font-semibold">
+                {speechText ? "🟢 Receiving Audio..." : "Ready"}
+            </span>
         </div>
 
       </div>
-
-      {/* CSS for Marquee Animation */}
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          animation: marquee 15s linear infinite;
-          padding-left: 100%; 
-        }
-      `}</style>
-
     </div>
   );
 };
 
-// --- Helper Components ---
-const ActionIcon = ({ icon, bg = "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" }) => (
-  <button className={`w-9 h-9 rounded border flex items-center justify-center shadow-sm transition ${bg}`}>
-    <span className="text-sm font-bold">{icon}</span>
-  </button>
-);
-
-const ToolBtn = ({ symbol, bold, italic, underline, strike }) => {
-  let classes = "hover:text-blue-600 transition px-1 cursor-pointer";
-  if (bold) classes += " font-bold";
-  if (italic) classes += " italic font-serif";
-  if (underline) classes += " underline";
-  if (strike) classes += " line-through";
-  return <button className={classes}>{symbol}</button>;
-};
+const AiButton = ({ label, onClick, color }) => {
+    const colors = {
+        blue: "bg-blue-100 text-blue-700 hover:bg-blue-200",
+        purple: "bg-purple-100 text-purple-700 hover:bg-purple-200",
+        green: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
+    };
+    return (
+        <button onClick={onClick} className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-colors ${colors[color]}`}>
+            {label}
+        </button>
+    )
+}
 
 export default Editor;

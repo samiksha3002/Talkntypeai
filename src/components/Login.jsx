@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react'; // Import icons
 
 const Login = () => {
   // 1. State to capture user input
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [status, setStatus] = useState({ type: '', message: '' });
+  
+  // New state for toggling password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  
   const navigate = useNavigate(); 
 
   // 2. Handle typing
@@ -109,17 +114,25 @@ const Login = () => {
             />
           </div>
 
-          {/* Password Input */}
+          {/* Password Input with Eye Toggle */}
           <div className="relative">
             <input 
-              type="password" 
+              type={showPassword ? "text" : "password"} 
               name="password" 
               placeholder="Password" 
               required
               value={formData.password}
               onChange={handleChange}
-              className="w-full border border-gray-300 px-4 py-2 rounded focus:outline-none focus:border-blue-400 text-gray-600"
+              // Added pr-10 to prevent text from going under the icon
+              className="w-full border border-gray-300 px-4 py-2 pr-10 rounded focus:outline-none focus:border-blue-400 text-gray-600"
             />
+            <button
+              type="button" // Important: prevents form submission when clicking the eye
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer focus:outline-none"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
           </div>
 
           {/* Sign In Button */}

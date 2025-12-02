@@ -2,9 +2,9 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createClient } from '@deepgram/sdk'; // ✅ Added Deepgram Import
 
-// Note: We are keeping bcryptjs import in case you want to revert to security later, 
-// but we are NOT using it in the logic below as per your request for plain text passwords.
+// Note: Keeping bcrypt import just in case, but unused as per request
 import bcrypt from 'bcryptjs'; 
 
 // Load environment variables
@@ -42,7 +42,7 @@ const UserSchema = new mongoose.Schema({
   city: String,
   phone: String,
   executive: String, 
-  password: { type: String, required: true }, // Storing Plain Text now
+  password: { type: String, required: true }, // Storing Plain Text
   role: { type: String, default: 'user' }, 
   subscription: {
     plan: { type: String, default: 'demo' }, 
@@ -62,7 +62,36 @@ app.get('/', (req, res) => {
   res.send('TalkNType Server is Running!');
 });
 
-// --- 1. REGISTER ROUTE (UPDATED: PLAIN TEXT PASSWORD) ---
+// --- NEW: DEEPGRAM TOKEN ROUTE ---
+
+
+// 🚨 PASTE IT RIGHT HERE (Line ~25) 🚨
+// Inside server.js - Update this section
+// ---------------------------------------------------------
+// SIMPLE DEEPGRAM ROUTE (No Project ID needed for now)
+// ---------------------------------------------------------
+app.get('/api/deepgram', (req, res) => {
+  try {
+    const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+    
+    if (!deepgramApiKey) {
+      console.error("❌ Deepgram Key is MISSING in .env file");
+      return res.status(500).json({ error: 'Deepgram API Key is missing' });
+    }
+
+    // DIRECT MODE: Sending the key directly to frontend
+    // (Great for testing, ensures "500 error" goes away)
+    res.json({ key: deepgramApiKey });
+    
+  } catch (err) {
+    console.error("Server Error:", err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ... then your DB connection and other routes ...
+
+// --- 1. REGISTER ROUTE (PLAIN TEXT PASSWORD) ---
 app.post('/api/create-user', async (req, res) => {
   try {
     const { fullName, email, state, city, phone, executive, password } = req.body;
@@ -76,9 +105,6 @@ app.post('/api/create-user', async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
-    // ❌ REMOVED HASHING LOGIC
-    // const hashedPassword = await bcrypt.hash(password, 10);
-    
     // ✅ SAVING PLAIN TEXT PASSWORD
     const newUser = new User({
       fullName,
@@ -106,7 +132,7 @@ app.post('/api/create-user', async (req, res) => {
   }
 });
 
-// --- 2. LOGIN ROUTE (UPDATED: PLAIN TEXT CHECK) ---
+// --- 2. LOGIN ROUTE (PLAIN TEXT CHECK) ---
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -129,12 +155,9 @@ app.post('/api/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // ❌ REMOVED BCRYPT COMPARE
-    // const isMatch = await bcrypt.compare(password, user.password);
-
-    // ✅ DIRECT COMPARISON (Since we saved it as plain text)
+    // ✅ DIRECT COMPARISON (Plain Text)
     if (user.password !== password) {
-         return res.status(400).json({ message: 'Invalid credentials' });
+          return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // --- SECURITY CHECK: IS ACCOUNT ACTIVE? ---
@@ -161,10 +184,10 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// --- 3. ADMIN: GET ALL USERS (UPDATED: SHOW PASSWORD) ---
+// --- 3. ADMIN: GET ALL USERS ---
 app.get('/api/admin/users', async (req, res) => {
   try {
-    // ❌ Removed .select('-password') so password is NOW INCLUDED
+    // Returns plain text password too as requested
     const users = await User.find({ role: 'user' }).sort({ createdAt: -1 });
     res.json(users);
   } catch (error) {

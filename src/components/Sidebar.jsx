@@ -1,118 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import 'regenerator-runtime/runtime';
+import React, { useState, useRef } from 'react';
+import { createClient } from '@deepgram/sdk';
 
-// Props: onSpeechInput (function to send text to parent)
 const Sidebar = ({ onSpeechInput }) => {
-  const [language, setLanguage] = useState('en-IN'); // Default Language
+  const [isListening, setIsListening] = useState(false);
+  const [language, setLanguage] = useState('en-IN'); 
+  
+  // Refs to manage connection and recorder
+  const deepgramRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
 
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition
-  } = useSpeechRecognition();
+  const startDeepgram = async () => {
+    try {
+      setIsListening(true);
+      console.log("🔵 Starting Hardcode Test...");
 
-  // Whenever transcript changes (user speaks), send it to Parent
-  useEffect(() => {
-    if (onSpeechInput) {
-      onSpeechInput(transcript);
+      // ----------------------------------------------------
+      // ⚠️ TEST MODE: IGNORING BACKEND. USING DIRECT KEY.
+      // ----------------------------------------------------
+      const TEST_KEY = "70ac2e5488a77423e14970323441e4fef804366b"; // <--- PASTE IT HERE!
+
+      if (TEST_KEY === "PASTE_YOUR_KEY_HERE") {
+        alert("You forgot to paste the key in the code!");
+        setIsListening(false);
+        return;
+      }
+
+      // Setup Deepgram
+      const deepgram = createClient(TEST_KEY);
+      
+      const connection = deepgram.listen.live({
+        model: "nova-2",
+        language: "en", 
+        smart_format: true,
+      });
+
+      connection.on("Open", () => console.log("🟢 CONNECTION OPEN! Success!"));
+      
+      connection.on("Results", (data) => {
+        const transcript = data.channel.alternatives[0].transcript;
+        if(transcript) {
+            console.log("📝 Transcript:", transcript);
+            if (data.is_final && onSpeechInput) onSpeechInput(transcript + " ");
+        }
+      });
+
+      connection.on("Close", (e) => console.log("🔴 Closed. Code:", e.code, "Reason:", e.reason));
+      connection.on("error", (e) => console.error("🔴 Error:", e));
+
+      deepgramRef.current = connection;
+
+      // Start Mic (Standard Mode)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream); 
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0 && connection.getReadyState() === 1) {
+          connection.send(event.data);
+        }
+      });
+
+      mediaRecorder.start(250);
+
+    } catch (error) {
+      console.error("❌ Failed:", error);
+      alert(error.message);
+      setIsListening(false);
     }
-  }, [transcript, onSpeechInput]);
-
-  // Handle Start/Stop
-  const toggleListening = () => {
-    if (listening) {
-      SpeechRecognition.stopListening();
-    } else {
-      SpeechRecognition.startListening({ continuous: true, language: language });
+  };  const stopDeepgram = () => {
+    setIsListening(false);
+    
+    // Stop Recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Close Deepgram Connection
+    if (deepgramRef.current) {
+      deepgramRef.current.finish();
+      deepgramRef.current = null;
     }
   };
 
-  if (!browserSupportsSpeechRecognition) {
-    return <span>Browser doesn't support speech recognition.</span>;
-  }
+  const toggleListening = () => {
+    if (isListening) {
+      stopDeepgram();
+    } else {
+      startDeepgram();
+    }
+  };
 
   return (
-    // --- CHANGE: Height reduced to [calc(100vh-128px)] to leave space for footer ---
-    // 64px (Header) + 64px (Footer) = 128px
     <aside className="w-72 bg-white h-[calc(100vh-128px)] border-r border-gray-200 p-4 overflow-y-auto fixed left-0 top-16 z-40">
       
-      {/* Speech Input Card */}
-      <ToolCard title="SPEECH INPUT" icon="🎙️">
+      {/* --- SPEECH INPUT CARD --- */}
+      <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100 shadow-sm">
+        <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2 uppercase tracking-wide">
+          <span className="bg-white p-1 rounded shadow-sm text-lg">🎙️</span> Super Steno
+        </h3>
+
         <select 
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
-          className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white focus:ring-2 focus:ring-indigo-200 outline-none"
+          className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-indigo-500 transition cursor-pointer"
+          disabled={isListening}
         >
           <option value="en-IN">English (India)</option>
-          <option value="hi-IN">Hindi</option>
-          <option value="mr-IN">Marathi</option>
+          <option value="hi">Hindi</option>
+          <option value="mr">Marathi</option>
         </select>
         
         <button 
           onClick={toggleListening}
           className={`w-full py-2.5 rounded font-medium flex items-center justify-center gap-2 transition shadow-sm text-white ${
-            listening ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-700'
+            isListening ? 'bg-red-500 animate-pulse hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'
           }`}
         >
-          <span>{listening ? '⏹️' : '🎙️'}</span> 
-          {listening ? 'Stop Listening' : 'Start Listening'}
+          <span>{isListening ? '⏹️' : '🎙️'}</span> 
+          {isListening ? 'Stop Steno' : 'Start Steno'}
         </button>
         
-        {/* Reset Button (Optional) */}
-        {listening && (
-           <button onClick={resetTranscript} className="text-xs text-red-500 mt-2 hover:underline w-full text-center">
-             Clear Speech
-           </button>
+        {isListening && (
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <p className="text-xs text-green-700 font-bold">
+                Listening (Deepgram AI)
+              </p>
+            </div>
         )}
-      </ToolCard>
+      </div>
 
-      {/* Translation Card */}
-      <ToolCard title="TRANSLATION" icon="🈯">
-        <select className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white focus:ring-2 focus:ring-indigo-200 outline-none">
-          <option>English</option>
-          <option>Hindi</option>
-        </select>
-        <button className="w-full border border-indigo-600 text-indigo-600 hover:bg-indigo-50 py-1.5 rounded flex items-center justify-center transition">
-          ⇄ Swap
-        </button>
-      </ToolCard>
+      {/* --- PLACEHOLDERS --- */}
+      <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
+         <h3 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2 uppercase">
+           <span className="bg-white p-1 rounded shadow-sm">🈯</span> Translation
+         </h3>
+         <button className="w-full border border-gray-300 text-gray-400 py-1.5 rounded text-sm cursor-not-allowed bg-gray-50">Coming Soon</button>
+      </div>
 
-      {/* Transliteration Card */}
-      <ToolCard title="TRANSLITERATION" icon="⌨️">
-        <select className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white focus:ring-2 focus:ring-indigo-200 outline-none">
-          <option>Hindi</option>
-          <option>Marathi</option>
-        </select>
-        <button className="w-full border border-indigo-600 text-indigo-600 hover:bg-indigo-50 py-1.5 rounded font-medium transition">
-          Enable
-        </button>
-      </ToolCard>
-
-      {/* Font Conversion Card */}
-      <ToolCard title="FONT CONVERSION" icon="A">
-        <select className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white focus:ring-2 focus:ring-indigo-200 outline-none">
-          <option>Krutidev</option>
-          <option>Mangal</option>
-        </select>
-        <button className="w-full border border-indigo-600 text-indigo-600 hover:bg-indigo-50 py-1.5 rounded flex items-center justify-center transition">
-          Convert
-        </button>
-      </ToolCard>
+      <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
+         <h3 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2 uppercase">
+            <span className="bg-white p-1 rounded shadow-sm">A</span> Font Conversion
+         </h3>
+         <button className="w-full border border-gray-300 text-gray-400 py-1.5 rounded text-sm cursor-not-allowed bg-gray-50">Coming Soon</button>
+      </div>
 
     </aside>
   );
 };
-
-// Helper Component for uniform cards
-const ToolCard = ({ title, icon, children }) => (
-  <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
-    <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2 uppercase tracking-wide">
-      <span className="bg-white p-1 rounded shadow-sm">{icon}</span> {title}
-    </h3>
-    {children}
-  </div>
-);
 
 export default Sidebar;
