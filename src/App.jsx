@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Preloader from './components/Preloader';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import Diary from './components/Dairy';
 import Features from './components/Features';
 import Testimonials from './components/Testimonials';
 import Contact from './components/Contact';
@@ -13,6 +14,10 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Register from './components/Register';
 import AdminPanel from './components/AdminPanel';
+import JudgementsPage from './components/JudgementsPage';
+
+// --- FIX: THIS IMPORT WAS MISSING ---
+import BusinessCardRequest from './components/BusinessCardRequest'; 
 
 // --- LANDING PAGE COMPONENT ---
 const LandingPage = () => {
@@ -28,12 +33,11 @@ const LandingPage = () => {
   );
 };
 
-// --- ROUTE GUARDS (The Fix for Merging) ---
+// --- ROUTE GUARDS ---
 
 // 1. Only allow ADMINS here
 const AdminRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  // If user is not admin, kick them to dashboard (or login)
   if (user.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
@@ -43,7 +47,6 @@ const AdminRoute = ({ children }) => {
 // 2. Only allow REGULAR USERS here
 const UserRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  // If ADMIN tries to go here, kick them to Admin Panel
   if (user.role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
@@ -51,10 +54,8 @@ const UserRoute = ({ children }) => {
 };
 
 function App() {
-  // --- State for loading ---
   const [loading, setLoading] = useState(true);
 
-  // --- Effect to handle the timer ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
@@ -74,8 +75,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* --- PROTECTED USER ROUTE --- */}
-            {/* This ensures Admins CANNOT enter /dashboard */}
+            {/* --- PROTECTED USER ROUTES --- */}
             <Route 
               path="/dashboard" 
               element={
@@ -84,9 +84,35 @@ function App() {
                 </UserRoute>
               } 
             />
+            <Route 
+             path="/judgements" 
+             element={
+               <UserRoute>
+                 <JudgementsPage />
+               </UserRoute>
+             } 
+           />
+            
+            {/* Business Card Route */}
+            <Route 
+              path="/business-card" 
+              element={
+                <UserRoute>
+                  <BusinessCardRequest />
+                </UserRoute>
+              } 
+            />
+             <Route 
+              path="/Diary" 
+              element={
+                <UserRoute>
+                  <Diary />
+                </UserRoute>
+              } 
+            />
+            
 
             {/* --- PROTECTED ADMIN ROUTE --- */}
-            {/* This ensures Users CANNOT enter /admin */}
             <Route 
               path="/admin" 
               element={

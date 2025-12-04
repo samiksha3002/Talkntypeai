@@ -1,92 +1,96 @@
-import React, { useState, useRef } from 'react';
-import { createClient } from '@deepgram/sdk';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Sidebar = ({ onSpeechInput }) => {
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState('en-IN'); 
   
-  // Refs to manage connection and recorder
-  const deepgramRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
+  // Ref for the Speech Recognition instance
+  const recognitionRef = useRef(null);
 
-  const startDeepgram = async () => {
-    try {
-      setIsListening(true);
-      console.log("🔵 Starting Hardcode Test...");
+  useEffect(() => {
+    // 1. Initialize Speech Recognition on Component Mount
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert("Browser does not support Speech Recognition. Please use Google Chrome.");
+      return;
+    }
 
-      // ----------------------------------------------------
-      // ⚠️ TEST MODE: IGNORING BACKEND. USING DIRECT KEY.
-      // ----------------------------------------------------
-      const TEST_KEY = "70ac2e5488a77423e14970323441e4fef804366b"; // <--- PASTE IT HERE!
-
-      if (TEST_KEY === "PASTE_YOUR_KEY_HERE") {
-        alert("You forgot to paste the key in the code!");
-        setIsListening(false);
-        return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    // Configuration
+    recognition.continuous = true; // Keep listening even after user pauses
+    recognition.interimResults = true; // Show results while speaking (optional logic below)
+    
+    // 2. Handle Results
+    recognition.onresult = (event) => {
+      let finalTranscript = '';
+      
+      // Loop through results to separate final text from interim
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
       }
 
-      // Setup Deepgram
-      const deepgram = createClient(TEST_KEY);
+      // Send only final text to the parent component
+      if (finalTranscript && onSpeechInput) {
+        onSpeechInput(finalTranscript);
+      }
+    };
+
+    // 3. Handle Errors
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+      if (event.error === 'not-allowed') {
+        alert("Microphone access denied. Please allow permissions.");
+        setIsListening(false);
+      }
+    };
+
+    // 4. Handle End (Auto-restart logic if needed, or just sync state)
+    recognition.onend = () => {
+      // If we expect it to be listening but it stopped (silence timeout), restart it
+      // Note: We check a ref or state wrapper here usually, but for simplicity:
+      // We rely on the button to manually stop visually.
+      // If the engine stops by itself, we update UI:
+      // setIsListening(false); // Uncomment this if you want it to auto-stop UI on silence
+    };
+
+    recognitionRef.current = recognition;
+
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [onSpeechInput]); // Re-run if input handler changes
+
+  // Update Language dynamically
+  useEffect(() => {
+    if (recognitionRef.current) {
+      // Map simple codes to Google's expected format
+      let langCode = language;
+      if (language === 'hi') langCode = 'hi-IN';
+      if (language === 'mr') langCode = 'mr-IN';
       
-      const connection = deepgram.listen.live({
-        model: "nova-2",
-        language: "en", 
-        smart_format: true,
-      });
-
-      connection.on("Open", () => console.log("🟢 CONNECTION OPEN! Success!"));
-      
-      connection.on("Results", (data) => {
-        const transcript = data.channel.alternatives[0].transcript;
-        if(transcript) {
-            console.log("📝 Transcript:", transcript);
-            if (data.is_final && onSpeechInput) onSpeechInput(transcript + " ");
-        }
-      });
-
-      connection.on("Close", (e) => console.log("🔴 Closed. Code:", e.code, "Reason:", e.reason));
-      connection.on("error", (e) => console.error("🔴 Error:", e));
-
-      deepgramRef.current = connection;
-
-      // Start Mic (Standard Mode)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream); 
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.addEventListener('dataavailable', (event) => {
-        if (event.data.size > 0 && connection.getReadyState() === 1) {
-          connection.send(event.data);
-        }
-      });
-
-      mediaRecorder.start(250);
-
-    } catch (error) {
-      console.error("❌ Failed:", error);
-      alert(error.message);
-      setIsListening(false);
+      recognitionRef.current.lang = langCode;
     }
-  };  const stopDeepgram = () => {
-    setIsListening(false);
-    
-    // Stop Recorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    
-    // Close Deepgram Connection
-    if (deepgramRef.current) {
-      deepgramRef.current.finish();
-      deepgramRef.current = null;
-    }
-  };
+  }, [language]);
 
   const toggleListening = () => {
     if (isListening) {
-      stopDeepgram();
+      recognitionRef.current.stop();
+      setIsListening(false);
     } else {
-      startDeepgram();
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        // Sometimes it throws if already started
+        console.log("Recognition start error (safe to ignore):", error);
+        setIsListening(true);
+      }
     }
   };
 
@@ -127,13 +131,13 @@ const Sidebar = ({ onSpeechInput }) => {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
               <p className="text-xs text-green-700 font-bold">
-                Listening (Deepgram AI)
+                Listening (Google Speech)
               </p>
             </div>
         )}
       </div>
 
-      {/* --- PLACEHOLDERS --- */}
+      {/* --- PLACEHOLDERS (SAME AS BEFORE) --- */}
       <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
          <h3 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2 uppercase">
            <span className="bg-white p-1 rounded shadow-sm">🈯</span> Translation
