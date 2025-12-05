@@ -1,117 +1,170 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+
+// --- LIST OF SUPPORTED LANGUAGES ---
+const languageOptions = [
+  { code: 'en-IN', label: 'English (India)' },
+  { code: 'hi', label: 'Hindi (हिंदी)' },
+  { code: 'mr', label: 'Marathi (मराठी)' },
+  { code: 'gu', label: 'Gujarati (ગુજરાતી)' },
+  { code: 'ta', label: 'Tamil (தமிழ்)' },
+  { code: 'te', label: 'Telugu (తెలుగు)' },
+  { code: 'kn', label: 'Kannada (ಕನ್ನಡ)' },
+  { code: 'ml', label: 'Malayalam (മലയാളം)' },
+  { code: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
+  { code: 'bn', label: 'Bengali (বাংলা)' },
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-GB', label: 'English (UK)' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' }
+];
 
 const Sidebar = ({ onSpeechInput }) => {
   const [isListening, setIsListening] = useState(false);
-  const [language, setLanguage] = useState('en-IN'); 
+  const [language, setLanguage] = useState('en-IN');
   
-  // Ref for the Speech Recognition instance
-  const recognitionRef = useRef(null);
+  const connectionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
 
-  useEffect(() => {
-    // 1. Initialize Speech Recognition on Component Mount
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert("Browser does not support Speech Recognition. Please use Google Chrome.");
-      return;
-    }
+  // ⚠️ REPLACE THIS WITH A NEW KEY (Your old one was exposed!)
+  const DEEPGRAM_API_KEY = "14f6f72c0669b3d0d2457c4f4b27fd75eabb3414";
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    // Configuration
-    recognition.continuous = true; // Keep listening even after user pauses
-    recognition.interimResults = true; // Show results while speaking (optional logic below)
-    
-    // 2. Handle Results
-    recognition.onresult = (event) => {
-      let finalTranscript = '';
-      
-      // Loop through results to separate final text from interim
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+  const startDeepgram = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const deepgram = createClient(DEEPGRAM_API_KEY);
+
+      const connection = deepgram.listen.live({
+        model: "nova-2",
+        language: language, // Uses the selected language from dropdown
+        smart_format: true,
+        interim_results: true,
+        // encoding/sample_rate removed so browser auto-detects
+        keywords: [
+          "Vakalatnama:3", "Suo Moto:3", "Res Judicata:3", 
+          "Affidavit:2", "Honorable Court:2", "Petitioner:2", "Respondent:2"
+        ]
+      });
+
+      connectionRef.current = connection;
+
+      connection.on(LiveTranscriptionEvents.Open, () => {
+        setIsListening(true);
+        
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+
+        mediaRecorder.addEventListener("dataavailable", (event) => {
+          if (event.data.size > 0 && connection.getReadyState() === 1) {
+            connection.send(event.data);
+          }
+        });
+
+        mediaRecorder.start(250);
+      });
+
+      connection.on(LiveTranscriptionEvents.Transcript, (data) => {
+        const transcript = data.channel.alternatives[0]?.transcript;
+        if (transcript && onSpeechInput) {
+             onSpeechInput(transcript); 
         }
-      }
+      });
 
-      // Send only final text to the parent component
-      if (finalTranscript && onSpeechInput) {
-        onSpeechInput(finalTranscript);
-      }
-    };
+     // Inside startDeepgram function...
 
-    // 3. Handle Errors
-    recognition.onerror = (event) => {
-      console.error("Speech Recognition Error:", event.error);
-      if (event.error === 'not-allowed') {
-        alert("Microphone access denied. Please allow permissions.");
+      connection.on(LiveTranscriptionEvents.Transcript, (data) => {
+        const transcript = data.channel.alternatives[0]?.transcript;
+        
+        // 🛑 FIX: "data.is_final" चेक करें। 
+        // इसका मतलब है: जब Deepgram को यकीन हो जाए कि वाक्य पूरा हो गया है, तभी टेक्स्ट भेजो।
+        if (transcript && data.is_final && onSpeechInput) {
+             onSpeechInput(transcript); 
+        }
+      });
+
+      connection.on(LiveTranscriptionEvents.Close, () => {
         setIsListening(false);
-      }
-    };
+        connectionRef.current = null;
+      });
 
-    // 4. Handle End (Auto-restart logic if needed, or just sync state)
-    recognition.onend = () => {
-      // If we expect it to be listening but it stopped (silence timeout), restart it
-      // Note: We check a ref or state wrapper here usually, but for simplicity:
-      // We rely on the button to manually stop visually.
-      // If the engine stops by itself, we update UI:
-      // setIsListening(false); // Uncomment this if you want it to auto-stop UI on silence
-    };
-
-    recognitionRef.current = recognition;
-
-    // Cleanup on unmount
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [onSpeechInput]); // Re-run if input handler changes
-
-  // Update Language dynamically
-  useEffect(() => {
-    if (recognitionRef.current) {
-      // Map simple codes to Google's expected format
-      let langCode = language;
-      if (language === 'hi') langCode = 'hi-IN';
-      if (language === 'mr') langCode = 'mr-IN';
-      
-      recognitionRef.current.lang = langCode;
+    } catch (error) {
+      console.error("Mic Access Error:", error);
+      alert("Could not access microphone.");
     }
-  }, [language]);
+  };
+
+  const stopDeepgram = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+
+    if (connectionRef.current) {
+      setTimeout(() => {
+        if (connectionRef.current) {
+            connectionRef.current.requestClose();
+            connectionRef.current = null;
+        }
+        setIsListening(false);
+      }, 500);
+    } else {
+        setIsListening(false);
+    }
+  };
 
   const toggleListening = () => {
     if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+      stopDeepgram();
     } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (error) {
-        // Sometimes it throws if already started
-        console.log("Recognition start error (safe to ignore):", error);
-        setIsListening(true);
-      }
+      startDeepgram();
     }
   };
+
+  // If user changes language while listening, restart the connection
+  useEffect(() => {
+    if (isListening) {
+        console.log("Language changed to", language, "- Restarting Steno...");
+        stopDeepgram();
+        // Give it a second to close before restarting
+        setTimeout(() => {
+            startDeepgram();
+        }, 1000);
+    }
+  }, [language]); 
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopDeepgram();
+    };
+  }, []);
 
   return (
     <aside className="w-72 bg-white h-[calc(100vh-128px)] border-r border-gray-200 p-4 overflow-y-auto fixed left-0 top-16 z-40">
       
-      {/* --- SPEECH INPUT CARD --- */}
+      {/* SPEECH INPUT CARD */}
       <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100 shadow-sm">
         <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2 uppercase tracking-wide">
           <span className="bg-white p-1 rounded shadow-sm text-lg">🎙️</span> Super Steno
         </h3>
 
+        {/* --- UPDATED DROPDOWN --- */}
         <select 
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-indigo-500 transition cursor-pointer"
-          disabled={isListening}
         >
-          <option value="en-IN">English (India)</option>
-          <option value="hi">Hindi</option>
-          <option value="mr">Marathi</option>
+          {languageOptions.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.label}
+            </option>
+          ))}
         </select>
         
         <button 
@@ -131,13 +184,13 @@ const Sidebar = ({ onSpeechInput }) => {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
               <p className="text-xs text-green-700 font-bold">
-                Listening (Google Speech)
+                Listening ({languageOptions.find(l => l.code === language)?.label})
               </p>
             </div>
         )}
       </div>
 
-      {/* --- PLACEHOLDERS (SAME AS BEFORE) --- */}
+      {/* PLACEHOLDERS */}
       <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
          <h3 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2 uppercase">
            <span className="bg-white p-1 rounded shadow-sm">🈯</span> Translation
@@ -147,7 +200,7 @@ const Sidebar = ({ onSpeechInput }) => {
 
       <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100">
          <h3 className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-2 uppercase">
-            <span className="bg-white p-1 rounded shadow-sm">A</span> Font Conversion
+           <span className="bg-white p-1 rounded shadow-sm">A</span> Font Conversion
          </h3>
          <button className="w-full border border-gray-300 text-gray-400 py-1.5 rounded text-sm cursor-not-allowed bg-gray-50">Coming Soon</button>
       </div>
