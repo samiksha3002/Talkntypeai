@@ -41,7 +41,7 @@ const Sidebar = ({ onSpeechInput }) => {
         model: "nova-2",
         language: language, // Uses the selected language from dropdown
         smart_format: true,
-        interim_results: true,
+        interim_results: false,
         // encoding/sample_rate removed so browser auto-detects
         keywords: [
           "Vakalatnama:3", "Suo Moto:3", "Res Judicata:3", 
