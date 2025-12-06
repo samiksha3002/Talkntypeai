@@ -181,7 +181,7 @@ const StenoCard = ({ onSpeechInput }) => {
         // --- CARD 1: SUPER STENO (INPUT) ---
         <div className="bg-sky-50 rounded-lg p-3 mb-4 border border-sky-100 shadow-sm">
             <h3 className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2 uppercase tracking-wide">
-                <span className="bg-white p-1 rounded shadow-sm text-lg">🎙️</span> Steno Input
+                <span className="bg-white p-1 rounded shadow-sm text-lg">🎙️</span> Speak
             </h3>
 
             <select 
@@ -204,7 +204,7 @@ const StenoCard = ({ onSpeechInput }) => {
                 }`}
             >
                 <span>{isListening ? '⏹️' : '🎙️'}</span> 
-                {isListening ? 'Stop Steno' : 'Start Steno'}
+                {isListening ? 'Stop Speaking' : 'Start Speaking'}
             </button>
             
             {isListening && (
