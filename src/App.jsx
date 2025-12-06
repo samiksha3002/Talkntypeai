@@ -15,7 +15,12 @@ import Dashboard from './components/Dashboard';
 import Register from './components/Register';
 import AdminPanel from './components/AdminPanel';
 import JudgementsPage from './components/JudgementsPage';
-
+import AddClientPage from './pages/AddClientPage';
+import GenerateReportPage from './pages/GenerateReportPage';
+import AddInquiryPage from './pages/AddInquiryPage';
+import AddTeamMemberPage from './pages/AddTeamMemberPage';
+import PaymentBookPage from './pages/PaymentBookPage';
+import AddCasePage from './pages/AddCasePage';
 // --- FIX: THIS IMPORT WAS MISSING ---
 import BusinessCardRequest from './components/BusinessCardRequest'; 
 
@@ -110,6 +115,19 @@ function App() {
                 </UserRoute>
               } 
             />
+            <Route path="/add-client" 
+            element={<AddClientPage />} />
+            <Route path="/generate-report" 
+            element={<GenerateReportPage />} />
+            <Route path="/inquiries" 
+            element={<AddInquiryPage />} />
+            <Route path="/team" 
+            element={<AddTeamMemberPage />} />
+            <Route path="/payments" 
+            element={<PaymentBookPage />} />
+            <Route path="/add-case" element={<AddCasePage />} />
+            <Route path="*" element={<div>404 Page Not Found</div>} />
+
             
 
             {/* --- PROTECTED ADMIN ROUTE --- */}

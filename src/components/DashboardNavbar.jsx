@@ -6,6 +6,7 @@ const DashboardNavbar = () => {
   const [isExpired, setIsExpired] = useState(false);
   const navigate = useNavigate();
 
+  // 'user' object में fullName या userName होना चाहिए
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   // --- 1. LOGOUT FUNCTION ---
@@ -72,7 +73,7 @@ const DashboardNavbar = () => {
             <div className="text-6xl mb-6">🔒</div>
             <h2 className="text-3xl font-bold mb-3">Subscription Expired</h2>
             <p className="text-slate-300 mb-8 text-center max-w-md px-4 leading-relaxed">
-                Dear <strong>{user.fullName || 'User'}</strong>, your license validity has ended. 
+                Dear <strong>{user.fullName || 'Valued User'}</strong>, your license validity has ended. 
                 <br/>
                 Please renew your plan to continue accessing the Talk N Type tools.
             </p>
@@ -98,7 +99,7 @@ const DashboardNavbar = () => {
       <nav className="w-full bg-white h-16 flex items-center justify-between px-6 border-b border-slate-200 fixed top-0 z-40 shadow-sm">
         
         {/* Left: Branding */}
-       <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
         
         {/* --- CHANGE 2: Negative Margin (-my-6) --- */}
         {/* '-my-6' image ke upar/niche ka extra space kha jayega */}
@@ -115,9 +116,9 @@ const DashboardNavbar = () => {
           
           {/* License Status Pill */}
           <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border ${
-             isExpired 
-               ? "bg-red-50 border-red-200 text-red-600" 
-               : "bg-green-50 border-green-200 text-green-700"
+              isExpired 
+                ? "bg-red-50 border-red-200 text-red-600" 
+                : "bg-green-50 border-green-200 text-green-700"
           }`}>
             <span className="text-lg">{isExpired ? "⚠️" : "📅"}</span>
             <span className="font-semibold">
@@ -128,10 +129,16 @@ const DashboardNavbar = () => {
           {/* Divider */}
           <div className="h-6 w-px bg-slate-300 hidden md:block"></div>
 
+          {/* ✨ नया बदलाव: WELCOME MESSAGE (Welcome Samiksha) ✨ */}
+          <div className="hidden sm:flex flex-col items-end leading-tight text-slate-700">
+            <span className="text-xs font-semibold text-slate-400 uppercase">Welcome</span>
+            <span className="font-bold text-base">{user.fullName || user.userName || 'User'}</span>
+          </div>
+          
           {/* Support Info */}
           <div className="hidden lg:flex flex-col items-end leading-tight text-slate-500">
-             <span className="text-xs font-semibold text-slate-400 uppercase">Support</span>
-             <span className="font-medium">+91-7678073260</span>
+               <span className="text-xs font-semibold text-slate-400 uppercase">Support</span>
+               <span className="font-medium">+91-7678073260</span>
           </div>
           
           {/* Logout Button */}
