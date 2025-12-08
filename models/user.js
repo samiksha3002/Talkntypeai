@@ -1,34 +1,49 @@
 import mongoose from 'mongoose';
 
 const UserSchema = new mongoose.Schema({
-  username: { 
+  // 1. Personal Details (Matches your Register Page)
+  fullName: { 
     type: String, 
-    required: [true, "Username is required"], 
-    unique: true,
+    required: [true, "Full Name is required"],
     trim: true 
   },
+  email: { 
+    type: String, 
+    required: [true, "Email is required"], 
+    unique: true,
+    trim: true,
+    lowercase: true 
+  },
+  phone: { type: String, trim: true },
+  state: { type: String },
+  city: { type: String },
+  executive: { type: String }, 
+  
+  // 2. Security
   password: { 
     type: String, 
-    required: [true, "Password is required"],
-    select: false // Keeps password hidden for security
+    required: [true, "Password is required"] 
+    // Note: We removed 'select: false' for now so your plain-text login logic works easily. 
+    // Once we add hashing later, we can add it back.
   },
-  role: {
-    type: String,
-    enum: ['admin', 'advocate'],
-    default: 'advocate'
+  
+  // 3. Roles & Permissions
+  role: { 
+    type: String, 
+    enum: ['user', 'admin'], // Matches the checks in your server.js
+    default: 'user' 
   },
+  
+  // 4. Subscription Logic
   subscription: {
-    plan: { 
-      type: String, 
-      enum: ['trial', 'yearly', 'lifetime'], 
-      default: 'yearly' 
-    },
-    startDate: { type: Date, default: Date.now },
-    expiryDate: { type: Date, required: true },
-    isActive: { type: Boolean, default: true }
-  },
-  createdAt: { type: Date, default: Date.now }
-});
+    plan: { type: String, default: 'demo' }, 
+    startDate: { type: Date },
+    expiryDate: { type: Date }, 
+    isActive: { type: Boolean, default: false } 
+  }
+}, { timestamps: true });
 
-// This line prevents "Model already exists" errors in Next.js
-export default mongoose.models.User || mongoose.model('User', UserSchema);
+// Prevent "Model Overwrite" errors in development
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+export default User;

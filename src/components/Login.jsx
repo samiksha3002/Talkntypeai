@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react'; // Import icons
+import { Eye, EyeOff } from 'lucide-react'; 
 
 const Login = () => {
   // 1. State to capture user input
@@ -23,7 +23,6 @@ const Login = () => {
     setStatus({ type: 'loading', message: 'Verifying credentials...' });
 
     try {
-      // ↓↓↓ THIS LINE IS CRITICAL. IT MUST BE EXACTLY LIKE THIS ↓↓↓
       const response = await fetch('https://tnt-gi49.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,7 +35,6 @@ const Login = () => {
         const user = data.user;
 
         // --- APPROVAL CHECK LOGIC ---
-        // Check if user is NOT admin AND (has no subscription OR subscription is inactive)
         const isUserInactive = user.role !== 'admin' && 
                                (!user.subscription || user.subscription.isActive === false);
 
@@ -45,14 +43,20 @@ const Login = () => {
                 type: 'error', 
                 message: '⛔ Access Denied: Your account is pending Admin Approval.' 
             });
-            return; // Stop here, do not redirect
+            return; 
         }
         // -----------------------------------
 
         setStatus({ type: 'success', message: 'Login Successful! Redirecting...' });
         
-        // Save user info
+        // 1. Save full user object (keep this for other needs)
         localStorage.setItem('user', JSON.stringify(user));
+
+        // 2. CRITICAL FIX: Save the ID separately so AddCasePage can find it!
+        // We check for _id (standard Mongo) or id (normalized)
+        localStorage.setItem('userId', user._id || user.id); 
+
+        // 3. Save expiry if exists
         if(user.subscription && user.subscription.expiryDate) {
             localStorage.setItem('expiryDate', user.subscription.expiryDate);
         }
@@ -62,7 +66,7 @@ const Login = () => {
            if (user.role === 'admin') {
              navigate('/admin');
            } else {
-             navigate('/dashboard');
+             navigate('/dashboard'); // Make sure this matches your route path
            }
         }, 1000);
 
@@ -71,9 +75,11 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Login Error:", error);
-      // Fallback for testing (Optional - remove if not needed in production)
+      
+      // Fallback for testing 
       if(formData.email === "admin@test.com") {
-          localStorage.setItem('user', JSON.stringify({ role: 'admin' }));
+          localStorage.setItem('user', JSON.stringify({ role: 'admin', _id: 'test_admin_id' }));
+          localStorage.setItem('userId', 'test_admin_id'); // Fix fallback too
           navigate('/admin');
       } else {
           setStatus({ type: 'error', message: 'Server error. Please try again later.' });
@@ -123,11 +129,10 @@ const Login = () => {
               required
               value={formData.password}
               onChange={handleChange}
-              // Added pr-10 to prevent text from going under the icon
               className="w-full border border-gray-300 px-4 py-2 pr-10 rounded focus:outline-none focus:border-blue-400 text-gray-600"
             />
             <button
-              type="button" // Important: prevents form submission when clicking the eye
+              type="button" 
               onClick={() => setShowPassword(!showPassword)}
               className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer focus:outline-none"
             >

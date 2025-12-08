@@ -1,4 +1,8 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+
+// Load env vars if not already loaded
+dotenv.config({ path: './.env.local' });
 
 const connectDB = async () => {
   try {
