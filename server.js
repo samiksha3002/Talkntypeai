@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs'; // 🟢 Added to handle file creation for credentials
 import connectDB from './config/db.js'; 
 
 // Import all existing Routes
@@ -8,37 +9,67 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import deepgramRoutes from './routes/deepgram.js';
 import caseRoutes from './routes/cases.js';
-
-// 🚀 CRITICAL FIX: Simplify the import to directly get the default exported router function.
-// This makes 'translationRoutes' the function Express needs.
 import translationRoutes from './routes/translation.js'; 
 
-
 // Load environment variables
-dotenv.config(); // Loads .env file by default
+dotenv.config();
 
 // Initialize App
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 🛑 FIX: Set the Google Credentials Environment Variable 🛑
-// This is critical for the Google client to authenticate.
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS_PATH) {
+// 🛑 1. GOOGLE CREDENTIALS SETUP (Live & Local) 🛑
+// Logic: If on Live Server, write JSON from ENV variable to a file.
+// If on Local, use the file path defined in .env
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    // SCENARIO 1: Live Server (Render/Heroku/etc)
+    const credentialsPath = './google-credentials.json';
+    try {
+        fs.writeFileSync(credentialsPath, process.env.GOOGLE_CREDENTIALS_JSON);
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+        console.log("✅ Live Server: Google Credentials file created successfully.");
+    } catch (err) {
+        console.error("❌ Error creating credentials file:", err);
+    }
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS_PATH) {
+    // SCENARIO 2: Local Development
     process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GOOGLE_APPLICATION_CREDENTIALS_PATH;
+    console.log("✅ Local Server: Using credentials from path.");
 }
 
 // Connect to Database
 connectDB();
 
-// --- MIDDLEWARE ---
+// 🛑 2. SECURE CORS SETUP 🛑
+// Define who can talk to your backend
+const allowedOrigins = [
+    "http://localhost:5173",          // 1. Local React App
+    "http://localhost:3000",          // 2. Alternative Local Port
+    "https://www.talkntype.com",      // 3. Your Live Domain (REPLACE THIS LATER)
+    "https://talkntype.onrender.com"  // 4. Your Backend URL (If testing directly)
+];
+
 app.use(cors({
-    origin: true, 
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            // Optional: You can uncomment the line below to strictly block unknown origins
+            // const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            // return callback(new Error(msg), false);
+            
+            // For now, allow it to prevent blocking during development
+            return callback(null, true); 
+        }
+        return callback(null, true);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
-// Middleware to parse incoming JSON body (CRUCIAL for translation request)
+// Middleware to parse incoming JSON body
 app.use(express.json());
 
 // --- ROUTES ---
@@ -61,7 +92,6 @@ app.use('/api/deepgram', deepgramRoutes);
 app.use('/api/cases', caseRoutes);
 
 // 6. 🌐 GOOGLE TRANSLATION ROUTE 
-// 🛑 FINAL FIX: Now that we have a direct import, we use the variable directly.
 app.use('/api/translate', translationRoutes);
 
 
