@@ -2,17 +2,16 @@ import React from 'react';
 import StenoCard from '../Sidebar/Stenocard';
 import TranslationCard from '../Sidebar/TranslationCard';
 import TransliterationCard from '../Sidebar/Transileration';
-import FontConvertCard from './FontConvertCard';
-// import FontConvertCard from './FontConvertCard'; // Add this when you create it
+import FontConvertCard from './FontConvertCard'; // Keep this import
 
 const Sidebar = ({ 
     onSpeechInput, 
     onTranslate, 
     onTransliterate, 
-    onFontConvert,
+    onFontConvert, // New prop received
     isTranslating, 
     isTransliterating,
-    isConverting
+    isConverting   // New prop received
 }) => {
 
     return (
@@ -35,13 +34,12 @@ const Sidebar = ({
                 isTransliterating={isTransliterating}
             />
 
+            {/* 🅰️ CARD 4: FONT CONVERSION */}
             <FontConvertCard 
-                onFontConvert={onFontConvert} // ⬅️ 3. Pass the handler
-                isConverting={isConverting}   // ⬅️ 3. Pass the loading state
+                onFontConvert={onFontConvert} 
+                isConverting={isConverting}  
             />
-            {/* 🅰️ CARD 4: FONT CONVERSION (Placeholder for your new feature) */}
-            {/* <FontConvertCard /> */}
-
+            
         </aside>
     );
 };

@@ -15,7 +15,7 @@ const languageOptions = [
 ];
 
 const TranslationCard = ({ onTranslate, isTranslating }) => {
-    // State for Translation Language (Output)
+    // State for Translation Language (Output), default to Hindi
     const [targetLang, setTargetLang] = useState('hi');
     
     return (
@@ -42,6 +42,7 @@ const TranslationCard = ({ onTranslate, isTranslating }) => {
             <button 
                 onClick={() => {
                     if(onTranslate) {
+                        // Pass the currently selected target language to the parent function
                         onTranslate(targetLang); 
                     }
                 }}

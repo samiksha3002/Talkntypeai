@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'; 
 // NOTE: Assuming Sidebar, Editor, Navbar, and FooterButtons are now direct siblings.
 import DashboardNavbar from '../components/DashboardNavbar';
-import Sidebar from '../components/Sidebar/Sidebar'; // ⬅️ Corrected to local path (assuming Sidebar.jsx is now a sibling)
+import Sidebar from '../components/Sidebar/Sidebar'; 
 import Editor from './Editor'; 
 import FooterButtons from './FooterButtons';
 
@@ -102,12 +102,12 @@ const Dashboard = () => {
                         // Command Triggers
                         translationCommand={translationCommand}
                         transliterationCommand={transliterationCommand}
-                        fontConvertCommand={fontConvertCommand} // ⬅️ NEW: Trigger Prop
+                        fontConvertCommand={fontConvertCommand} // ⬅️ Trigger Prop
 
                         // Loading State Setters
                         setIsTranslating={setIsTranslating} 
                         setIsTransliterating={setIsTransliterating} 
-                        setIsConverting={setIsConverting} // ⬅️ NEW: Loading Setter Prop
+                        setIsConverting={setIsConverting} // ⬅️ Loading Setter Prop
                     />
                     
                 </main>
