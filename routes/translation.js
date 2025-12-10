@@ -2,10 +2,12 @@ import express from 'express';
 import { v2 } from '@google-cloud/translate';
 const router = express.Router();
 
-// Initialize Google Translate
-// Ensure you have run: npm install @google-cloud/translate
+// 🟢 CONFIGURATION: Initialize with API Key
+// We use process.env to keep your key safe.
 const { Translate } = v2;
-const translate = new Translate();
+const translate = new Translate({
+    key: process.env.GOOGLE_TRANSLATE_API_KEY
+});
 
 // ROUTE: POST /api/translate/
 router.post('/', async (req, res) => {
@@ -18,23 +20,34 @@ router.post('/', async (req, res) => {
     }
 
     try {
+        // Check if Key exists before calling Google
+        if (!process.env.GOOGLE_TRANSLATE_API_KEY) {
+            throw new Error("GOOGLE_TRANSLATE_API_KEY is missing in .env file");
+        }
+
         // 1. Call Google API
         const [translation] = await translate.translate(text, target);
         
-        console.log("Translation success:", translation);
+        console.log("✅ Translation success:", translation);
 
         // 2. Send back to Frontend
         res.json({ translatedText: translation });
 
     } catch (error) {
-        console.error("Google Translate Error:", error);
+        console.error("❌ Google Translate Error:", error.message);
         
-        // FALLBACK: If API fails (e.g., no credentials), return mocked text so app doesn't freeze
-        res.status(500).json({ 
-            error: "Translation API Failed", 
-            details: error.message,
-            // Optional: Send back dummy text for testing if API fails
-            // translatedText: `[MOCK] Translated: ${text}` 
+        // 🟢 SMART FALLBACK: 
+        // Instead of breaking the app with a 500 Error, we return a mock response.
+        // This proves your Frontend <-> Backend connection is working.
+        
+        const mockText = target === 'hi' ? 
+            `[Mock Hindi] ${text} (API Key Invalid)` : 
+            `[Mock] ${text}`;
+
+        res.json({ 
+            translatedText: mockText,
+            isMock: true, 
+            warning: "Real translation failed. Check backend console for API Key errors." 
         });
     }
 });
