@@ -1,26 +1,32 @@
-// routes/translation.js
-
+import 'dotenv/config'; // 1. IMPORTANT: Loads .env variables
 import express from 'express';
-// 1. CRITICAL FIX: Direct import for the V2 client in ES Module environment
+// Using your specific import path regarding V2 client
 import { Translate } from '@google-cloud/translate/build/src/v2/index.js'; 
-
-// We no longer need fs or path since we are letting the client library handle the file
-// import fs from 'fs'; 
-// import path from 'path';
 
 const router = express.Router(); 
 
-// --- CLIENT INITIALIZATION (Simplified and Standardized) ---
+// --- CLIENT INITIALIZATION (SECURE MODE) ---
 let translate;
 
 try {
-    // 2. SIMPLIFICATION: The client automatically finds the credentials 
-    // from the GOOGLE_APPLICATION_CREDENTIALS environment variable.
-    translate = new Translate(); 
-    console.log("Google Translate client initialized using environment credentials.");
+    // Check if critical variables exist before initializing
+    if (!process.env.GOOGLE_PROJECT_ID || !process.env.GOOGLE_PRIVATE_KEY) {
+        throw new Error("Missing GOOGLE_PROJECT_ID or GOOGLE_PRIVATE_KEY in .env file");
+    }
+
+    // 2. Initialize using Environment Variables (No JSON file needed)
+    translate = new Translate({
+        projectId: process.env.GOOGLE_PROJECT_ID,
+        credentials: {
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            // 3. FIX: Replace escaped newlines so the key works correctly
+            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        }
+    });
+
+    console.log("Google Translate client initialized successfully using .env credentials.");
 
 } catch (e) {
-    // This catch block will trigger if the client fails to instantiate for any reason
     console.error("CRITICAL ERROR: Failed to instantiate Google Translate client.", e.message);
     translate = null; 
 }
@@ -35,8 +41,7 @@ router.post('/', async (req, res) => {
     
     // Check if initialization failed
     if (!translate) {
-        // Send a specific error back if the client failed to initialize
-        return res.status(500).json({ error: 'Translation client not initialized due to server configuration error. Check backend logs for credential issues.' });
+        return res.status(500).json({ error: 'Translation client not initialized due to server configuration error. Check .env variables.' });
     }
 
     try {
@@ -49,7 +54,6 @@ router.post('/', async (req, res) => {
         res.json({ translatedText: translation });
         
     } catch (error) {
-        // Catch network or API-specific errors (e.g., 403 Permission Denied)
         console.error('ERROR during translation API call:', error.message);
         res.status(500).json({ error: `Translation service failed. Details: ${error.message}` });
     }
