@@ -1,0 +1,151 @@
+// src/components/AiChat.jsx
+import React, { useEffect, useRef, useState } from 'react';
+
+export default function AiChat({ contextText }) {
+  const API_URL = import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api/chat` 
+    : 'http://localhost:5000/api/chat';
+
+  const [messages, setMessages] = useState([
+    {
+        id: 'welcome',
+        role: 'system',
+        content: "Hello Advocate! I am TNT AI. I can help you draft legal documents based on Indian Law. Try asking: 'Draft a bail application'."
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const handleInputChange = (e) => setInput(e.target.value);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const userMessage = { id: Date.now().toString(), role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      console.log("🔵 Sending request to:", API_URL);
+      console.log("🔵 Payload:", { messages: [...messages, userMessage] });
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, userMessage]
+        })
+      });
+
+      if (!response.ok) throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+
+      // Try to get text first
+      let data = await response.text();
+      console.log("🟢 Raw Backend Response:", data);
+
+      // 1. Check if empty
+      if (!data || data.trim() === "") {
+        data = "(Error: The server returned an empty response. Check your backend terminal for errors.)";
+      } 
+      // 2. Check if it's actually JSON
+      else {
+        try {
+            const jsonData = JSON.parse(data);
+            // If the backend returns { content: "..." } or { text: "..." }
+            if (jsonData.content) data = jsonData.content;
+            else if (jsonData.text) data = jsonData.text;
+            else if (typeof jsonData === 'string') data = jsonData;
+            // Otherwise, keep it as string/JSON for now
+        } catch (e) {
+            // It's not JSON, so it's likely plain text or a stream chunk.
+            // If it looks like Vercel Stream Data (e.g. 0:"Hello"), clean it up:
+            if (data.includes('0:"')) {
+                // Very basic cleanup for stream format
+                data = data.replace(/0:"/g, '').replace(/"\n/g, '').replace(/"/g, ''); 
+            }
+        }
+      }
+
+      const botMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: data };
+      setMessages(prev => [...prev, botMessage]);
+
+    } catch (error) {
+      console.error("🔴 Chat Error:", error);
+      const errorMessage = { id: 'error', role: 'assistant', content: `Error: ${error.message}` };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  return (
+    <div className="flex flex-col h-full bg-white border-l border-gray-200">
+      
+      {/* Header */}
+      <div className="bg-slate-900 text-white p-3 shadow-md">
+        <h3 className="font-bold text-sm flex items-center gap-2">
+           ⚖️ TNT Legal Assistant
+        </h3>
+        <p className="text-[10px] text-gray-400">Powered by Google Gemini</p>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        {messages.filter(m => m.role !== 'system').length === 0 && (
+            <div className="text-center text-gray-400 mt-10 text-xs">
+                <p>Try asking:</p>
+                <ul className="mt-2 space-y-1">
+                    <li className="bg-white p-2 rounded border border-gray-200 shadow-sm cursor-pointer hover:bg-blue-50">"Draft Section 138 Notice"</li>
+                </ul>
+            </div>
+        )}
+        
+        {messages.map(m => {
+            if(m.role === 'system') return null;
+            return (
+              <div key={m.id} className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] p-3 rounded-lg text-sm shadow-sm ${
+                  m.role === 'user' 
+                    ? 'bg-blue-600 text-white rounded-br-none' 
+                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                }`}>
+                  <strong className="block text-[10px] mb-1 opacity-70 uppercase tracking-wide">
+                    {m.role === 'user' ? 'You' : 'TNT AI'}
+                  </strong>
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                </div>
+              </div>
+            )
+        })}
+        {isLoading && (
+           <div className="flex justify-start animate-pulse">
+             <div className="bg-gray-200 text-gray-500 text-xs px-3 py-2 rounded-lg rounded-bl-none">
+               Thinking...
+             </div>
+           </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-200 flex gap-2">
+        <input
+          className="flex-1 bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Ask a legal query..."
+        />
+        <button type="submit" disabled={isLoading} className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            ➤
+        </button>
+      </form>
+    </div>
+  );
+}
