@@ -17,18 +17,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ----------------------
-// CONNECT MONGODB
+// CONNECT MONGO
 // ----------------------
 connectDB();
 
 // ----------------------
-// JSON PARSING LIMIT
+// BODY PARSING
 // ----------------------
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ----------------------
-// CORS CONFIG (FIXED)
+// CORS SETTINGS
 // ----------------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -38,27 +38,26 @@ const allowedOrigins = [
   "https://talkntype.onrender.com",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow server-to-server and mobile apps
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("❌ BLOCKED ORIGIN:", origin);
+      callback(new Error("CORS blocked: " + origin));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        console.log("❌ BLOCKED ORIGIN:", origin);
-        return callback(new Error("CORS blocked: " + origin), false);
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors(corsOptions));
 
-// Handle preflight manually
-app.options("*", cors());
+// **Important:** Fix OPTIONS handling
+app.options("/", cors(corsOptions));   // allow root
+app.options("/api/*", cors(corsOptions)); // allow API requests
 
 // ----------------------
 // TEST ROUTE
@@ -75,8 +74,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/deepgram", deepgramRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/translate", translationRoutes);
-
-// Gemini AI Legal Assistant (CHAT)
 app.use("/api/chat", aiChatRoutes);
 
 // ----------------------
