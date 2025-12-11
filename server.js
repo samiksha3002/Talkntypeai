@@ -33,6 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://talkntype.com",
   "https://www.talkntype.com",
   "https://talkntype.onrender.com",
 ];
@@ -40,26 +41,24 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // 1. Allow requests with no origin (like mobile apps, Postman/cURL, or same-server requests)
+      // allow server-to-server and mobile apps
       if (!origin) return callback(null, true);
-      
-      // 2. Allow if the origin is in our whitelist
-      if (allowedOrigins.indexOf(origin) !== -1) {
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
-      } 
-      
-      // 3. Block all other origins
-      else {
-        const error = new Error("Not allowed by CORS: " + origin);
-        error.status = 403;
-        return callback(error, false);
+      } else {
+        console.log("❌ BLOCKED ORIGIN:", origin);
+        return callback(new Error("CORS blocked: " + origin), false);
       }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Handle preflight manually
+app.options("*", cors());
 
 // ----------------------
 // TEST ROUTE

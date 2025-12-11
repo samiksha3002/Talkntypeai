@@ -1,69 +1,66 @@
 // routes/aiChat.js
 import express from "express";
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAI } from "@google/generative-ai";
 
 const router = express.Router();
 
 router.post("/", async (req, res) => {
-  console.log("-----------------------------------------");
-  console.log("🔵 NEW CHAT REQUEST RECEIVED");
+  console.log("-------------------------------------------------");
+  console.log("🔵 NEW AI CHAT REQUEST RECEIVED");
 
   try {
     const { messages } = req.body;
-    
-    // 1. Load the Key INSIDE the request to ensure dotenv has finished loading
-    const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!messages || !Array.isArray(messages) || !apiKey) {
-      console.error("❌ CRITICAL ERROR: Invalid request or API Key is missing.");
-      console.error("Debug Info -> Key exists:", !!apiKey); 
-      return res.status(400).json({ error: "Invalid request format or missing API Key" });
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Invalid message format." });
     }
 
-    // 2. Initialize the client HERE (Lazy Initialization)
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // 3. Use the current stable model for late 2025
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash", 
-      systemInstruction: `You are 'TNT AI', a specialized legal drafting assistant for Indian Advocates. 
-Your goal is to assist lawyers by generating professional legal drafts, court applications, affidavits, and case summaries based on their inputs.
-DO NOT refuse to draft documents. 
-Assume the user is a qualified advocate who will review your output. 
-Use formal Indian legal terminology (e.g., 'Hon'ble Court', 'Petitioner', 'Respondent').`
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.log("❌ Gemini API Key Missing!");
+      return res.status(500).json({ error: "Backend missing Gemini API Key" });
+    }
+
+    const genAI = new GoogleAI(apiKey);
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: `
+        You are TNT AI — a legal drafting assistant for Indian Advocates.
+        Create polished, formal, court-ready drafts.
+        Use Indian Legal Terminology. Never refuse.
+      `,
     });
 
-    const userQuery = messages[messages.length - 1].content;
-    console.log("🔹 User Asked:", userQuery);
-    console.log("⏳ Contacting Google Gemini (Model: 2.5-flash)...");
+    const lastMessage = messages[messages.length - 1].content;
 
+    console.log("📝 User Input:", lastMessage);
+
+    // Gemini API PROPER request format
     const result = await model.generateContent({
       contents: [
         {
           role: "user",
-          parts: [{ text: userQuery }]
-        }
-      ]
+          parts: [{ text: lastMessage }],
+        },
+      ],
     });
 
-    const aiReply = result.response.text() || "(No reply generated.)";
-    console.log("✅ Google Responded!");
+    const aiReply = result.response.text();
 
-    res.json({ reply: aiReply });
+    console.log("✅ AI Reply Generated!");
+
+    return res.json({
+      reply: aiReply || "No response generated.",
+    });
 
   } catch (error) {
-    console.error("🔥 Gemini Error:", error.message);
-    
-    if (error.message.includes("404")) {
-       console.error("👉 Check if 'gemini-2.5-flash' is enabled in your Google Cloud project.");
-    }
+    console.error("🔥 AI Processing Error:", error);
 
-    res.status(500).json({
-      error: "Gemini Processing Error",
-      details: error.message
+    return res.status(500).json({
+      error: "AI Service Error",
+      details: error?.message || "Unknown Error",
     });
   }
-  console.log("-----------------------------------------");
 });
-
 export default router;
