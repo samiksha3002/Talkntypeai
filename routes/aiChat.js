@@ -1,46 +1,69 @@
-import express from 'express';
+// routes/aiChat.js
+import express from "express";
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
-
-// Load the .env file
-dotenv.config();
 
 const router = express.Router();
 
-// Initialize Gemini with your specific key name
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+router.post("/", async (req, res) => {
+  console.log("-----------------------------------------");
+  console.log("🔵 NEW CHAT REQUEST RECEIVED");
 
-router.post('/', async (req, res) => {
   try {
     const { messages } = req.body;
+    
+    // 1. Load the Key INSIDE the request to ensure dotenv has finished loading
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // Log to confirm the server is working and has the Key
-    console.log("🔹 AI Request Received.");
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("❌ ERROR: GEMINI_API_KEY is missing in .env file!");
-        return res.status(500).json({ content: "Server Error: API Key missing." });
+    if (!messages || !Array.isArray(messages) || !apiKey) {
+      console.error("❌ CRITICAL ERROR: Invalid request or API Key is missing.");
+      console.error("Debug Info -> Key exists:", !!apiKey); 
+      return res.status(400).json({ error: "Invalid request format or missing API Key" });
     }
 
-    const lastUserMessage = messages[messages.length - 1].content;
-
-    // Use Gemini 1.5 Flash (It's fast and free-tier friendly)
+    // 2. Initialize the client HERE (Lazy Initialization)
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // 3. Use the current stable model for late 2025
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: "You are 'TNT AI', a legal assistant for Indian Advocates. Strictly cite Indian Laws (IPC, CrPC, BNS) and draft purely for Section 138 NI Act cases."
+      model: "gemini-2.5-flash", 
+      systemInstruction: `You are 'TNT AI', a specialized legal drafting assistant for Indian Advocates. 
+Your goal is to assist lawyers by generating professional legal drafts, court applications, affidavits, and case summaries based on their inputs.
+DO NOT refuse to draft documents. 
+Assume the user is a qualified advocate who will review your output. 
+Use formal Indian legal terminology (e.g., 'Hon'ble Court', 'Petitioner', 'Respondent').`
     });
 
-    const result = await model.generateContent(lastUserMessage);
-    const response = await result.response;
-    const text = response.text();
+    const userQuery = messages[messages.length - 1].content;
+    console.log("🔹 User Asked:", userQuery);
+    console.log("⏳ Contacting Google Gemini (Model: 2.5-flash)...");
 
-    console.log("✅ Generated:", text.substring(0, 30) + "...");
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: userQuery }]
+        }
+      ]
+    });
 
-    res.json({ content: text });
+    const aiReply = result.response.text() || "(No reply generated.)";
+    console.log("✅ Google Responded!");
+
+    res.json({ reply: aiReply });
 
   } catch (error) {
-    console.error("❌ Backend Error:", error);
-    res.status(500).json({ content: "Error: Could not connect to Google Gemini." });
+    console.error("🔥 Gemini Error:", error.message);
+    
+    if (error.message.includes("404")) {
+       console.error("👉 Check if 'gemini-2.5-flash' is enabled in your Google Cloud project.");
+    }
+
+    res.status(500).json({
+      error: "Gemini Processing Error",
+      details: error.message
+    });
   }
+  console.log("-----------------------------------------");
 });
 
 export default router;

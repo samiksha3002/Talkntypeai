@@ -1,5 +1,10 @@
+// src/App.jsx
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
+// 🛑 FIX 1: Import the CaseProvider to use it in the routes.
+import { CaseProvider } from './context/CaseContext'; 
 
 // Import Components
 import Preloader from './components/Preloader';
@@ -39,26 +44,20 @@ const LandingPage = () => {
   );
 };
 
-// --- ROUTE GUARDS (Unchanged, but crucial) ---
-
-// 1. Only allow ADMINS here
+// --- ROUTE GUARDS (Unchanged) ---
 const AdminRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  // Check if user is logged in AND is an admin
   if (!user.role || user.role !== 'admin') { 
     return <Navigate to="/dashboard" replace />;
   }
   return children;
 };
 
-// 2. Only allow REGULAR USERS here
 const UserRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  // Check if user is logged in (i.e., has a role)
   if (!user.role) {
-    return <Navigate to="/login" replace />; // Redirect to login if no role/user found
+    return <Navigate to="/login" replace />; 
   }
-  // Check if user is an admin; if so, send them to their dedicated area
   if (user.role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
@@ -89,27 +88,45 @@ function App() {
             <Route path="/register" element={<Register />} />
 
             {/* --- 2. PROTECTED USER ROUTES (Standard User Pages) --- */}
-            {/* All user-facing application pages MUST be wrapped in UserRoute */}
+            
+            {/* 🛑 FIX 2: Wrap all components that use CaseContext (Diary, Add Case, Manage Cases) 
+                inside <CaseProvider> so the hook can access the context value.
+            */}
+            
+            <Route 
+              path="/dashboard" 
+              element={<UserRoute><Dashboard /></UserRoute>} 
+            />
 
-            <Route path="/dashboard" element={<UserRoute><Dashboard /></UserRoute>} />
+            <Route 
+                path="/Diary" 
+                element={<UserRoute><CaseProvider><Diary /></CaseProvider></UserRoute>} 
+            />
+            
+            <Route 
+                path="/add-case" 
+                element={<UserRoute><CaseProvider><AddCasePage /></CaseProvider></UserRoute>} 
+            />
+            
+            <Route 
+                path="/manage-cases" 
+                element={<UserRoute><CaseProvider><ManageCasesPage /></CaseProvider></UserRoute>} 
+            />
+
+            {/* Other Protected User Routes (They don't need CaseProvider if they don't use useCases) */}
             <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
             <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
-            <Route path="/Diary" element={<UserRoute><Diary /></UserRoute>} />
-            
-            {/* 🛑 FIX: Protecting formerly exposed routes */}
             <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
             <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
             <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
             <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
             <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
-            <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
-            <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
             <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
 
             {/* --- 3. PROTECTED ADMIN ROUTE --- */}
             <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
 
-            {/* 🛑 FIX: The 404 route MUST be the last one defined. */}
+            {/* --- 4. 404 CATCH-ALL ROUTE --- */}
             <Route path="*" element={<div>404 Page Not Found</div>} />
             
           </Routes>

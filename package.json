@@ -11,11 +11,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ai-sdk/google-vertex": "^3.0.88",
     "@deepgram/sdk": "^4.11.2",
     "@google-cloud/translate": "^9.3.0",
+    "@google-cloud/vision": "^5.3.4",
+    "@google/genai": "^1.32.0",
     "@google/generative-ai": "^0.24.1",
-    "ai": "^3.4.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",

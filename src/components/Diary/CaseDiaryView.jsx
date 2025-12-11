@@ -5,15 +5,18 @@ import { format } from 'date-fns';
 import { Briefcase, Clock, ArrowRight } from 'lucide-react';
 
 const CaseDiaryView = ({ selectedDate, navigate }) => {
-  // We need context to fetch cases
-  // NOTE: This will only work if you have fixed the Context setup (Step 1-3 from previous response)
-  const { allCases } = useCases(); 
+  // CRITICAL LINE: Safely destructure, assuming useCases returns an object.
+  // The ultimate fix is in CaseContext.jsx (see below).
+  const { allCases } = useCases() || {}; 
   
+  // Safety check: If allCases is not an array (due to the missing Provider), default to an empty array.
+  const casesData = Array.isArray(allCases) ? allCases : [];
+
   // Format the selected date for filtering
   const dateToFilter = format(selectedDate, 'yyyy-MM-dd');
   
   // Filter cases for the selected date
-  const casesForDay = allCases.filter(caseItem => 
+  const casesForDay = casesData.filter(caseItem => 
     caseItem.hearingDate === dateToFilter
   );
 
