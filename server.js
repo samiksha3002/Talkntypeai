@@ -28,7 +28,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ----------------------
-// CORS CONFIG
+// CORS CONFIG (FIXED)
 // ----------------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -40,8 +40,20 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow all local tools without blocking
-      return callback(null, true);
+      // 1. Allow requests with no origin (like mobile apps, Postman/cURL, or same-server requests)
+      if (!origin) return callback(null, true);
+      
+      // 2. Allow if the origin is in our whitelist
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      } 
+      
+      // 3. Block all other origins
+      else {
+        const error = new Error("Not allowed by CORS: " + origin);
+        error.status = 403;
+        return callback(error, false);
+      }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
