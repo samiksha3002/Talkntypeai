@@ -60,8 +60,6 @@ app.use(cors(corsOptions));
 // ----------------------
 // FIX FOR PATHERROR
 // ----------------------
-// Note: app.options("/", cors(corsOptions)); is usually redundant and can be removed.
-
 // FIX: Handle OPTIONS preflight requests for all API routes using RegExp 
 // This resolves the PathError with both '/api/*' and '/api/:path*'
 app.options(/^\/api\/(.*)/, cors(corsOptions)); 
