@@ -7,9 +7,17 @@ dotenv.config({ path: ".env.local" });
 const router = express.Router();
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
+// ✅ HANDLE PREFLIGHT FOR THIS ROUTE
+router.options("/", (req, res) => {
+  res.sendStatus(200);
+});
+
+// ----------------------
+// POST /api/expand
+// ----------------------
 router.post("/", async (req, res) => {
   try {
     const { text } = req.body;
@@ -22,15 +30,16 @@ router.post("/", async (req, res) => {
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "Expand the text clearly and neatly." },
-        { role: "user", content: text }
-      ]
+        { role: "user", content: text },
+      ],
     });
 
-    res.json({ expanded: completion.choices[0].message.content });
-
+    res.json({
+      expanded: completion.choices[0].message.content,
+    });
   } catch (error) {
-    console.error("EXPAND API ERROR:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ EXPAND API ERROR:", error.message);
+    res.status(500).json({ error: "Failed to expand text" });
   }
 });
 

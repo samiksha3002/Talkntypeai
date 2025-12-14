@@ -49,11 +49,10 @@ const allowedOrigins = [
 ];
 
 // ----------------------
-// CORS OPTIONS (FIXED)
+// CORS CONFIG
 // ----------------------
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server / curl / mobile apps
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -61,25 +60,45 @@ const corsOptions = {
     }
 
     console.log("⚠️ CORS BLOCKED:", origin);
-    return callback(null, false); // ❌ DO NOT THROW ERROR
+    return callback(null, false); // ❌ never throw error
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
 };
 
 // ----------------------
-// APPLY CORS (GLOBAL)
+// APPLY CORS
 // ----------------------
 app.use(cors(corsOptions));
 
 // ----------------------
-// HANDLE PREFLIGHT EXPLICITLY
+// FORCE PREFLIGHT (🔥 MOST IMPORTANT PART 🔥)
 // ----------------------
-app.options("*", cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    res.header("Access-Control-Allow-Origin", req.headers.origin);
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Accept"
+    );
+    res.header("Access-Control-Allow-Credentials", "true");
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 // ----------------------
-// ROOT ROUTE
+// ROOT
 // ----------------------
 app.get("/", (req, res) => {
   res.send("TalkNType Server is Running!");
@@ -102,7 +121,7 @@ app.use("/api/font-convert", fontConvertRoute);
 app.use("/api/ai", aiRoutes);
 
 // ----------------------
-// ERROR HANDLER (SAFE)
+// ERROR HANDLER
 // ----------------------
 app.use((err, req, res, next) => {
   console.error("🔥 Server Error:", err.message);
@@ -117,6 +136,6 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log("🛡️ CORS allowed origins:");
+  console.log("🛡️ CORS enabled for:");
   allowedOrigins.forEach((o) => console.log("   ✔", o));
 });
