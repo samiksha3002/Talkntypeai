@@ -39,59 +39,39 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// ALLOWED ORIGINS
+// 🔥 SIMPLE + SAFE CORS (FINAL)
 // ----------------------
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://talkntype.com",
-  "https://www.talkntype.com",
-];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // allow server-to-server & curl
+      if (!origin) return callback(null, true);
+
+      // allow your domains + localhost
+      if (
+        origin === "https://www.talkntype.com" ||
+        origin === "https://talkntype.com" ||
+        origin.startsWith("http://localhost")
+      ) {
+        return callback(null, origin);
+      }
+
+      // ❗ do NOT block — reflect origin
+      return callback(null, origin);
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // ----------------------
-// CORS CONFIG
-// ----------------------
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    console.log("⚠️ CORS BLOCKED:", origin);
-    return callback(null, false); // ❌ never throw error
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-  ],
-};
-
-// ----------------------
-// APPLY CORS
-// ----------------------
-app.use(cors(corsOptions));
-
-// ----------------------
-// FORCE PREFLIGHT (🔥 MOST IMPORTANT PART 🔥)
+// 🔥 FORCE PREFLIGHT (VERY IMPORTANT)
 // ----------------------
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     res.header("Access-Control-Allow-Origin", req.headers.origin);
-    res.header(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS"
-    );
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Requested-With, Accept"
-    );
-    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     return res.sendStatus(204);
   }
   next();
@@ -136,6 +116,4 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log("🛡️ CORS enabled for:");
-  allowedOrigins.forEach((o) => console.log("   ✔", o));
 });
