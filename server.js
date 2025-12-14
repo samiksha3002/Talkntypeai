@@ -6,8 +6,7 @@ import connectDB from "./config/db.js";
 // ----------------------
 // LOAD ENV FIRST
 // ----------------------
-// changed to standard config so it works on Render without needing a specific file
-dotenv.config(); 
+dotenv.config();
 
 // ----------------------
 // ROUTE IMPORTS
@@ -36,11 +35,11 @@ connectDB();
 // ----------------------
 // BODY PARSER
 // ----------------------
-app.use(express.json({ limit: "50mb" })); // Increased limit just in case for audio
+app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// CORS SETUP (FIXED)
+// CORS SETUP
 // ----------------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -58,7 +57,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log("⚠️ BLOCKED CORS ORIGIN:", origin); // Log blocked attempts for debugging
+      console.log("⚠️ BLOCKED CORS ORIGIN:", origin);
       callback(new Error("CORS blocked by policy: " + origin));
     }
   },
@@ -67,11 +66,8 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 };
 
-// Apply CORS to all requests
+// Apply CORS globally (This handles OPTIONS/Pre-flight automatically)
 app.use(cors(corsOptions));
-
-// Enable Pre-Flight for ALL routes (Crucial for the "Fix Grammar" button)
-app.options('*', cors(corsOptions));
 
 // ----------------------
 // ROOT ROUTE
@@ -97,7 +93,7 @@ app.use("/api/font-convert", fontConvertRoute);
 app.use("/api/ai", aiRoutes);
 
 // ----------------------
-// ERROR HANDLING MIDDLEWARE (Optional but Good)
+// ERROR HANDLING
 // ----------------------
 app.use((err, req, res, next) => {
   console.error("Server Error:", err.stack);
