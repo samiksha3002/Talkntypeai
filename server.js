@@ -39,35 +39,44 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// CORS SETUP
+// ALLOWED ORIGINS
 // ----------------------
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "https://talkntype.com",
   "https://www.talkntype.com",
-  "https://talkntype.onrender.com",
 ];
 
+// ----------------------
+// CORS OPTIONS (FIXED)
+// ----------------------
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+  origin: (origin, callback) => {
+    // Allow server-to-server / curl / mobile apps
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("⚠️ BLOCKED CORS ORIGIN:", origin);
-      callback(new Error("CORS blocked by policy: " + origin));
+      return callback(null, true);
     }
+
+    console.log("⚠️ CORS BLOCKED:", origin);
+    return callback(null, false); // ❌ DO NOT THROW ERROR
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 };
 
-// Apply CORS globally (This handles OPTIONS/Pre-flight automatically)
+// ----------------------
+// APPLY CORS (GLOBAL)
+// ----------------------
 app.use(cors(corsOptions));
+
+// ----------------------
+// HANDLE PREFLIGHT EXPLICITLY
+// ----------------------
+app.options("*", cors(corsOptions));
 
 // ----------------------
 // ROOT ROUTE
@@ -93,11 +102,14 @@ app.use("/api/font-convert", fontConvertRoute);
 app.use("/api/ai", aiRoutes);
 
 // ----------------------
-// ERROR HANDLING
+// ERROR HANDLER (SAFE)
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("Server Error:", err.stack);
-  res.status(500).json({ message: "Internal Server Error", error: err.message });
+  console.error("🔥 Server Error:", err.message);
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
 });
 
 // ----------------------
@@ -105,5 +117,6 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🛡️  CORS enabled for: ${allowedOrigins.join(", ")}`);
+  console.log("🛡️ CORS allowed origins:");
+  allowedOrigins.forEach((o) => console.log("   ✔", o));
 });
