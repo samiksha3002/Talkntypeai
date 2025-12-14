@@ -6,10 +6,11 @@ import connectDB from "./config/db.js";
 // ----------------------
 // LOAD ENV FIRST
 // ----------------------
-dotenv.config({ path: ".env.local" }); // VERY IMPORTANT
+// changed to standard config so it works on Render without needing a specific file
+dotenv.config(); 
 
 // ----------------------
-// ROUTES
+// ROUTE IMPORTS
 // ----------------------
 import aiRoutes from "./routes/ai.js";
 import authRoutes from "./routes/auth.js";
@@ -24,10 +25,6 @@ import expandRoute from "./routes/expand.js";
 import fixGrammarRoute from "./routes/fixGrammar.js";
 import fontConvertRoute from "./routes/fontConvert.js";
 
-
-
- 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -39,11 +36,11 @@ connectDB();
 // ----------------------
 // BODY PARSER
 // ----------------------
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "50mb" })); // Increased limit just in case for audio
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// CORS
+// CORS SETUP (FIXED)
 // ----------------------
 const allowedOrigins = [
   "http://localhost:5173",
@@ -55,22 +52,26 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log("❌ BLOCKED ORIGIN:", origin);
-      callback(new Error("CORS blocked: " + origin));
+      console.log("⚠️ BLOCKED CORS ORIGIN:", origin); // Log blocked attempts for debugging
+      callback(new Error("CORS blocked by policy: " + origin));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 };
 
+// Apply CORS to all requests
 app.use(cors(corsOptions));
-app.options(/^\/api\/(.*)/, cors(corsOptions));
+
+// Enable Pre-Flight for ALL routes (Crucial for the "Fix Grammar" button)
+app.options('*', cors(corsOptions));
 
 // ----------------------
 // ROOT ROUTE
@@ -95,11 +96,18 @@ app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRoute);
 app.use("/api/ai", aiRoutes);
 
-
+// ----------------------
+// ERROR HANDLING MIDDLEWARE (Optional but Good)
+// ----------------------
+app.use((err, req, res, next) => {
+  console.error("Server Error:", err.stack);
+  res.status(500).json({ message: "Internal Server Error", error: err.message });
+});
 
 // ----------------------
 // START SERVER
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🛡️  CORS enabled for: ${allowedOrigins.join(", ")}`);
 });
