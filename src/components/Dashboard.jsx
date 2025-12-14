@@ -1,55 +1,65 @@
-import React, { useState, useCallback } from 'react'; 
-// NOTE: Ensure these paths match your actual project structure
+import React, { useState, useCallback } from 'react';
+
+// Components
 import DashboardNavbar from '../components/DashboardNavbar';
-import Sidebar from '../components/Sidebar/Sidebar'; 
-import Editor from './Editor'; 
+import Sidebar from '../components/Sidebar/Sidebar';
+import Editor from '../Editor/Editor';  
 import FooterButtons from './FooterButtons';
 
 const Dashboard = () => {
-    // --- 1. STATE: CONTENT (The Single Source of Truth) ---
-    const [editorContent, setEditorContent] = useState('');
-    const [voiceText, setVoiceText] = useState("");
 
-    // --- 2. STATE: COMMANDS (Triggers sent to Editor) ---
+    // ------------------------------------------
+    // 1. MAIN EDITOR STATE (Single Source of Truth)
+    // ------------------------------------------
+    const [editorContent, setEditorContent] = useState('');
+    const [voiceText, setVoiceText] = useState('');
+
+    // ------------------------------------------
+    // 2. COMMAND TRIGGERS (Fire → Editor will catch)
+    // ------------------------------------------
     const [translationCommand, setTranslationCommand] = useState(null);
     const [transliterationCommand, setTransliterationCommand] = useState(null);
-    const [fontConvertCommand, setFontConvertCommand] = useState(null); // 🟢 NEW
+    const [fontConvertCommand, setFontConvertCommand] = useState(null); // 🟢 NEW COMMAND
 
-    // --- 3. STATE: LOADING (UI Feedback for Sidebar Buttons) ---
+    // ------------------------------------------
+    // 3. LOADING STATES (UI Spinners & disable buttons)
+    // ------------------------------------------
     const [isTranslating, setIsTranslating] = useState(false);
     const [isTransliterating, setIsTransliterating] = useState(false);
     const [isConverting, setIsConverting] = useState(false); // 🟢 NEW
 
-    // --- HANDLERS ---
+    // ------------------------------------------
+    // HANDLERS
+    // ------------------------------------------
 
-    // 1. Handle Voice Input coming from Sidebar/Microphone
+    // Voice input from sidebar microphone
     const handleSpeechInput = useCallback((text) => {
         setVoiceText(text);
     }, []);
 
-    // 2. Handle Translation Button Click
+    // Trigger translation action
     const handleTranslateCommand = (langCode) => {
-        console.log("Dashboard: Sending Translation Request ->", langCode);
-        setTranslationCommand({ 
-            lang: langCode, 
-            textToTranslate: editorContent, // Send current text state
-            id: Date.now() // Unique ID to ensure useEffect fires even if lang is same
+        console.log("Dashboard → Translation Trigger:", langCode);
+        setTranslationCommand({
+            lang: langCode,
+            textToTranslate: editorContent,
+            id: Date.now()
         });
     };
 
-    // 3. Handle Transliteration Button Click
+    // Trigger transliteration action
     const handleTransliterateCommand = (scriptCode) => {
-        console.log("Dashboard: Sending Transliteration Request ->", scriptCode);
+        console.log("Dashboard → Transliteration Trigger:", scriptCode);
         setTransliterationCommand({
             script: scriptCode,
             textToTransliterate: editorContent,
             id: Date.now()
         });
     };
-    
-    // 4. Handle Font Convert Button Click (🟢 NEW)
+
+    // Trigger FONT CONVERSION action (Mangal → KrutiDev, Shivaji, Priti etc.)
     const handleFontConvertCommand = (fontCode) => {
-        console.log("Dashboard: Sending Font Convert Request ->", fontCode);
+        console.log("Dashboard → Font Convert Trigger:", fontCode);
         setFontConvertCommand({
             font: fontCode,
             textToConvert: editorContent,
@@ -57,68 +67,68 @@ const Dashboard = () => {
         });
     };
 
-    // 5. Update Editor Content (Lifted State from Editor)
+    // Editor updates content
     const updateEditorContent = useCallback((newContent) => {
         setEditorContent(newContent);
     }, []);
 
     return (
         <div className="h-screen bg-gray-50 font-sans overflow-hidden flex flex-col">
-            
-            {/* --- TOP: NAVBAR --- */}
+
+            {/* -------- TOP NAVBAR -------- */}
             <div className="flex-none z-50 h-16 w-full shadow-sm">
                 <DashboardNavbar />
             </div>
-            
-            {/* --- MIDDLE: WORKSPACE --- */}
-            <div className="flex flex-1 overflow-hidden relative"> 
-                
-                {/* LEFT: Sidebar (Fixed Width) */}
+
+            {/* -------- MAIN LAYOUT WRAPPER -------- */}
+            <div className="flex flex-1 overflow-hidden relative">
+
+                {/* -------- SIDEBAR AREA -------- */}
                 <div className="flex-none w-72 h-full overflow-y-auto border-r border-gray-200 bg-white">
-                    <Sidebar 
-                        onSpeechInput={handleSpeechInput} 
-                        
-                        // Pass Command Handlers
-                        onTranslate={handleTranslateCommand} 
-                        onTransliterate={handleTransliterateCommand} 
-                        onFontConvert={handleFontConvertCommand} // 🟢
-                        
-                        // Pass Loading States (To show spinners on buttons)
-                        isTranslating={isTranslating} 
-                        isTransliterating={isTransliterating}
-                        isConverting={isConverting} // 🟢
-                    />
-                </div>
-                
-                {/* RIGHT: Editor (Takes remaining space) */}
-                <main className="flex-1 flex flex-col relative h-full bg-gray-50"> 
-                    
-                    <Editor 
-                        // Data Props
-                        speechText={voiceText} 
-                        manualText={editorContent} 
-                        setManualText={updateEditorContent} 
+                    <Sidebar
+                        onSpeechInput={handleSpeechInput}
 
-                        // Command Triggers (This "wires" the Sidebar to the Editor)
-                        translationCommand={translationCommand}
-                        transliterationCommand={transliterationCommand}
-                        fontConvertCommand={fontConvertCommand} // 🟢
+                        // Commands
+                        onTranslate={handleTranslateCommand}
+                        onTransliterate={handleTransliterateCommand}
+                        onFontConvert={handleFontConvertCommand} // 🟢 NEW
 
-                        // State Setters (So Editor can tell Dashboard it's loading)
-                        setIsTranslating={setIsTranslating} 
-                        setIsTransliterating={setIsTransliterating} 
-                        setIsConverting={setIsConverting} // 🟢
-                        
-                        // Loading Status (To show status bar at bottom of Editor)
+                        // Loading Indicators
                         isTranslating={isTranslating}
                         isTransliterating={isTransliterating}
-                        isConverting={isConverting} // 🟢
+                        isConverting={isConverting} // 🟢 NEW
                     />
-                    
+                </div>
+
+                {/* -------- EDITOR AREA -------- */}
+                <main className="flex-1 flex flex-col relative h-full bg-gray-50">
+
+                    <Editor
+                        // Data
+                        speechText={voiceText}
+                        manualText={editorContent}
+                        setManualText={updateEditorContent}
+
+                        // Command Triggers
+                        translationCommand={translationCommand}
+                        transliterationCommand={transliterationCommand}
+                        fontConvertCommand={fontConvertCommand} // 🟢 NEW
+
+                        // Loading Setters
+                        setIsTranslating={setIsTranslating}
+                        setIsTransliterating={setIsTransliterating}
+                        setIsConverting={setIsConverting} // 🟢 NEW
+
+                        // Actual state values
+                        isTranslating={isTranslating}
+                        isTransliterating={isTransliterating}
+                        isConverting={isConverting} // 🟢 NEW
+                    />
+
                 </main>
             </div>
 
-            {/* --- BOTTOM: FOOTER --- */}
+            {/* -------- FOOTER BUTTONS -------- */}
             <div className="flex-none w-full bg-white border-t border-gray-200 z-50">
                 <FooterButtons />
             </div>

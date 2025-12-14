@@ -1,7 +1,11 @@
 import express from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 const router = express.Router();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 router.post("/", async (req, res) => {
   console.log("--------------------------------------------------");
@@ -10,49 +14,50 @@ router.post("/", async (req, res) => {
   try {
     const { messages } = req.body;
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Invalid message format" });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      console.log("❌ Missing GEMINI_API_KEY in backend");
-      return res.status(500).json({ error: "Missing API Key" });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "Missing OpenAI API Key" });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    // Convert frontend messages → OpenAI format
+    const openAIMessages = [
+      {
+        role: "system",
+        content: `
+You are TNT AI, a professional legal drafting assistant for Indian advocates.
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",    // STABLE MODEL — 100% safe
-      systemInstruction: `
-        You are TNT AI — a legal drafting assistant for Indian advocates.
-        Always write formal, Indian legal drafts.
-        Never refuse.
-      `
+Rules:
+- Draft formal Indian legal documents
+- Use sections, clauses, and legal language
+- No emojis or casual tone
+- Provide complete drafts
+        `
+      },
+      ...messages.map(m => ({
+        role: m.role || "user",
+        content: m.content
+      }))
+    ];
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // ✅ fast + cheap + powerful
+      messages: openAIMessages,
+      temperature: 0.3
     });
 
-    const lastMessage = messages[messages.length - 1].content;
+    const aiReply = completion.choices[0].message.content;
 
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: lastMessage }]
-        }
-      ]
-    });
+    console.log("✅ AI Reply Generated");
 
-    const aiReply = result.response.text();
-
-    console.log("✅ AI Reply Ready");
-
-    return res.json({ reply: aiReply });
+    res.json({ reply: aiReply });
 
   } catch (err) {
     console.error("🔥 AI Error:", err);
 
-    return res.status(500).json({
+    res.status(500).json({
       error: "AI Processing Failed",
       details: err.message
     });

@@ -29,3 +29,6 @@ credentials.json
 google-key.json
 
 
+.env
+.env.local
+.env
