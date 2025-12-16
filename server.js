@@ -40,43 +40,26 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// 🔥 FIX: Standard CORS Configuration with Whitelist
-// This replaces the old CORS logic and removes the manual OPTIONS handler
+// 🔥 FINAL, ULTIMATE CORS FIX (Use app.use(cors()) for simplicity and robustness)
+// This is the simplest and most forgiving way to enable CORS for all origins.
 // ----------------------
-const allowedOrigins = [
-    'https://www.talkntype.com', // Your main production domain
-    'https://talkntype.com',     // Your secondary production domain
-    'https://talkntype.onrender.com', // Added: The API's own host (Render URL)
-    // Add other testing or staging origins here if needed.
-];
+app.use(cors());
 
-const corsOptions = {
-    // Check if the requesting origin is in the allowed list
-    origin: (origin, callback) => {
-        // 1. Allow requests with no origin (e.g., from Postman, cURL, or server-to-server)
-        if (!origin) return callback(null, true);
-        
-        // 2. Allow whitelisted domains OR any localhost development instance
-        if (allowedOrigins.includes(origin) || origin.startsWith("http://localhost")) {
-            // Set the Access-Control-Allow-Origin header to the specific origin
-            callback(null, true); 
-        } else {
-            // Block the origin if it's not whitelisted and log the failure
-            console.error(`CORS Blocked Failure: Origin ${origin} not in allowed list: ${allowedOrigins.join(', ')}.`);
-            callback(new Error(`CORS Blocked: Origin ${origin}`), false); 
-        }
-    },
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204 // Handle preflight OPTIONS requests automatically
-};
+// --- CRUCIAL MANUAL PREFLIGHT HANDLER ---
+// Add explicit headers for all requests, and handle OPTIONS directly
+app.use((req, res, next) => {
+    // This is the most permissive header to allow all origins
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-// Apply the standard CORS middleware globally
-app.use(cors(corsOptions));
-
-// NOTE: The previous manual 'FORCE PREFLIGHT' block has been removed as it conflicted
-// with the standard 'cors' middleware handling of OPTIONS requests.
+    // Handle preflight requests (OPTIONS) directly
+    if (req.method === 'OPTIONS') {
+        // Send a 200 OK status code for preflight requests
+        return res.sendStatus(200); 
+    }
+    next();
+});
 
 // ----------------------
 // ROOT
