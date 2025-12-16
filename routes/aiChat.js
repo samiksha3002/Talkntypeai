@@ -3,48 +3,30 @@ import OpenAI from "openai";
 
 const router = express.Router();
 
-// ✅ Initialize OpenAI safely
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-/**
- * 🔹 GET /api/chat
- * Just for health-check / debug
- */
-router.get("/", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    message: "TNT AI Chat API is running. Use POST to chat.",
-  });
-});
-
-/**
- * 🔹 POST /api/chat
- * Main AI chat endpoint
- */
 router.post("/", async (req, res) => {
   console.log("--------------------------------------------------");
   console.log("🔵 NEW LEGAL AI REQUEST");
+  console.log("ENV:", { NODE_ENV: process.env.NODE_ENV, VERCEL: !!process.env.VERCEL, RENDER: !!process.env.RENDER, DYNO: !!process.env.DYNO });
+  console.log("OPENAI_KEY present:", !!process.env.OPENAI_API_KEY, process.env.OPENAI_API_KEY ? `len=${process.env.OPENAI_API_KEY.length}` : '');
 
   try {
     const { messages } = req.body;
 
-    // ✅ Validate input
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({
-        error: "Invalid message format. 'messages' array required.",
-      });
+      console.warn("Invalid messages payload", messages);
+      return res.status(400).json({ error: "Invalid message format" });
     }
 
-    // ✅ Validate API key
     if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({
-        error: "Missing OpenAI API Key",
-      });
+      console.error("Missing OPENAI_API_KEY in process.env");
+      return res.status(500).json({ error: "Missing OpenAI API Key" });
     }
 
-    // ✅ Convert frontend messages → OpenAI format
+    // Convert frontend messages → OpenAI format
     const openAIMessages = [
       {
         role: "system",
@@ -56,37 +38,43 @@ Rules:
 - Use sections, clauses, and legal language
 - No emojis or casual tone
 - Provide complete drafts
-        `,
+        `
       },
-      ...messages.map((m) => ({
+      ...messages.map(m => ({
         role: m.role || "user",
-        content: m.content,
-      })),
+        content: m.content
+      }))
     ];
 
-    // ✅ OpenAI request
+    // Call OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // ✅ fast + cheap + powerful
       messages: openAIMessages,
-      temperature: 0.3,
+      temperature: 0.3
     });
 
-    const aiReply =
-      completion?.choices?.[0]?.message?.content ||
-      "No response generated.";
+    if (!completion || !completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+      console.error("Unexpected OpenAI response:", completion);
+      return res.status(502).json({ error: "Invalid response from OpenAI", raw: completion });
+    }
+
+    const aiReply = completion.choices[0].message.content;
 
     console.log("✅ AI Reply Generated");
 
-    // ✅ Final response
-    res.status(200).json({
-      reply: aiReply,
-    });
-  } catch (err) {
-    console.error("🔥 AI Error:", err);
+    res.json({ reply: aiReply });
 
+  } catch (err) {
+    // Enhanced error logging for production debugging
+    console.error("🔥 AI Error:", err);
+    if (err?.response) {
+      console.error("OpenAI response error:", err.response.status, err.response.data);
+    }
+    // Avoid returning secrets in production
+    const details = err?.response?.data || err?.message || String(err);
     res.status(500).json({
       error: "AI Processing Failed",
-      details: err.message,
+      details
     });
   }
 });
