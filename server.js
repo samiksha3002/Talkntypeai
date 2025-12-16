@@ -40,49 +40,48 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// 🔥 SIMPLE + SAFE CORS (FINAL)
+// 🔥 FIX: Standard CORS Configuration with Whitelist
+// This replaces the old CORS logic and removes the manual OPTIONS handler
 // ----------------------
-app.use(
-  cors({
+const allowedOrigins = [
+    'https://www.talkntype.com', // Your main production domain
+    'https://talkntype.com',     // Your secondary production domain
+    // Add other testing or staging origins here if needed.
+];
+
+const corsOptions = {
+    // Check if the requesting origin is in the allowed list
     origin: (origin, callback) => {
-      // allow server-to-server & curl
-      if (!origin) return callback(null, true);
-
-      // allow your domains + localhost
-      if (
-        origin === "https://www.talkntype.com" ||
-        origin === "https://talkntype.com" ||
-        origin.startsWith("http://localhost")
-      ) {
-        return callback(null, origin);
-      }
-
-      // ❗ do NOT block — reflect origin
-      return callback(null, origin);
+        // 1. Allow requests with no origin (e.g., from Postman, cURL, or server-to-server)
+        if (!origin) return callback(null, true);
+        
+        // 2. Allow whitelisted domains OR any localhost development instance
+        if (allowedOrigins.includes(origin) || origin.startsWith("http://localhost")) {
+            // Set the Access-Control-Allow-Origin header to the specific origin
+            callback(null, true); 
+        } else {
+            // Block the origin if it's not whitelisted
+            console.log(`CORS Blocked: Origin ${origin} not in allowed list.`);
+            callback(new Error('Not allowed by CORS'), false); 
+        }
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 204 // Handle preflight OPTIONS requests automatically
+};
 
-// ----------------------
-// 🔥 FORCE PREFLIGHT (VERY IMPORTANT)
-// ----------------------
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Origin", req.headers.origin);
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    return res.sendStatus(204);
-  }
-  next();
-});
+// Apply the standard CORS middleware globally
+app.use(cors(corsOptions));
+
+// NOTE: The previous manual 'FORCE PREFLIGHT' block has been removed as it conflicted
+// with the standard 'cors' middleware handling of OPTIONS requests.
 
 // ----------------------
 // ROOT
 // ----------------------
 app.get("/", (req, res) => {
-  res.send("TalkNType Server is Running!");
+  res.send("TalkNType Server is Running!");
 });
 
 // ----------------------
@@ -105,16 +104,16 @@ app.use("/api/ai", aiRoutes);
 // ERROR HANDLER
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err.message);
-  res.status(500).json({
-    success: false,
-    message: "Internal Server Error",
-  });
+  console.error("🔥 Server Error:", err.message);
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
 });
 
 // ----------------------
 // START SERVER
 // ----------------------
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
