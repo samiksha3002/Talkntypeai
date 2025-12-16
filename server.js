@@ -72,8 +72,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ✅ Handle preflight requests for all routes
-// Handle preflight requests for all routes
-app.options("/*", cors(corsOptions));
+
 
 
 // ----------------------
