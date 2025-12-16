@@ -5,7 +5,9 @@ import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
 
-const API_BASE_URL =
+// src/components/Editor.jsx
+const API_BASE_URL = "https://tnt-gi49.onrender.com";
+
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const Editor = ({
