@@ -3,9 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 
 export default function AiChat({ contextText }) {
   // 🔧 Option 1: Use env variable (production)
- // Direct hardcoded link for trial
-const API_URL = "https://tnt-gi49.onrender.com/api/chat";
-
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_URL = `${API_BASE_URL}/api/chat`;
 
   // 🔧 Option 2: Hardcode direct link for trial
   // const API_URL = "https://tnt-gi49.onrender.com/api/chat";
