@@ -46,6 +46,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const allowedOrigins = [
     'https://www.talkntype.com', // Your main production domain
     'https://talkntype.com',     // Your secondary production domain
+    'https://talkntype.onrender.com', // Added: The API's own host (Render URL)
     // Add other testing or staging origins here if needed.
 ];
 
@@ -60,9 +61,9 @@ const corsOptions = {
             // Set the Access-Control-Allow-Origin header to the specific origin
             callback(null, true); 
         } else {
-            // Block the origin if it's not whitelisted
-            console.log(`CORS Blocked: Origin ${origin} not in allowed list.`);
-            callback(new Error('Not allowed by CORS'), false); 
+            // Block the origin if it's not whitelisted and log the failure
+            console.error(`CORS Blocked Failure: Origin ${origin} not in allowed list: ${allowedOrigins.join(', ')}.`);
+            callback(new Error(`CORS Blocked: Origin ${origin}`), false); 
         }
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
