@@ -50,8 +50,10 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const allowedOrigins = [
   "https://www.talkntype.com",
   "https://talkntype.com",
-  "http://localhost:3000", // for local dev
+  "http://localhost:3000", // React default
+  "http://localhost:5173", // Vite default
 ];
+
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -62,12 +64,21 @@ const corsOptions = {
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
 };
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions)); // handle preflight for all routes
 
 // Apply CORS globally
 app.use(cors(corsOptions));
-// Handle preflight requests
-app.options("*", cors(corsOptions));
+
+// Explicitly handle preflight requests
+app.options(/.*/, cors(corsOptions));
+
+app.options("/api/chat", cors(corsOptions)); // ensure chat route preflight works
 
 // ----------------------
 // ROUTES
