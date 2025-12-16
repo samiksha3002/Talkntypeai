@@ -1,9 +1,8 @@
 import express from "express";
-
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
+import cors from 'cors'; // <-- Changed to import syntax
 
-import cors from 'cors';
 // ----------------------
 // LOAD ENV FIRST
 // ----------------------
@@ -36,41 +35,52 @@ connectDB();
 // ----------------------
 // BODY PARSER
 // ----------------------
+// For JSON data
 app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// For URL-encoded data (note the limit setting)
+app.use(express.urlencoded({ extended: true, limit: "50mb" })); // <-- Consistent limit setting
 
 // ----------------------
-// 🔥 FINAL, ULTIMATE CORS FIX (Use app.use(cors()) for simplicity and robustness)
-// This is the simplest and most forgiving way to enable CORS for all origins.
+// 🔥 FIX: Standard CORS Configuration with Whitelist
+// This is the correct logic that resolves the 'Access-Control-Allow-Origin' error.
 // ----------------------
-app.use(cors());
+const allowedOrigins = [
+    'https://www.talkntype.com', // 1. HTTPS with www
+    'https://talkntype.com',     // 2. HTTPS without www
+    'http://www.talkntype.com',  // 3. **IMPORTANT: HTTP with www**
+    'http://talkntype.com',      // 4. **IMPORTANT: HTTP without www**
+];
 
-// --- CRUCIAL MANUAL PREFLIGHT HANDLER ---
-// Add explicit headers for all requests, and handle OPTIONS directly
-app.use((req, res, next) => {
-    // This is the most permissive header to allow all origins
-    res.setHeader('Access-Control-Allow-Origin', '*'); 
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+const corsOptions = {
+    // Custom origin function remains the same
+    origin: (origin, callback) => {
+        // ... (rest of the logic is correct)
+        if (!origin) return callback(null, true); 
+        
+        // Now checks against the expanded list including HTTP
+        if (allowedOrigins.includes(origin) || origin.startsWith("http://localhost")) {
+            // Success: allow the specific origin
+            callback(null, true); 
+        } else {
+            // Failure: block the origin and log it
+            console.error(`CORS Blocked Failure: Origin ${origin} not in allowed list: ${allowedOrigins.join(', ')}.`);
+            callback(new Error(`CORS Blocked: Origin ${origin} is not allowed by policy.`), false); 
+        }
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 204 // Handle preflight OPTIONS requests automatically
+};
 
-    // Handle preflight requests (OPTIONS) directly
-    if (req.method === 'OPTIONS') {
-        // Send a 200 OK status code for preflight requests
-        return res.sendStatus(200); 
-    }
-    next();
-});
 
-// ----------------------
-// ROOT
-// ----------------------
+app.use(cors(corsOptions));
+
 app.get("/", (req, res) => {
-  res.send("TalkNType Server is Running!");
+    res.send("TalkNType Server is Running!");
 });
 
-// ----------------------
-// API ROUTES
-// ----------------------
+
 app.use("/api", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deepgram", deepgramRoutes);
@@ -88,16 +98,19 @@ app.use("/api/ai", aiRoutes);
 // ERROR HANDLER
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err.message);
-  res.status(500).json({
-    success: false,
-    message: "Internal Server Error",
-  });
+    console.error("🔥 Server Error:", err.message);
+    // You can inspect if the error is a CORS error
+    const statusCode = err.message.startsWith('CORS Blocked') ? 403 : 500; 
+
+    res.status(statusCode).json({
+        success: false,
+        message: err.message.startsWith('CORS Blocked') ? "Forbidden: Origin not allowed." : "Internal Server Error",
+    });
 });
 
 // ----------------------
 // START SERVER
 // ----------------------
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
