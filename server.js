@@ -54,7 +54,6 @@ const allowedOrigins = [
   "http://localhost:5173", // Vite default
 ];
 
-
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // allow server-to-server or curl
@@ -69,16 +68,8 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
+// Apply CORS globally (only once!)
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions)); // handle preflight for all routes
-
-// Apply CORS globally
-app.use(cors(corsOptions));
-
-// Explicitly handle preflight requests
-app.options(/.*/, cors(corsOptions));
-
-app.options("/api/chat", cors(corsOptions)); // ensure chat route preflight works
 
 // ----------------------
 // ROUTES
