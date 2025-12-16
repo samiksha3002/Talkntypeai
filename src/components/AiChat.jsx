@@ -2,8 +2,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function AiChat({ contextText }) {
- const API_URL = "/api/chat";
 
+  // ✅ ALWAYS call backend on Render
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
+  const API_URL = `${API_BASE_URL}/api/chat`;
 
   const [messages, setMessages] = useState([
     {
@@ -24,7 +26,12 @@ export default function AiChat({ contextText }) {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMessage = { id: Date.now().toString(), role: 'user', content: input };
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input
+    };
+
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -34,22 +41,23 @@ export default function AiChat({ contextText }) {
 
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           messages: [...messages, userMessage]
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        throw new Error(`Server Error: ${response.status} - ${text}`);
       }
 
-      // Always parse JSON directly
       const json = await response.json();
-      console.log("🟢 Raw Backend JSON:", json);
+      console.log("🟢 Backend JSON:", json);
 
-      // FINAL fixed output mapping
-      const data =
+      const reply =
         json.reply ||
         json.content ||
         json.text ||
@@ -58,20 +66,22 @@ export default function AiChat({ contextText }) {
       const botMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: data
+        content: reply
       };
 
       setMessages((prev) => [...prev, botMessage]);
+
     } catch (error) {
       console.error("🔴 Chat Error:", error);
 
-      const errorMessage = {
-        id: 'error',
-        role: 'assistant',
-        content: `Error: ${error.message}`
-      };
-
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'error-' + Date.now(),
+          role: 'assistant',
+          content: `❌ ${error.message}`
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +99,9 @@ export default function AiChat({ contextText }) {
         <h3 className="font-bold text-sm flex items-center gap-2">
           ⚖️ TNT Legal Assistant
         </h3>
-        <p className="text-[10px] text-gray-400">Powered by Google Gemini</p>
+        <p className="text-[10px] text-gray-400">
+          Powered by Google Gemini
+        </p>
       </div>
 
       {/* Messages */}
@@ -100,7 +112,7 @@ export default function AiChat({ contextText }) {
           return (
             <div
               key={m.id}
-              className={`flex gap-2 ${
+              className={`flex ${
                 m.role === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
@@ -108,10 +120,10 @@ export default function AiChat({ contextText }) {
                 className={`max-w-[85%] p-3 rounded-lg text-sm shadow-sm ${
                   m.role === 'user'
                     ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                    : 'bg-white text-gray-800 border rounded-bl-none'
                 }`}
               >
-                <strong className="block text-[10px] mb-1 opacity-70 uppercase tracking-wide">
+                <strong className="block text-[10px] mb-1 opacity-70 uppercase">
                   {m.role === 'user' ? 'You' : 'TNT AI'}
                 </strong>
                 <div className="whitespace-pre-wrap">{m.content}</div>
@@ -122,7 +134,7 @@ export default function AiChat({ contextText }) {
 
         {isLoading && (
           <div className="flex justify-start animate-pulse">
-            <div className="bg-gray-200 text-gray-500 text-xs px-3 py-2 rounded-lg rounded-bl-none">
+            <div className="bg-gray-200 text-gray-500 text-xs px-3 py-2 rounded-lg">
               Thinking...
             </div>
           </div>
@@ -131,10 +143,13 @@ export default function AiChat({ contextText }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Box */}
-      <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-gray-200 flex gap-2">
+      {/* Input */}
+      <form
+        onSubmit={handleSubmit}
+        className="p-3 bg-white border-t flex gap-2"
+      >
         <input
-          className="flex-1 bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+          className="flex-1 bg-gray-50 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 text-black"
           value={input}
           onChange={handleInputChange}
           placeholder="Ask a legal query..."
@@ -142,7 +157,7 @@ export default function AiChat({ contextText }) {
         <button
           type="submit"
           disabled={isLoading}
-          className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="bg-blue-600 text-white p-2 rounded-md disabled:opacity-50"
         >
           ➤
         </button>
