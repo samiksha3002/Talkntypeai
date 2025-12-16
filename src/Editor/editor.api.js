@@ -1,4 +1,6 @@
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Direct hardcoded link for trial
+const API = "https://tnt-gi49.onrender.com";
+
 
 export const fixGrammar = async (text, setText, setLoading, API_URL = API) => {
   if (!text?.trim()) return alert("Type something first");

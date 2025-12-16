@@ -15,7 +15,8 @@ const AudioToText = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/audio-to-text", formData);
+     const res = await axios.post("https://tnt-gi49.onrender.com/api/audio-to-text", formData);
+
       setText(res.data.text);
     } catch (err) {
       console.error(err);
