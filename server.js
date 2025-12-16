@@ -45,13 +45,13 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// ✅ FIXED GLOBAL CORS CONFIG
+// ✅ GLOBAL CORS CONFIG
 // ----------------------
 const allowedOrigins = [
   "https://www.talkntype.com",
   "https://talkntype.com",
-  "http://localhost:3000", // React default
-  "http://localhost:5173", // Vite default
+  "http://localhost:3000",
+  "http://localhost:5173",
 ];
 
 const corsOptions = {
@@ -70,10 +70,6 @@ const corsOptions = {
 
 // ✅ Apply CORS globally before routes
 app.use(cors(corsOptions));
-
-// ✅ Handle preflight requests for all routes
-
-
 
 // ----------------------
 // ROUTES

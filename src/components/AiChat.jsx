@@ -1,22 +1,25 @@
 // src/components/AiChat.jsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 
 export default function AiChat({ contextText }) {
+  // 🔧 Option 1: Use env variable (production)
+ // Direct hardcoded link for trial
+const API_URL = "https://tnt-gi49.onrender.com/api/chat";
 
-  // ✅ ALWAYS call backend on Render
-  const API_BASE_URL = import.meta.env.VITE_API_URL;
-  const API_URL = `${API_BASE_URL}/api/chat`;
+
+  // 🔧 Option 2: Hardcode direct link for trial
+  // const API_URL = "https://tnt-gi49.onrender.com/api/chat";
 
   const [messages, setMessages] = useState([
     {
-      id: 'welcome',
-      role: 'system',
+      id: "welcome",
+      role: "system",
       content:
-        "Hello Advocate! I am TNT AI. I can help you draft legal documents based on Indian Law. Try asking: 'Draft a bail application'."
-    }
+        "Hello Advocate! I am TNT AI. I can help you draft legal documents based on Indian Law. Try asking: 'Draft a bail application'.",
+    },
   ]);
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -28,25 +31,25 @@ export default function AiChat({ contextText }) {
 
     const userMessage = {
       id: Date.now().toString(),
-      role: 'user',
-      content: input
+      role: "user",
+      content: input,
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    setInput("");
     setIsLoading(true);
 
     try {
       console.log("🔵 Sending request to:", API_URL);
 
       const response = await fetch(API_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: [...messages, userMessage]
-        })
+          messages: [...messages, userMessage],
+        }),
       });
 
       if (!response.ok) {
@@ -58,29 +61,25 @@ export default function AiChat({ contextText }) {
       console.log("🟢 Backend JSON:", json);
 
       const reply =
-        json.reply ||
-        json.content ||
-        json.text ||
-        "(Empty response from AI)";
+        json.reply || json.content || json.text || "(Empty response from AI)";
 
       const botMessage = {
         id: Date.now().toString(),
-        role: 'assistant',
-        content: reply
+        role: "assistant",
+        content: reply,
       };
 
       setMessages((prev) => [...prev, botMessage]);
-
     } catch (error) {
       console.error("🔴 Chat Error:", error);
 
       setMessages((prev) => [
         ...prev,
         {
-          id: 'error-' + Date.now(),
-          role: 'assistant',
-          content: `❌ ${error.message}`
-        }
+          id: "error-" + Date.now(),
+          role: "assistant",
+          content: `❌ ${error.message}`,
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -93,38 +92,35 @@ export default function AiChat({ contextText }) {
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-200">
-
       {/* Header */}
       <div className="bg-slate-900 text-white p-3 shadow-md">
         <h3 className="font-bold text-sm flex items-center gap-2">
           ⚖️ TNT Legal Assistant
         </h3>
-        <p className="text-[10px] text-gray-400">
-          Powered by Google Gemini
-        </p>
+        <p className="text-[10px] text-gray-400">Powered by TNT AI</p>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.map((m) => {
-          if (m.role === 'system') return null;
+          if (m.role === "system") return null;
 
           return (
             <div
               key={m.id}
               className={`flex ${
-                m.role === 'user' ? 'justify-end' : 'justify-start'
+                m.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
               <div
                 className={`max-w-[85%] p-3 rounded-lg text-sm shadow-sm ${
-                  m.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white text-gray-800 border rounded-bl-none'
+                  m.role === "user"
+                    ? "bg-blue-600 text-white rounded-br-none"
+                    : "bg-white text-gray-800 border rounded-bl-none"
                 }`}
               >
                 <strong className="block text-[10px] mb-1 opacity-70 uppercase">
-                  {m.role === 'user' ? 'You' : 'TNT AI'}
+                  {m.role === "user" ? "You" : "TNT AI"}
                 </strong>
                 <div className="whitespace-pre-wrap">{m.content}</div>
               </div>
@@ -144,10 +140,7 @@ export default function AiChat({ contextText }) {
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="p-3 bg-white border-t flex gap-2"
-      >
+      <form onSubmit={handleSubmit} className="p-3 bg-white border-t flex gap-2">
         <input
           className="flex-1 bg-gray-50 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 text-black"
           value={input}
