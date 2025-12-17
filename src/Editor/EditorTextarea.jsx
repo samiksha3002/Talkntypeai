@@ -1,4 +1,5 @@
 import AiChat from "../components/AiChat";
+
 const EditorTextarea = ({ manualText, setManualText, showChat }) => (
   <div className="flex flex-1 overflow-hidden">
     <textarea
@@ -12,6 +13,7 @@ const EditorTextarea = ({ manualText, setManualText, showChat }) => (
 
     {showChat && (
       <div className="w-1/3 border-l">
+        {/* Note: Ensure AiChat takes contextText prop */}
         <AiChat contextText={manualText} />
       </div>
     )}

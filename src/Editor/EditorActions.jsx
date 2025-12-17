@@ -1,11 +1,11 @@
 import { useRef } from "react";
-import AiButton from "./AiButton"; // Make sure path correct ho
+import AiButton from "./AiButton"; 
 import {
   fixGrammar,
   expandText,
   uploadOCR,
   uploadAudio
-} from "./editor.api"; // Make sure ye file exist karti ho
+} from "./editor.api"; 
 
 const EditorActions = ({
   manualText,
@@ -26,7 +26,9 @@ const EditorActions = ({
   setShowDraftPopup,
   isAIGenerating,
 
-  API_BASE_URL
+  API_BASE_URL,
+  // 💡 ADDED: Receiving setTranslationCommand prop
+  setTranslationCommand, 
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
@@ -38,6 +40,21 @@ const EditorActions = ({
       e.target.value = null; // ✅ Reset value to allow re-uploading same file
     }
   };
+  
+  // 🌐 Example Translation Trigger (If you need a button for it)
+  // NOTE: Assuming translation is triggered elsewhere (like EditorToolbar), 
+  // but if you needed a button here, you'd use setTranslationCommand.
+  /*
+  const handleTranslate = () => {
+      // Example: Translate current text to Tamil ('ta')
+      if (manualText) {
+          setTranslationCommand({
+              textToTranslate: manualText,
+              lang: 'ta' 
+          });
+      }
+  };
+  */
 
   return (
     <div className="bg-indigo-50 border-b p-2 flex gap-2 flex-wrap">
@@ -62,8 +79,10 @@ const EditorActions = ({
       <AiButton
         label={isOCRLoading ? "⏳ Extracting..." : "🖼️ Image → Text"}
         color="purple"
-        isActive={!isOCRLoading}
-        onClick={() => ocrRef.current.click()}
+        // Changed isActive prop name for clarity
+        onClick={() => !isOCRLoading && ocrRef.current.click()} 
+        // isActive={!isOCRLoading} was passed but not used, 
+        // using the ternary for label and disabling click if loading
       />
 
       <input
@@ -78,8 +97,8 @@ const EditorActions = ({
       <AiButton
         label={isAudioLoading ? "⏳ Converting..." : "🎵 Audio → Text"}
         color="green"
-        isActive={!isAudioLoading}
-        onClick={() => audioRef.current.click()}
+        // Changed isActive prop name for clarity
+        onClick={() => !isAudioLoading && audioRef.current.click()}
       />
 
       <input
@@ -103,10 +122,18 @@ const EditorActions = ({
       <AiButton
         label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"}
         color="purple"
-        isActive={!isAIGenerating}
-        onClick={() => setShowDraftPopup(true)}
+        // Changed isActive prop name for clarity
+        onClick={() => !isAIGenerating && setShowDraftPopup(true)}
       />
-
+      
+      {/* Example Translation Button - Uncomment if needed */}
+      {/*
+      <AiButton
+        label="🌐 Translate to Tamil"
+        color="blue"
+        onClick={handleTranslate}
+      />
+      */}
     </div>
   );
 };

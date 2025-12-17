@@ -26,13 +26,14 @@ import audioToTextRoutes from "./routes/audioToText.js";
 import expandRoute from "./routes/expand.js";
 import fixGrammarRoute from "./routes/fixGrammar.js";
 import fontConvertRoute from "./routes/fontConvert.js";
+import translateRouter from "./routes/translate.js";
 
 // ----------------------
 // APP INIT
 // ----------------------
 const app = express();
 const PORT = process.env.PORT || 5000;
-
+app.use(express.json()); 
 // ----------------------
 // CONNECT DATABASE
 // ----------------------
@@ -90,6 +91,7 @@ app.use("/api/expand", expandRoute);
 app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRoute);
 app.use("/api/ai", aiRoutes);
+app.use("/api/translate", translateRouter);
 
 // ----------------------
 // ERROR HANDLER

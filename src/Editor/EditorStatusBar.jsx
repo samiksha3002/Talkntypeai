@@ -6,7 +6,7 @@ const EditorStatusBar = ({
   isConverting,
   isOCRLoading
 }) => (
-  <div className="h-8 bg-sky-50 border-t px-4 flex justify-between text-xs">
+  <div className="h-8 bg-sky-50 border-t px-4 flex justify-between items-center text-xs">
     <span>
       {isTranslating || isTransliterating || isConverting || isOCRLoading
         ? "Processing..."
