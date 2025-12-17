@@ -1,20 +1,14 @@
-// ----------------------
-// IMPORTS
-// ----------------------
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from "cors";
 
-// ----------------------
-// LOAD ENV FIRST
-// ----------------------
 dotenv.config();
 
 // ----------------------
 // ROUTE IMPORTS
 // ----------------------
-import aiRoutes from "./routes/ai.js";
+import draftRouter from "./routes/draft.routes.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import deepgramRoutes from "./routes/deepgram.js";
@@ -25,15 +19,12 @@ import ocrRoutes from "./routes/ocr.js";
 import audioToTextRoutes from "./routes/audioToText.js";
 import expandRoute from "./routes/expand.js";
 import fixGrammarRoute from "./routes/fixGrammar.js";
-import fontConvertRoute from "./routes/fontConvert.js";
-import translateRouter from "./routes/translate.js";
+import fontConvertRouter from "./routes/fontConvert.js";
+import transliterateRouter from "./routes/transliterate.js";
 
-// ----------------------
-// APP INIT
-// ----------------------
 const app = express();
 const PORT = process.env.PORT || 5000;
-app.use(express.json()); 
+
 // ----------------------
 // CONNECT DATABASE
 // ----------------------
@@ -57,7 +48,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow server-to-server or curl
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -69,7 +60,6 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-// ✅ Apply CORS globally before routes
 app.use(cors(corsOptions));
 
 // ----------------------
@@ -89,9 +79,9 @@ app.use("/api/ocr", ocrRoutes);
 app.use("/api/audio-to-text", audioToTextRoutes);
 app.use("/api/expand", expandRoute);
 app.use("/api/fix-grammar", fixGrammarRoute);
-app.use("/api/font-convert", fontConvertRoute);
-app.use("/api/ai", aiRoutes);
-app.use("/api/translate", translateRouter);
+app.use("/api/font-convert", fontConvertRouter);
+app.use("/api/draft", draftRouter);
+app.use("/api/transliterate", transliterateRouter);
 
 // ----------------------
 // ERROR HANDLER

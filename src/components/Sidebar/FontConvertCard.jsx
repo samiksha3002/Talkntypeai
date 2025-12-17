@@ -1,43 +1,55 @@
-import React from 'react';
+import React, { useState } from "react";
 
-const FontConvertCard = ({ onFontConvert, isConverting }) => {
-    // ⚠️ Ismein aapko actual font selection logic (dropdown) dalna padega.
-    // Filhaal, hum 'krutidev' font ke liye ek hardcoded button banate hain.
-    const handleConvert = () => {
-        onFontConvert('krutidev'); // 'krutidev' code pass karega Dashboard ko
-    };
+const fontOptions = [
+  { code: "unicode", label: "Convert to Unicode (Devanagari)" },
+  { code: "krutidev", label: "Convert to KrutiDev" },
+];
 
-    return (
-        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl shadow-md mb-4">
-            <h3 className="text-sm font-bold text-orange-700 uppercase mb-2">
-                🅰️ Font Conversion
-            </h3>
-            
-            {/* 1. Dropdown for Font Selection (Aap ismein aur fonts add kar sakte hain) */}
-            <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Convert Editor Text to Font:
-                </label>
-                <select className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
-                    <option value="krutidev">Krutidev 10</option>
-                    <option value="mangala">Mangal (Unicode)</option>
-                </select>
-            </div>
-            
-            {/* 2. Conversion Button */}
-            <button
-                onClick={handleConvert}
-                disabled={isConverting}
-                className={`w-full py-2 px-4 rounded-xl text-white font-semibold transition-colors ${
-                    isConverting 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-orange-500 hover:bg-orange-600'
-                }`}
-            >
-                {isConverting ? 'Converting...' : 'Convert Font'}
-            </button>
-        </div>
-    );
+const FontConvertCard = ({ onFontConvert, isConverting, editorText }) => {
+  const [targetFont, setTargetFont] = useState("unicode");
+  const [error, setError] = useState("");
+
+  const handleClick = () => {
+  if (!editorText || editorText.trim() === "") {
+    setError("⚠️ Please enter text in the editor first.");
+    return;
+  }
+  setError("");
+
+  if (onFontConvert) {
+    onFontConvert(targetFont); // ✅ send lowercase code
+  }
+};
+
+  return (
+    <div className="bg-purple-50 rounded-lg p-3 mb-4 border border-purple-100 shadow-sm">
+      <h3 className="text-xs font-bold text-purple-500 mb-2 flex items-center gap-2 uppercase">
+        🅰️ Font Conversion
+      </h3>
+
+      <select
+        value={targetFont}
+        onChange={(e) => setTargetFont(e.target.value)}
+        className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-purple-500 cursor-pointer"
+      >
+        {fontOptions.map((f) => (
+          <option key={f.code} value={f.code}>{f.label}</option>
+        ))}
+      </select>
+
+      {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
+
+      <button
+        onClick={handleClick}
+        disabled={isConverting}
+        className={`w-full py-2 rounded text-sm font-medium transition shadow-sm flex items-center justify-center gap-2 ${
+          isConverting ? "bg-purple-300 text-purple-700 cursor-not-allowed" : "bg-purple-600 text-white hover:bg-purple-700"
+        }`}
+      >
+        {isConverting ? "⏳ Converting..." : "🔄 Convert Font"}
+      </button>
+    </div>
+  );
 };
 
 export default FontConvertCard;

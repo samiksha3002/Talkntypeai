@@ -10,56 +10,32 @@ import {
 const EditorActions = ({
   manualText,
   setManualText,
-
   showChat,
   setShowChat,
-
   setIsTranslating,
-
   isOCRLoading,
   setIsOCRLoading,
-
   isAudioLoading,
   setIsAudioLoading,
-
-  // 🔴 DRAFT RELATED PROPS
   setShowDraftPopup,
   isAIGenerating,
-
   API_BASE_URL,
-  // 💡 ADDED: Receiving setTranslationCommand prop
-  setTranslationCommand, 
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
 
-  // 🛠️ Helper to handle file selection safely
+  // 🛠️ File handler for OCR and Audio uploads
   const handleFileSelect = (e, uploadFunction, setLoadingState) => {
     if (e.target.files && e.target.files[0]) {
       uploadFunction(e, setManualText, setLoadingState, API_BASE_URL);
-      e.target.value = null; // ✅ Reset value to allow re-uploading same file
+      e.target.value = null; // Input reset taaki same file dubara select ho sake
     }
   };
-  
-  // 🌐 Example Translation Trigger (If you need a button for it)
-  // NOTE: Assuming translation is triggered elsewhere (like EditorToolbar), 
-  // but if you needed a button here, you'd use setTranslationCommand.
-  /*
-  const handleTranslate = () => {
-      // Example: Translate current text to Tamil ('ta')
-      if (manualText) {
-          setTranslationCommand({
-              textToTranslate: manualText,
-              lang: 'ta' 
-          });
-      }
-  };
-  */
 
   return (
     <div className="bg-indigo-50 border-b p-2 flex gap-2 flex-wrap">
 
-      {/* ✨ Fix Grammar */}
+      {/* ✨ AI Fix Grammar */}
       <AiButton
         label="✨ Fix Grammar"
         color="blue"
@@ -68,23 +44,12 @@ const EditorActions = ({
         }
       />
 
-      {/* 📝 AI Chat */}
-      <AiButton
-        label={showChat ? "❌ Close Chat" : "📝 AI Chat"}
-        color="blue"
-        onClick={() => setShowChat(!showChat)}
-      />
-
-      {/* 🖼️ OCR (Image to Text) */}
+      {/* 🖼️ Image to Text (OCR) */}
       <AiButton
         label={isOCRLoading ? "⏳ Extracting..." : "🖼️ Image → Text"}
         color="purple"
-        // Changed isActive prop name for clarity
-        onClick={() => !isOCRLoading && ocrRef.current.click()} 
-        // isActive={!isOCRLoading} was passed but not used, 
-        // using the ternary for label and disabling click if loading
+        onClick={() => !isOCRLoading && ocrRef.current.click()}
       />
-
       <input
         ref={ocrRef}
         type="file"
@@ -97,10 +62,8 @@ const EditorActions = ({
       <AiButton
         label={isAudioLoading ? "⏳ Converting..." : "🎵 Audio → Text"}
         color="green"
-        // Changed isActive prop name for clarity
         onClick={() => !isAudioLoading && audioRef.current.click()}
       />
-
       <input
         ref={audioRef}
         type="file"
@@ -109,7 +72,14 @@ const EditorActions = ({
         onChange={(e) => handleFileSelect(e, uploadAudio, setIsAudioLoading)}
       />
 
-      {/* ↔️ Expand Text */}
+      {/* 📝 Toggle AI Chat Window */}
+      <AiButton
+        label={showChat ? "❌ Close Chat" : "📝 AI Chat"}
+        color="blue"
+        onClick={() => setShowChat(!showChat)}
+      />
+
+      {/* ↔️ Expand Content */}
       <AiButton
         label="↔️ Expand"
         color="green"
@@ -118,22 +88,13 @@ const EditorActions = ({
         }
       />
 
-      {/* 🧠 GENERATE DRAFT */}
+      {/* 🧠 AI Draft Generation */}
       <AiButton
         label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"}
         color="purple"
-        // Changed isActive prop name for clarity
         onClick={() => !isAIGenerating && setShowDraftPopup(true)}
       />
-      
-      {/* Example Translation Button - Uncomment if needed */}
-      {/*
-      <AiButton
-        label="🌐 Translate to Tamil"
-        color="blue"
-        onClick={handleTranslate}
-      />
-      */}
+
     </div>
   );
 };

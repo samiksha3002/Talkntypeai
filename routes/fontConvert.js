@@ -1,17 +1,71 @@
 import express from "express";
-import { convertToKrutiDev } from "../utils/fontConverter.js";
-
 const router = express.Router();
 
-router.post("/convert", (req, res) => {
-    const { text } = req.body;
+// 🔠 Unicode (Mangal) → KrutiDev mapping (starter)
+const unicodeToKrutiMap = {
+  "क": "d",
+  "ख": "[",
+  "ग": "x",
+  "घ": "X",
+  "च": "p",
+  "छ": "P",
+  "ज": "h",
+  "झ": "H",
+  "ट": "V",
+  "ठ": "B",
+  "ड": "M",
+  "ढ": "<",
+  "त": "r",
+  "थ": "F",
+  "द": "n",
+  "ध": "/",
+  "न": "u",
+  "प": "i",
+  "फ": "Q",
+  "ब": "c",
+  "भ": "e",
+  "म": "m",
+  "य": ";",
+  "र": "j",
+  "ल": "y",
+  "व": "o",
+  "श": "'",
+  "ष": "\"",
+  "स": "l",
+  "ह": "g",
+  "ा": "k",
+  "ि": "f",
+  "ी": "h",
+  "ु": "q",
+  "ू": "w",
+  "े": "s",
+  "ै": "S",
+  "ो": "ks",
+  "ौ": "kS",
+  "ं": "a",
+  "ः": "%",
+  "्": "~"
+};
 
-    if (!text) {
-        return res.status(400).json({ error: "No text provided" });
-    }
+// 🔁 converter
+function unicodeToKruti(text) {
+  let out = "";
+  for (let ch of text) {
+    out += unicodeToKrutiMap[ch] || ch;
+  }
+  return out;
+}
 
-    const converted = convertToKrutiDev(text);
-    res.json({ converted });
+// 🚀 API route
+router.post("/unicode-to-krutidev", (req, res) => {
+  const { text } = req.body;
+
+  if (!text) {
+    return res.status(400).json({ error: "Text is required" });
+  }
+
+  const convertedText = unicodeToKruti(text);
+  res.json({ convertedText });
 });
 
 export default router;
