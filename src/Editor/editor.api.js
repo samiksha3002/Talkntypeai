@@ -70,21 +70,19 @@ export const uploadAudio = async (e, setText, setLoading, API_URL = API) => {
 
 
 
-export const generateDraftAPI = async (
-  { prompt, language, draftType = "General" },
-  API_URL = API
-) => {
-  try {
-    const res = await fetch(`${API_URL}/api/generate-draft`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, language, draftType }),
-    });
+export async function generateDraftAPI(data) {
+  const res = await fetch(`${API_BASE_URL}/api/ai/generate-draft`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(data)
+  });
 
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error("Draft API error:", err);
-    throw err;
+  if (!res.ok) {
+    throw new Error("Draft API failed");
   }
-};
+
+  return res.json();
+}
+
