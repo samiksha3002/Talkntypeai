@@ -20,19 +20,31 @@ const DraftPopup = ({ onClose, setManualText, setIsAIGenerating }) => {
   const [prompt, setPrompt] = useState("");
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return alert("Enter prompt");
+    if (!selectedDraft) {
+      return alert("Please select a draft type first");
+    }
+    if (!prompt.trim()) {
+      return alert("Enter prompt");
+    }
 
     try {
       setIsAIGenerating(true);
 
       const res = await generateDraftAPI({
-        prompt: `${selectedDraft.title}: ${prompt}`,
-        language: "English"
+        prompt, // only user input
+        language: "English",
+        draftType: selectedDraft.title // pass draft type separately
       });
 
-      setManualText(res.text || res.draft);
+      if (!res.text || res.text === "No draft generated.") {
+        alert("AI did not return a valid draft. Try a clearer prompt.");
+        return;
+      }
+
+      setManualText(res.text);
       onClose();
     } catch (e) {
+      console.error("Draft generation failed:", e);
       alert("Draft generation failed");
     } finally {
       setIsAIGenerating(false);
@@ -75,7 +87,7 @@ const DraftPopup = ({ onClose, setManualText, setIsAIGenerating }) => {
         )}
 
         {/* STEP 2 */}
-        {step === 2 && (
+        {step === 2 && selectedDraft && (
           <>
             <h2 className="text-xl font-semibold mb-2">
               {selectedDraft.title}

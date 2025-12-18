@@ -19,16 +19,22 @@ const EditorActions = ({
   setIsAudioLoading,
   setShowDraftPopup,
   isAIGenerating,
-  API_BASE_URL,
+  API, // ✅ use API instead of API_BASE_URL
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
 
   // 🛠️ File handler for OCR and Audio uploads
-  const handleFileSelect = (e, uploadFunction, setLoadingState) => {
+  const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
     if (e.target.files && e.target.files[0]) {
-      uploadFunction(e, setManualText, setLoadingState, API_BASE_URL);
-      e.target.value = null; // Input reset taaki same file dubara select ho sake
+      try {
+        await uploadFunction(e, setManualText, setLoadingState, API);
+      } catch (err) {
+        console.error("File upload error:", err);
+        alert("Failed to process file");
+      } finally {
+        e.target.value = null; // reset so same file can be reselected
+      }
     }
   };
 
@@ -40,7 +46,7 @@ const EditorActions = ({
         label="✨ Fix Grammar"
         color="blue"
         onClick={() =>
-          fixGrammar(manualText, setManualText, setIsTranslating, API_BASE_URL)
+          fixGrammar(manualText, setManualText, setIsTranslating, API)
         }
       />
 
@@ -84,7 +90,7 @@ const EditorActions = ({
         label="↔️ Expand"
         color="green"
         onClick={() =>
-          expandText(manualText, setManualText, setIsTranslating, API_BASE_URL)
+          expandText(manualText, setManualText, setIsTranslating, API)
         }
       />
 
@@ -92,6 +98,7 @@ const EditorActions = ({
       <AiButton
         label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"}
         color="purple"
+        disabled={isAIGenerating} // ✅ prevent double clicks
         onClick={() => !isAIGenerating && setShowDraftPopup(true)}
       />
 

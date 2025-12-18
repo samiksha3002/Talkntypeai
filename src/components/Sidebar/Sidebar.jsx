@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import StenoCard from './Stenocard'; 
 import TranslationCard from './TranslationCard';
 import TransliterationCard from './TransliterationCard';
@@ -7,25 +7,56 @@ import FontConvertCard from './FontConvertCard';
 const Sidebar = ({ 
   onSpeechInput, 
   onTranslate, 
-  onTransliterate, 
   onFontConvert, 
   isTranslating, 
-  isTransliterating,
   isConverting,
-  editorText 
+  editorText,
+  setManualText
 }) => {
+  const [isTransliterating, setIsTransliterating] = useState(false);
+
+  const handleTransliterate = async (targetScript) => {
+    if (!editorText || !editorText.trim()) {
+      alert("⚠️ Please enter text in the editor first.");
+      return;
+    }
+
+    try {
+      setIsTransliterating(true);
+
+      const res = await fetch("http://localhost:5000/api/transliterate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: editorText,
+          sourceLang: "hi",         
+          targetLang: "hi",         
+          // targetScript: 'en' from UI maps to 'Latn', anything else to 'Deva'
+          targetScript: targetScript === "en" ? "Latn" : "Deva"
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.details || "Transliteration API failed");
+      }
+
+      // Update the editor with the new transliterated text
+      setManualText(data.transliteratedText || "");
+    } catch (err) {
+      console.error("Transliteration failed:", err);
+      alert(`Transliteration Error: ${err.message}`);
+    } finally {
+      setIsTransliterating(false);
+    }
+  };
+
   return (
     <aside 
       className="w-full flex flex-col gap-3 p-3 overflow-y-auto"
-      style={{ 
-        height: 'calc(100vh - 160px)', // Footer aur Header ke beech fit karne ke liye
-        scrollbarWidth: 'thin',        // Firefox ke liye chota scrollbar
-      }}
+      style={{ height: 'calc(100vh - 160px)', scrollbarWidth: 'thin' }}
     >
-      {/* Har card ko 'flex-shrink-0' diya hai taaki wo pichke nahi, 
-          aur humne gap-3 use kiya hai space bachane ke liye 
-      */}
-      
       <div className="flex-shrink-0">
         <StenoCard onSpeechInput={onSpeechInput} />
       </div>
@@ -40,7 +71,7 @@ const Sidebar = ({
 
       <div className="flex-shrink-0">
         <TransliterationCard 
-          onTransliterate={onTransliterate} 
+          onTransliterate={handleTransliterate} 
           isTransliterating={isTransliterating}
           editorText={editorText} 
         />
@@ -54,7 +85,6 @@ const Sidebar = ({
         />
       </div>
 
-      {/* Ek extra space niche taaki last button status bar ke piche na jaye */}
       <div className="h-10 flex-shrink-0"></div>
     </aside>
   );
