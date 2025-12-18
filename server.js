@@ -1,26 +1,13 @@
+// server.js
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from "cors";
 
+// ----------------------
+// LOAD ENV VARIABLES
+// ----------------------
 dotenv.config();
-
-// ----------------------
-// ROUTE IMPORTS
-// ----------------------
-import draftRouter from "./routes/draft.routes.js";
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
-import deepgramRoutes from "./routes/deepgram.js";
-import caseRoutes from "./routes/cases.js";
-import translationRoutes from "./routes/translation.js";
-import aiChatRoutes from "./routes/aiChat.js";
-import ocrRoutes from "./routes/ocr.js";
-import audioToTextRoutes from "./routes/audioToText.js";
-import expandRoute from "./routes/expand.js";
-import fixGrammarRoute from "./routes/fixGrammar.js";
-import fontConvertRouter from "./routes/fontConvert.js";
-import transliterateRouter from "./routes/transliterate.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -63,6 +50,27 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ----------------------
+// ROUTE IMPORTS
+// ----------------------
+import draftRouter from "./routes/draft.routes.js";
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import deepgramRoutes from "./routes/deepgram.js";
+import caseRoutes from "./routes/cases.js";
+import translationRoutes from "./routes/translation.js";
+import aiChatRoutes from "./routes/aiChat.js";
+import ocrRoutes from "./routes/ocr.js";
+import audioToTextRoutes from "./routes/audioToText.js";
+import expandRoute from "./routes/expand.js";
+import fixGrammarRoute from "./routes/fixGrammar.js";
+import fontConvertRouter from "./routes/fontConvert.js";
+import transliterateRouter from "./routes/transliterate.js";
+import clientsRoutes from "./routes/clients.js";   // ✅ only one clients router
+import casesRoutes from "./routes/cases.js";
+import inquiriesRouter from "./routes/inquiries.js";
+import teamRoutes from "./routes/team.js";
+
+// ----------------------
 // ROUTES
 // ----------------------
 app.get("/", (req, res) => {
@@ -82,7 +90,11 @@ app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRouter);
 app.use("/api/draft", draftRouter);
 app.use("/api/transliterate", transliterateRouter);
+app.use("/api/clients", clientsRoutes);   // ✅ only one clients router
+app.use("/api/cases", casesRoutes);
+app.use("/api/inquiries", inquiriesRouter);
 
+app.use("/api/team", teamRoutes);
 // ----------------------
 // ERROR HANDLER
 // ----------------------

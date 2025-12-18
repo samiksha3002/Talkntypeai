@@ -1,18 +1,18 @@
-// src/pages/AddClientPage.jsx
 import React, { useState } from 'react';
-import { ChevronLeft, User, Mail, Phone, MapPin, Save } from 'lucide-react';
+import { ChevronLeft, User, Mail, Phone, MapPin, Save, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const AddClientPage = () => {
   const navigate = useNavigate();
-  
-  // State to hold all client form data
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // ✅ Use "name" instead of "fullName" to match backend schema
   const [clientDetails, setClientDetails] = useState({
-    fullName: '',
+    name: '',
     email: '',
     phone: '',
     address: '',
-    city: '',
     notes: '',
   });
 
@@ -21,123 +21,128 @@ const AddClientPage = () => {
     setClientDetails({ ...clientDetails, [name]: value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Client Details Submitted:", clientDetails);
-    
-    // In a real application, this is where you'd make an API call (POST /api/clients)
-    alert(`Client ${clientDetails.fullName} added successfully (simulated)!`);
-    
-    // Clear the form and navigate back
-    setClientDetails({ fullName: '', email: '', phone: '', address: '', city: '', notes: '' });
-    navigate('/'); 
+    setIsSubmitting(true);
+    setError('');
+
+    const userId = localStorage.getItem('userId'); // Ensure this is saved during login
+
+    if (!userId) {
+      setError("User session not found. Please login again.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://tnt-gi49.onrender.com/api/clients/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...clientDetails, userId }),
+      });
+
+      if (response.ok) {
+        alert("Client saved successfully!");
+        navigate('/manage-clients'); // Redirect to list page
+      } else {
+        const data = await response.json();
+        setError(data.message || "Failed to save client.");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
       {/* Header */}
       <div className="flex items-center p-4 bg-slate-800 border-b border-slate-700">
-        <button onClick={() => navigate(-1)} className="p-2 mr-2 text-slate-400 hover:text-white rounded-full">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 mr-2 text-slate-400 hover:text-white rounded-full"
+        >
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-xl font-bold">Add New Client</h1>
       </div>
 
-      {/* Form Area */}
-      <form onSubmit={handleSubmit} className="p-4 space-y-6">
-        
-        {/* Full Name */}
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="p-4 space-y-6 max-w-2xl mx-auto">
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500 rounded-lg flex items-center text-red-400 text-sm">
+            <AlertCircle size={16} className="mr-2" /> {error}
+          </div>
+        )}
+
+        {/* Name */}
         <div>
-          <label htmlFor="fullName" className="block text-sm font-medium text-slate-300 mb-1">
-            <User size={14} className="inline mr-1" /> Full Name
+          <label className="block text-sm font-medium text-slate-300 mb-1">
+            <User size={14} className="inline mr-1 text-blue-400" /> Full Name
           </label>
           <input
             type="text"
-            id="fullName"
-            name="fullName"
-            value={clientDetails.fullName}
+            name="name"
+            value={clientDetails.name}
             onChange={handleInputChange}
-            placeholder="e.g., Ramesh Kumar"
             required
-            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-green-500 focus:border-green-500 text-white"
+            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
           />
         </div>
 
-        {/* Email & Phone (Grouped) */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Email + Phone */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-              <Mail size={14} className="inline mr-1" /> Email
+            <label className="block text-sm font-medium text-slate-300 mb-1">
+              <Mail size={14} className="inline mr-1 text-blue-400" /> Email
             </label>
             <input
               type="email"
-              id="email"
               name="email"
               value={clientDetails.email}
               onChange={handleInputChange}
-              placeholder="client@example.com"
-              className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-green-500 focus:border-green-500 text-white"
+              className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
             />
           </div>
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-slate-300 mb-1">
-              <Phone size={14} className="inline mr-1" /> Phone Number
+            <label className="block text-sm font-medium text-slate-300 mb-1">
+              <Phone size={14} className="inline mr-1 text-blue-400" /> Phone
             </label>
             <input
               type="tel"
-              id="phone"
               name="phone"
               value={clientDetails.phone}
               onChange={handleInputChange}
-              placeholder="+91-9876543210"
               required
-              className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-green-500 focus:border-green-500 text-white"
+              className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
             />
           </div>
         </div>
-        
+
         {/* Address */}
         <div>
-          <label htmlFor="address" className="block text-sm font-medium text-slate-300 mb-1">
-            <MapPin size={14} className="inline mr-1" /> Full Address
+          <label className="block text-sm font-medium text-slate-300 mb-1">
+            <MapPin size={14} className="inline mr-1 text-blue-400" /> Address
           </label>
           <textarea
-            id="address"
             name="address"
             value={clientDetails.address}
             onChange={handleInputChange}
-            placeholder="Street address, Colony, Pin Code"
             rows="2"
-            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-green-500 focus:border-green-500 text-white"
+            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
           ></textarea>
         </div>
 
-        {/* Notes */}
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-slate-300 mb-1">
-            Additional Notes
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            value={clientDetails.notes}
-            onChange={handleInputChange}
-            placeholder="Notes on client history or payment terms."
-            rows="3"
-            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:ring-green-500 focus:border-green-500 text-white"
-          ></textarea>
-        </div>
-
-        {/* Submit Button */}
+        {/* Save Button */}
         <button
           type="submit"
-          className="w-full flex items-center justify-center py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg transition duration-200 active:scale-98"
+          disabled={isSubmitting}
+          className="w-full flex items-center justify-center py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition active:scale-95 disabled:bg-slate-600"
         >
-          <Save size={20} className="mr-2" />
-          Save Client Details
+          <Save size={20} className="mr-2" /> {isSubmitting ? "Saving..." : "Save Client Details"}
         </button>
       </form>
-      
     </div>
   );
 };

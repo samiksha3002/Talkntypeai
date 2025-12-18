@@ -23,6 +23,7 @@ import JudgementsPage from "./components/JudgementsPage";
 import AddClientPage from "./pages/AddClientPage";
 import GenerateReportPage from "./pages/GenerateReportPage";
 import AddInquiryPage from "./pages/AddInquiryPage";
+import ManageInquiries from "./pages/ManageInquiries";   // ✅ NEW IMPORT
 import AddTeamMemberPage from "./pages/AddTeamMemberPage";
 import PaymentBookPage from "./pages/PaymentBookPage";
 import AddCasePage from "./pages/AddCasePage";
@@ -101,6 +102,7 @@ function App() {
               <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
               <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
               <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
+              <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} /> {/* ✅ NEW ROUTE */}
               <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
               <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
               <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />

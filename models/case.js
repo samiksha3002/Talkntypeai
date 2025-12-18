@@ -16,7 +16,7 @@ const CaseSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// Prevent model overwrite error
+// Prevent model overwrite error in dev/hot-reload
 const Case = mongoose.models.Case || mongoose.model('Case', CaseSchema);
 
 export default Case;
