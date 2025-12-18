@@ -8,8 +8,6 @@ import DraftPopup from "./DraftPopup";
 // 🔠 FONT CONVERTER
 import { mangalToKruti } from "../../utils/mangalToKruti";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
 const Editor = ({
   speechText,
   manualText,
@@ -38,6 +36,24 @@ const Editor = ({
   // 🟣 Draft states
   const [showDraftPopup, setShowDraftPopup] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
+
+  // 🌐 API Base URL (runtime + fallback)
+  const [API_BASE_URL, setApiBaseUrl] = useState(
+    import.meta.env.VITE_API_URL || "http://localhost:5000"
+  );
+
+  // Load runtime config.json if available
+  useEffect(() => {
+    fetch("/config.json")
+      .then((res) => res.json())
+      .then((cfg) => {
+        if (cfg.API_URL) {
+          setApiBaseUrl(cfg.API_URL);
+          console.log("Runtime API URL loaded:", cfg.API_URL);
+        }
+      })
+      .catch((err) => console.error("Failed to load config.json", err));
+  }, []);
 
   // 🎤 Speech append
   useEffect(() => {
@@ -74,7 +90,7 @@ const Editor = ({
       }
     };
     runTranslation();
-  }, [translationCommand]);
+  }, [translationCommand, API_BASE_URL]);
 
   // ✍️ Transliteration Effect
   useEffect(() => {
@@ -103,7 +119,7 @@ const Editor = ({
       }
     };
     runTransliteration();
-  }, [transliterationCommand]);
+  }, [transliterationCommand, API_BASE_URL]);
 
   // 🔠 FONT CONVERSION (MANGAL → KRUTIDEV / UNICODE)
   useEffect(() => {

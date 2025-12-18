@@ -1,5 +1,6 @@
 // ✅ Use env variable from Vite
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || "https://tnt-gi49.onrender.com";
+
 
 // ✅ Grammar Fix
 export const fixGrammar = async (text, setText, setLoading, API_URL = API) => {
