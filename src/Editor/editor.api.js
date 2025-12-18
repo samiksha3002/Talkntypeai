@@ -1,14 +1,13 @@
-// ✅ Use env variable from Vite
-const API = import.meta.env.VITE_API_URL || "https://tnt-gi49.onrender.com";
-
+// ✅ Always use hardcoded API base URL (production safe)
+const API = "https://tnt-gi49.onrender.com";
 
 // ✅ Grammar Fix
-export const fixGrammar = async (text, setText, setLoading, API_URL = API) => {
+export const fixGrammar = async (text, setText, setLoading) => {
   if (!text?.trim()) return alert("Type something first");
   setLoading(true);
 
   try {
-    const res = await fetch(`${API_URL}/api/fix-grammar`, {
+    const res = await fetch(`${API}/api/fix-grammar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
@@ -25,12 +24,12 @@ export const fixGrammar = async (text, setText, setLoading, API_URL = API) => {
 };
 
 // ✅ Expand Text
-export const expandText = async (text, setText, setLoading, API_URL = API) => {
+export const expandText = async (text, setText, setLoading) => {
   if (!text?.trim()) return;
   setLoading(true);
 
   try {
-    const res = await fetch(`${API_URL}/api/expand`, {
+    const res = await fetch(`${API}/api/expand`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
@@ -47,7 +46,7 @@ export const expandText = async (text, setText, setLoading, API_URL = API) => {
 };
 
 // ✅ OCR Upload
-export const uploadOCR = async (e, setText, setLoading, API_URL = API) => {
+export const uploadOCR = async (e, setText, setLoading) => {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -56,7 +55,7 @@ export const uploadOCR = async (e, setText, setLoading, API_URL = API) => {
     const fd = new FormData();
     fd.append("image", file);
 
-    const res = await fetch(`${API_URL}/api/ocr/image-to-text`, {
+    const res = await fetch(`${API}/api/ocr/image-to-text`, {
       method: "POST",
       body: fd
     });
@@ -72,7 +71,7 @@ export const uploadOCR = async (e, setText, setLoading, API_URL = API) => {
 };
 
 // ✅ Audio Upload
-export const uploadAudio = async (e, setText, setLoading, API_URL = API) => {
+export const uploadAudio = async (e, setText, setLoading) => {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -81,7 +80,7 @@ export const uploadAudio = async (e, setText, setLoading, API_URL = API) => {
     const fd = new FormData();
     fd.append("audio", file);
 
-    const res = await fetch(`${API_URL}/api/audio-to-text`, {
+    const res = await fetch(`${API}/api/audio-to-text`, {
       method: "POST",
       body: fd
     });
@@ -97,8 +96,8 @@ export const uploadAudio = async (e, setText, setLoading, API_URL = API) => {
 };
 
 // ✅ Draft Generation
-export async function generateDraftAPI(data, API_URL = API) {
-  const res = await fetch(`${API_URL}/api/draft/generate-draft`, {
+export async function generateDraftAPI(data) {
+  const res = await fetch(`${API}/api/draft/generate-draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
