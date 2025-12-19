@@ -32,21 +32,21 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn("❌ Blocked by CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+  })
+);
 
 // ----------------------
 // ROUTE IMPORTS (ESM)
@@ -56,7 +56,7 @@ import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import deepgramRoutes from "./routes/deepgram.js";
 import casesRoutes from "./routes/cases.js";
-import translationRoutes from "./routes/translation.js";
+import translationRoutes from "./routes/translation.js"; // <-- must exist
 import aiChatRoutes from "./routes/aiChat.js";
 import ocrRoutes from "./routes/ocr.js";
 import audioToTextRoutes from "./routes/audioToText.js";
@@ -70,9 +70,6 @@ import teamRoutes from "./routes/team.js";
 import reportsRoute from "./routes/reports.js";
 import paymentsRoute from "./routes/payments.js";
 
-// If you have auth middleware, import it here
-// import authMiddleware from "./middleware/auth.js";
-
 // ----------------------
 // ROUTES
 // ----------------------
@@ -84,7 +81,7 @@ app.use("/api", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deepgram", deepgramRoutes);
 app.use("/api/cases", casesRoutes);
-app.use("/api/translate", translationRoutes);
+app.use("/api/translate", translationRoutes); // <-- this is where your 500 comes from
 app.use("/api/chat", aiChatRoutes);
 app.use("/api/ocr", ocrRoutes);
 app.use("/api/audio-to-text", audioToTextRoutes);
@@ -97,20 +94,17 @@ app.use("/api/clients", clientsRoutes);
 app.use("/api/inquiries", inquiriesRouter);
 app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoutes);
-
-// If you want auth protection, uncomment authMiddleware
-// app.use("/api/payments", authMiddleware, paymentsRoute);
 app.use("/api/payments", paymentsRoute);
 
 // ----------------------
 // ERROR HANDLER
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err.message);
-  const statusCode = err.message.includes("CORS") ? 403 : 500;
+  console.error("🔥 Server Error:", err.stack || err.message);
+  const statusCode = err.message?.includes("CORS") ? 403 : 500;
   res.status(statusCode).json({
     success: false,
-    message: err.message,
+    message: err.message || "Internal Server Error",
   });
 });
 

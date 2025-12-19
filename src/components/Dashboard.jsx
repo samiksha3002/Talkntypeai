@@ -62,6 +62,7 @@ const Dashboard = () => {
     const text = editorContent.trim();
     if (!text) return;
 
+    // This sets the command that the Editor's useEffect will listen to
     setTransliterationCommand({
       id: Date.now(),
       script: scriptCode,
@@ -111,6 +112,8 @@ const Dashboard = () => {
             isTransliterating={isTransliterating}
             isConverting={isConverting}
             editorText={editorContent}
+            // Passing setters just in case Sidebar needs to reset something
+            setManualText={updateEditorContent} 
           />
         </aside>
 

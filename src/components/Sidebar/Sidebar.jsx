@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import StenoCard from './Stenocard'; 
 import TranslationCard from './TranslationCard';
 import TransliterationCard from './TransliterationCard';
@@ -7,48 +7,24 @@ import FontConvertCard from './FontConvertCard';
 const Sidebar = ({ 
   onSpeechInput, 
   onTranslate, 
+  onTransliterate, // Using the prop from Dashboard
   onFontConvert, 
   isTranslating, 
+  isTransliterating, // Using the loading state from Dashboard
   isConverting,
-  editorText,
-  setManualText
+  editorText 
 }) => {
-  const [isTransliterating, setIsTransliterating] = useState(false);
 
-  const handleTransliterate = async (targetScript) => {
+  // This handles the local check before sending the command up to Dashboard
+  const handleTransliterate = (targetScript) => {
     if (!editorText || !editorText.trim()) {
       alert("⚠️ Please enter text in the editor first.");
       return;
     }
-
-    try {
-      setIsTransliterating(true);
-
-      const res = await fetch("http://localhost:5000/api/transliterate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: editorText,
-          sourceLang: "hi",         
-          targetLang: "hi",         
-          // targetScript: 'en' from UI maps to 'Latn', anything else to 'Deva'
-          targetScript: targetScript === "en" ? "Latn" : "Deva"
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.details || "Transliteration API failed");
-      }
-
-      // Update the editor with the new transliterated text
-      setManualText(data.transliteratedText || "");
-    } catch (err) {
-      console.error("Transliteration failed:", err);
-      alert(`Transliteration Error: ${err.message}`);
-    } finally {
-      setIsTransliterating(false);
+    
+    // Call the command handler passed down from Dashboard
+    if (onTransliterate) {
+      onTransliterate(targetScript);
     }
   };
 

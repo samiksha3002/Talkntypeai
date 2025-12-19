@@ -59,12 +59,13 @@ const Editor = ({
     if (!speechText) return;
     if (speechText === lastProcessedSpeechRef.current) return;
 
-    // Append speech as a new line/space within the HTML structure
-    setManualText((prev) => (prev ? prev + " " + speechText : `<p>${speechText}</p>`));
+    setManualText((prev) =>
+      prev ? prev + " " + speechText : `<p>${speechText}</p>`
+    );
     lastProcessedSpeechRef.current = speechText;
   }, [speechText, setManualText]);
 
-  // 🌐 Translation Effect (FIXED for HTML/Rich Text)
+  // 🌐 Translation Effect
   useEffect(() => {
     const runTranslation = async () => {
       if (!translationCommand?.textToTranslate || !translationCommand?.lang) return;
@@ -72,8 +73,7 @@ const Editor = ({
       try {
         setIsTranslating(true);
 
-        // ✅ FIX: Strip HTML tags so the API receives plain text (Prevents 500 Error)
-        const plainText = translationCommand.textToTranslate.replace(/<[^>]*>/g, '');
+        const plainText = translationCommand.textToTranslate.replace(/<[^>]*>/g, "");
 
         const res = await fetch(`${API_BASE_URL}/api/translate`, {
           method: "POST",
@@ -84,11 +84,16 @@ const Editor = ({
           }),
         });
 
+        if (!res.ok) {
+          throw new Error(`Server responded with ${res.status}`);
+        }
+
         const data = await res.json();
-        // ✅ Wrap result back in HTML tags for the Rich Text Editor
-        if (data.translatedText) setManualText(`<p>${data.translatedText}</p>`);
+        if (data.translatedText) {
+          setManualText(`<p>${data.translatedText}</p>`);
+        }
       } catch (err) {
-        console.error("Translation error:", err.message);
+        console.error("Translation error:", err);
       } finally {
         setIsTranslating(false);
         setTranslationCommand(null);
@@ -97,14 +102,14 @@ const Editor = ({
     runTranslation();
   }, [translationCommand, API_BASE_URL, setManualText, setIsTranslating, setTranslationCommand]);
 
-  // ✍️ Transliteration Effect (FIXED for HTML/Rich Text)
+  // ✍️ Transliteration Effect
   useEffect(() => {
     const runTransliteration = async () => {
       if (!transliterationCommand) return;
 
       try {
         setIsTransliterating(true);
-        const plainText = transliterationCommand.textToTransliterate.replace(/<[^>]*>/g, '');
+        const plainText = transliterationCommand.textToTransliterate.replace(/<[^>]*>/g, "");
 
         const res = await fetch(`${API_BASE_URL}/api/transliterate`, {
           method: "POST",
@@ -112,14 +117,23 @@ const Editor = ({
           body: JSON.stringify({
             text: plainText,
             sourceLang: "hi",
-            targetLang: transliterationCommand.script,
+            // Mapping English to 'Latn' and others to 'Deva'
+            targetScript: transliterationCommand.script === "en" ? "Latn" : "Deva",
           }),
         });
 
+        // 🛑 SAFETY CHECK: Stop if server sends 404/500 before parsing JSON
+        if (!res.ok) {
+          throw new Error(`Server responded with ${res.status}. Route might be missing.`);
+        }
+
         const data = await res.json();
-        if (data.transliteratedText) setManualText(`<p>${data.transliteratedText}</p>`);
+        if (data.transliteratedText) {
+          setManualText(`<p>${data.transliteratedText}</p>`);
+        }
       } catch (err) {
-        console.error("Transliteration error:", err.message);
+        console.error("Transliteration error:", err);
+        alert(`Transliteration Error: ${err.message}`);
       } finally {
         setIsTransliterating(false);
         setTransliterationCommand(null);
@@ -128,14 +142,14 @@ const Editor = ({
     runTransliteration();
   }, [transliterationCommand, API_BASE_URL, setManualText, setIsTransliterating, setTransliterationCommand]);
 
-  // 🔠 FONT CONVERSION (MANGAL → KRUTIDEV / UNICODE)
+  // 🔠 FONT CONVERSION
   useEffect(() => {
     const runFontConversion = () => {
       if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
 
       try {
         setIsConverting(true);
-        const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, '');
+        const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
 
         if (fontConvertCommand.font === "krutidev") {
           const convertedText = mangalToKruti(plainText);
@@ -144,7 +158,7 @@ const Editor = ({
           setManualText(`<p>${plainText}</p>`);
         }
       } catch (err) {
-        console.error("Font conversion error:", err.message);
+        console.error("Font conversion error:", err);
       } finally {
         setIsConverting(false);
         setFontConvertCommand(null);
@@ -156,12 +170,7 @@ const Editor = ({
 
   return (
     <div className="flex-1 w-full h-full p-4 flex flex-col bg-gray-50 relative">
-      {/* LAYOUT FIX: 
-          Added 'border-2 border-gray-200' and 'mb-4' 
-          to prevent the 'sliding under' effect.
-      */}
       <div className="flex-1 bg-white rounded-xl border-2 border-gray-200 shadow-xl overflow-hidden flex flex-col mb-4">
-        
         <EditorActions
           manualText={manualText}
           setManualText={setManualText}

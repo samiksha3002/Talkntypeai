@@ -1,7 +1,7 @@
 // routes/reports.js
 import express from "express";
 import PDFDocument from "pdfkit";
-import Case from "../models/Case.js"; // adjust path
+import Case from "../models/case.js"; // adjust path
 
 const router = express.Router();
 
