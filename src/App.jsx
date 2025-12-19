@@ -30,6 +30,7 @@ import AddCasePage from "./pages/AddCasePage";
 import ManageCasesPage from "./pages/ManageCasesPage";
 import BusinessCardRequest from "./components/BusinessCardRequest";
 import ImportECourtPage from "./pages/ImportECourtPage";
+import ManageTeamPage from "./pages/ManageTeamPage"; 
 
 // Landing Page
 const LandingPage = () => {
@@ -97,6 +98,8 @@ function App() {
               <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
               <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
 
+<Route path="/manage-team" element={<ManageTeamPage />} />
+
               <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
               <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
               <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
@@ -107,8 +110,10 @@ function App() {
               <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
               <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
 
+
               {/* ADMIN ROUTE */}
               <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+              
 
               {/* 404 */}
               <Route path="*" element={<div>404 Page Not Found</div>} />

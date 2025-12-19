@@ -1,4 +1,3 @@
-// src/pages/ImportECourtPage.jsx
 import React, { useState } from 'react';
 import { ChevronLeft, RefreshCw, Upload, FileText, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,8 +7,18 @@ const ImportECourtPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Get current user from localStorage to pass the userId
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const userId = user._id || user.id;
+
   const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+    const file = e.target.files[0];
+    if (file && file.type === 'text/plain') {
+      setSelectedFile(file);
+    } else {
+      alert("Please upload a valid .txt file.");
+      e.target.value = null;
+    }
   };
 
   const handleImport = async (e) => {
@@ -20,31 +29,58 @@ const ImportECourtPage = () => {
       return;
     }
 
-    if (selectedFile.type !== 'text/plain') {
-        alert("Only plain text files (.txt) from eCourt are supported for import.");
-        return;
+    if (!userId) {
+      alert("User not authenticated. Please log in again.");
+      return;
     }
 
     setIsProcessing(true);
-    console.log(`Processing file: ${selectedFile.name}`);
 
-    // --- Simulation of File Reading and Parsing ---
-    // In a real application:
-    // 1. Read the file contents (FileReader API).
-    // 2. Parse the text (using Regex or string manipulation) to extract Case Name, Number, Date, etc.
-    // 3. Call the backend API (POST /api/import-cases) with the extracted case objects.
+    // 1. Initialize FileReader to read the file as text
+    const reader = new FileReader();
 
-    // Simulated API delay
-    await new Promise(resolve => setTimeout(resolve, 3000)); 
+    reader.onload = async (event) => {
+      const textContent = event.target.result;
 
-    setIsProcessing(false);
-    
-    // Simulated result
-    const simulatedCasesCount = Math.floor(Math.random() * 5) + 1; // 1 to 5 cases
-    alert(`Import successful! ${simulatedCasesCount} cases were imported from ${selectedFile.name}.`);
-    
-    // Redirect to the dashboard or the Manage Cases page
-    navigate('/manage-cases'); 
+      try {
+        const API_URL = import.meta.env.VITE_API_URL;
+
+        // 2. Call the real backend API
+        const res = await fetch(`${API_URL}/api/cases/import`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem("token") || ""}`
+          },
+          body: JSON.stringify({ 
+            userId: userId, 
+            textData: textContent 
+          }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          alert(`Import successful! ${data.count} cases were imported.`);
+          navigate('/manage-cases'); 
+        } else {
+          alert(data.message || "Failed to parse file. Ensure it is a valid eCourt text export.");
+        }
+      } catch (err) {
+        console.error("Import error:", err);
+        alert("An error occurred while connecting to the server.");
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    reader.onerror = () => {
+      alert("Failed to read the file.");
+      setIsProcessing(false);
+    };
+
+    // Start reading the file
+    reader.readAsText(selectedFile);
   };
 
   return (
@@ -55,7 +91,8 @@ const ImportECourtPage = () => {
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-xl font-bold flex items-center">
-            <RefreshCw size={20} className="mr-2 text-purple-400" /> Import Cases (eCourt)
+            <RefreshCw size={20} className={`mr-2 text-purple-400 ${isProcessing ? 'animate-spin' : ''}`} /> 
+            Import Cases (eCourt)
         </h1>
       </div>
 
@@ -67,35 +104,47 @@ const ImportECourtPage = () => {
             <h3 className="text-lg font-semibold text-slate-100 mb-2">
                 Import Guidelines
             </h3>
-            <ul className="text-sm text-slate-400 space-y-2 list-disc list-inside">
-                <li><ArrowRight size={14} className="inline mr-1 text-purple-400" /> Download your case data as a **plain text file (.txt)** from the eCourt portal.</li>
-                <li><ArrowRight size={14} className="inline mr-1 text-purple-400" /> The file must contain standard eCourt format data for successful parsing.</li>
-                <li><ArrowRight size={14} className="inline mr-1 text-purple-400" /> Uploading a large file may take a few moments to process.</li>
+            <ul className="text-sm text-slate-400 space-y-2 list-none">
+                <li className="flex items-start">
+                  <ArrowRight size={14} className="mr-2 mt-1 text-purple-400 shrink-0" /> 
+                  Download your case data as a **plain text file (.txt)** from the eCourt portal.
+                </li>
+                <li className="flex items-start">
+                  <ArrowRight size={14} className="mr-2 mt-1 text-purple-400 shrink-0" /> 
+                  The file must contain standard eCourt format data (Case No, Party Names, etc).
+                </li>
+                <li className="flex items-start">
+                  <ArrowRight size={14} className="mr-2 mt-1 text-purple-400 shrink-0" /> 
+                  Once imported, you can find your cases in the **Manage Cases** section.
+                </li>
             </ul>
         </div>
         
         {/* File Upload Input */}
-        <div className="bg-slate-800 p-6 rounded-xl border border-dashed border-slate-600 hover:border-purple-500 transition cursor-pointer">
+        <div className={`bg-slate-800 p-6 rounded-xl border border-dashed transition cursor-pointer ${selectedFile ? 'border-purple-500 bg-purple-500/5' : 'border-slate-600 hover:border-purple-500'}`}>
             <label htmlFor="ecourtFile" className="block text-center cursor-pointer">
                 <div className="flex flex-col items-center justify-center">
-                    <Upload size={40} className="text-purple-400 mb-3" />
+                    <Upload size={40} className={`${selectedFile ? 'text-purple-300' : 'text-purple-400'} mb-3`} />
                     {selectedFile ? (
-                        <p className="text-base font-bold text-white">{selectedFile.name}</p>
+                        <div className="space-y-1">
+                          <p className="text-base font-bold text-white">{selectedFile.name}</p>
+                          <p className="text-xs text-purple-400">File selected successfully</p>
+                        </div>
                     ) : (
                         <p className="text-base font-bold text-slate-300">
                             Click to select eCourt Text File (.txt)
                         </p>
                     )}
-                    <p className="text-xs text-slate-500 mt-1">Maximum file size 5MB</p>
+                    <p className="text-xs text-slate-500 mt-2">Maximum file size 5MB</p>
                 </div>
             </label>
             <input
                 type="file"
                 id="ecourtFile"
                 name="ecourtFile"
-                accept=".txt" // Only accept text files
+                accept=".txt"
                 onChange={handleFileChange}
-                className="hidden" // Hide default file input
+                className="hidden"
                 disabled={isProcessing}
             />
         </div>
@@ -103,15 +152,15 @@ const ImportECourtPage = () => {
         {/* Submit Button */}
         <button
           type="submit"
-          className={`w-full flex items-center justify-center py-3 font-bold rounded-xl shadow-lg transition duration-200 active:scale-98 
-            ${selectedFile && !isProcessing ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}
+          className={`w-full flex items-center justify-center py-3 font-bold rounded-xl shadow-lg transition duration-200 active:scale-95 
+            ${selectedFile && !isProcessing ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-900/20' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}
           `}
           disabled={!selectedFile || isProcessing}
         >
           {isProcessing ? (
             <div className="flex items-center">
                 <RefreshCw size={20} className="mr-2 animate-spin" />
-                Processing... Please wait
+                Parsing File...
             </div>
           ) : (
             <>

@@ -33,11 +33,10 @@ router.post('/add', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    // Check if userId is valid
     if (!userId) return res.status(400).json({ success: false, message: "User ID missing" });
 
     const cases = await Case.find({ userId }).sort({ hearingDate: 1 });
-    res.status(200).json({ success: true, cases }); // Sending as object with cases array
+    res.status(200).json({ success: true, cases });
   } catch (error) {
     console.error("Error fetching cases:", error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -75,6 +74,59 @@ router.put('/:caseId', async (req, res) => {
   } catch (error) {
     console.error("Error updating case:", error);
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// ✅ 5. IMPORT CASES FROM ECOURT TEXT DATA
+router.post('/import', async (req, res) => {
+  try {
+    const { userId, textData } = req.body;
+
+    if (!userId || !textData) {
+      return res.status(400).json({ success: false, message: 'User ID or text data missing' });
+    }
+
+    const casesToInsert = [];
+    
+    // eCourt format ke hisaab se blocks mein split karna
+    // Aksar cases ke beech khali lines hoti hain
+    const caseBlocks = textData.split(/\n\s*\n/);
+
+    caseBlocks.forEach((block) => {
+      // Regex Patterns (Advanced)
+      const caseNoMatch = block.match(/(?:Case No|CNR No|Number)\s*[:|-]?\s*(\S+)/i);
+      const partyMatch = block.match(/(.+)\s+Vs\.?\s+(.+)/i);
+      const dateMatch = block.match(/(?:Next Date|Hearing Date|Date)\s*[:|-]?\s*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+      const courtMatch = block.match(/(?:Court|Judge)\s*[:|-]?\s*(.+)/i);
+
+      if (caseNoMatch) {
+        casesToInsert.push({
+          userId,
+          caseName: partyMatch ? `${partyMatch[1].trim()} vs ${partyMatch[2].trim()}` : "Imported Case",
+          caseNumber: caseNoMatch[1],
+          courtName: courtMatch ? courtMatch[1].trim() : "Unknown Court",
+          hearingDate: dateMatch ? dateMatch[1] : new Date(), // Agar date nahi mili toh current date
+          description: `Auto-imported from eCourt file. Raw Data: ${block.substring(0, 50)}...`
+        });
+      }
+    });
+
+    if (casesToInsert.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid cases found in the file format.' });
+    }
+
+    // Database mein ek saath save karna (Efficiency ke liye)
+    const importedCases = await Case.insertMany(casesToInsert);
+
+    res.status(201).json({ 
+      success: true, 
+      message: `${importedCases.length} cases imported successfully!`,
+      count: importedCases.length 
+    });
+
+  } catch (error) {
+    console.error("Error importing cases:", error);
+    res.status(500).json({ success: false, message: 'Server Error during import' });
   }
 });
 

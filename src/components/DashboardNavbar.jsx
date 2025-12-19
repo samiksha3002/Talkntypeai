@@ -135,11 +135,7 @@ const DashboardNavbar = () => {
             <span className="font-bold text-base">{user.fullName || user.userName || 'User'}</span>
           </div>
           
-          {/* Support Info */}
-          <div className="hidden lg:flex flex-col items-end leading-tight text-slate-500">
-               <span className="text-xs font-semibold text-slate-400 uppercase">Support</span>
-               <span className="font-medium">+91-7678073260</span>
-          </div>
+        
           
           {/* Logout Button */}
           <button 

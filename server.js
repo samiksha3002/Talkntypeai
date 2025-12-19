@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
@@ -50,13 +49,13 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ----------------------
-// ROUTE IMPORTS
+// ROUTE IMPORTS (ESM)
 // ----------------------
 import draftRouter from "./routes/draft.routes.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import deepgramRoutes from "./routes/deepgram.js";
-import caseRoutes from "./routes/cases.js";
+import casesRoutes from "./routes/cases.js";
 import translationRoutes from "./routes/translation.js";
 import aiChatRoutes from "./routes/aiChat.js";
 import ocrRoutes from "./routes/ocr.js";
@@ -65,10 +64,14 @@ import expandRoute from "./routes/expand.js";
 import fixGrammarRoute from "./routes/fixGrammar.js";
 import fontConvertRouter from "./routes/fontConvert.js";
 import transliterateRouter from "./routes/transliterate.js";
-import clientsRoutes from "./routes/clients.js";   // ✅ only one clients router
-import casesRoutes from "./routes/cases.js";
+import clientsRoutes from "./routes/clients.js";
 import inquiriesRouter from "./routes/inquiries.js";
 import teamRoutes from "./routes/team.js";
+import reportsRoute from "./routes/reports.js";
+import paymentsRoute from "./routes/payments.js";
+
+// If you have auth middleware, import it here
+// import authMiddleware from "./middleware/auth.js";
 
 // ----------------------
 // ROUTES
@@ -80,7 +83,7 @@ app.get("/", (req, res) => {
 app.use("/api", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/deepgram", deepgramRoutes);
-app.use("/api/cases", caseRoutes);
+app.use("/api/cases", casesRoutes);
 app.use("/api/translate", translationRoutes);
 app.use("/api/chat", aiChatRoutes);
 app.use("/api/ocr", ocrRoutes);
@@ -90,11 +93,15 @@ app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRouter);
 app.use("/api/draft", draftRouter);
 app.use("/api/transliterate", transliterateRouter);
-app.use("/api/clients", clientsRoutes);   // ✅ only one clients router
-app.use("/api/cases", casesRoutes);
+app.use("/api/clients", clientsRoutes);
 app.use("/api/inquiries", inquiriesRouter);
-
+app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoutes);
+
+// If you want auth protection, uncomment authMiddleware
+// app.use("/api/payments", authMiddleware, paymentsRoute);
+app.use("/api/payments", paymentsRoute);
+
 // ----------------------
 // ERROR HANDLER
 // ----------------------

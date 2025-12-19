@@ -33,7 +33,10 @@ const AddInquiryPage = () => {
 
       const res = await fetch(`${API_URL}/api/inquiries`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token") || ""}` // Added Auth if required by your backend
+        },
         body: JSON.stringify(inquiryDetails),
       });
 
@@ -54,8 +57,8 @@ const AddInquiryPage = () => {
         followUpDate: '',
       });
 
-      // Navigate back to dashboard/home
-      navigate('/');
+      // ✅ Changed from navigate('/') to navigate('/diary')
+      navigate('/diary');
     } catch (err) {
       alert('Error saving inquiry: ' + err.message);
     } finally {
@@ -100,7 +103,7 @@ const AddInquiryPage = () => {
                 onChange={handleInputChange}
                 placeholder="Inquirer's Name"
                 required
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
               />
             </div>
             {/* Phone & Email (Grouped) */}
@@ -120,7 +123,7 @@ const AddInquiryPage = () => {
                   onChange={handleInputChange}
                   placeholder="Contact Number"
                   required
-                  className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                  className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
                 />
               </div>
               <div>
@@ -137,7 +140,7 @@ const AddInquiryPage = () => {
                   value={inquiryDetails.email}
                   onChange={handleInputChange}
                   placeholder="Email Address"
-                  className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                  className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
                 />
               </div>
             </div>
@@ -165,7 +168,7 @@ const AddInquiryPage = () => {
                 value={inquiryDetails.typeOfCase}
                 onChange={handleInputChange}
                 placeholder="e.g., Property Dispute, Divorce, Commercial"
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
               />
             </div>
             {/* Summary */}
@@ -183,7 +186,7 @@ const AddInquiryPage = () => {
                 onChange={handleInputChange}
                 placeholder="Brief facts and specific client request."
                 rows="3"
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
               ></textarea>
             </div>
             {/* Follow-up Date */}
@@ -200,7 +203,7 @@ const AddInquiryPage = () => {
                 name="followUpDate"
                 value={inquiryDetails.followUpDate}
                 onChange={handleInputChange}
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white"
+                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-white outline-none"
               />
             </div>
           </div>
@@ -210,7 +213,7 @@ const AddInquiryPage = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg transition duration-200 active:scale-98 disabled:opacity-50"
+          className="w-full flex items-center justify-center py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg transition duration-200 active:scale-95 disabled:opacity-50"
         >
           <Save size={20} className="mr-2" />
           {loading ? 'Saving...' : 'Save Inquiry'}
