@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-// Language Options for dropdown
 const languageOptions = [
   { code: 'en-IN', label: 'English (India)' },
   { code: 'hi', label: 'Hindi (हिंदी)' },
@@ -14,31 +13,54 @@ const languageOptions = [
   { code: 'bn-IN', label: 'Bengali (বাংলা)' },
 ];
 
-const TranslationCard = ({ onTranslate, isTranslating, editorText }) => {
+const TranslationCard = ({ editorText, onTranslationComplete }) => {
   const [targetLang, setTargetLang] = useState('hi');
   const [error, setError] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
 
-  // 💡 HELPER: Function to clean up language codes (e.g., "mr-IN" -> "mr")
   const getCleanLangCode = (code) => {
-    // Splits at '-' and takes the first part, or returns the code itself
     return code ? code.split('-')[0] : '';
   };
 
-  const handleTranslateClick = () => {
-    // 1. Client-Side Validation (Prevents 400 Bad Request when text is empty)
+  const handleTranslateClick = async () => {
     if (!editorText || editorText.trim() === '') {
       setError('⚠️ Please enter some text in the editor before translating.');
       return;
     }
-    
+
     setError('');
-    
-    // 2. Cleanup Language Code (Ensures API gets a standard code like 'hi', not 'hi-IN')
+    setIsTranslating(true);
+
     const cleanLangCode = getCleanLangCode(targetLang);
 
-    if (onTranslate) {
-      // 3. Trigger command with the cleaned code
-      onTranslate(cleanLangCode);
+    try {
+      const response = await fetch("http://localhost:5000/api/chattranslate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: editorText,
+          targetLang: cleanLangCode,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Server error ${response.status}: ${text}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        setError(`❌ ${data.details || data.error}`);
+      } else {
+        // ✅ send translated text up to Dashboard
+        if (onTranslationComplete) {
+          onTranslationComplete(data.translatedText);
+        }
+      }
+    } catch (err) {
+      setError(`❌ Translation failed: ${err.message}`);
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -55,7 +77,6 @@ const TranslationCard = ({ onTranslate, isTranslating, editorText }) => {
         CONVERT EDITOR TEXT TO:
       </label>
 
-      {/* Language Selector */}
       <select
         id="translation-language"
         value={targetLang}
@@ -69,12 +90,8 @@ const TranslationCard = ({ onTranslate, isTranslating, editorText }) => {
         ))}
       </select>
 
-      {/* Error message */}
-      {error && (
-        <p className="text-red-500 text-xs mb-2">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
 
-      {/* Translate Button */}
       <button
         onClick={handleTranslateClick}
         disabled={isTranslating}

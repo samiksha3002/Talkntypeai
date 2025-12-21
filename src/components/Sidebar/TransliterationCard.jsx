@@ -5,18 +5,48 @@ const scriptOptions = [
   { code: "hi", label: "Devanagari (हिंदी)" },
 ];
 
-const TransliterationCard = ({ onTransliterate, isTransliterating, editorText }) => {
+const TransliterationCard = ({ editorText, onTransliterationComplete }) => {
   const [targetScript, setTargetScript] = useState("en");
   const [error, setError] = useState("");
+  const [isTransliterating, setIsTransliterating] = useState(false);
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (!editorText || editorText.trim() === "") {
       setError("⚠️ Please enter text in the editor first.");
       return;
     }
     setError("");
-    if (onTransliterate) {
-      onTransliterate(targetScript);
+    setIsTransliterating(true);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/transliterate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: editorText,
+          sourceLang: "hi",       // adjust if needed
+          targetScript: targetScript,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Server error ${response.status}: ${text}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        setError(`❌ ${data.details || data.error}`);
+      } else {
+        // ✅ send transliterated text up to Dashboard
+        if (onTransliterationComplete) {
+          onTransliterationComplete(data.transliteratedText);
+        }
+      }
+    } catch (err) {
+      setError(`❌ Transliteration failed: ${err.message}`);
+    } finally {
+      setIsTransliterating(false);
     }
   };
 
@@ -42,7 +72,9 @@ const TransliterationCard = ({ onTransliterate, isTransliterating, editorText })
         onClick={handleClick}
         disabled={isTransliterating}
         className={`w-full py-2 rounded text-sm font-medium transition shadow-sm flex items-center justify-center gap-2 ${
-          isTransliterating ? "bg-green-300 text-green-700 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"
+          isTransliterating
+            ? "bg-green-300 text-green-700 cursor-not-allowed"
+            : "bg-green-600 text-white hover:bg-green-700"
         }`}
       >
         {isTransliterating ? "⏳ Transliterating..." : "🔄 Transliterate Script"}

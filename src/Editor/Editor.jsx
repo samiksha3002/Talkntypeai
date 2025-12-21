@@ -18,7 +18,6 @@ const Editor = ({
   isTransliterating,
   isConverting,
 
-  // Commands from Dashboard/Sidebar
   translationCommand,
   setTranslationCommand,
   transliterationCommand,
@@ -32,16 +31,14 @@ const Editor = ({
   const [isOCRLoading, setIsOCRLoading] = useState(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
 
-  // 🟣 Draft states
   const [showDraftPopup, setShowDraftPopup] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
 
-  // 🌐 API Base URL (runtime + fallback)
+  // 🌐 API Base URL
   const [API_BASE_URL, setApiBaseUrl] = useState(
     import.meta.env.VITE_API_URL || "http://localhost:5000"
   );
 
-  // Load runtime config.json if available
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
@@ -54,7 +51,7 @@ const Editor = ({
       .catch((err) => console.error("Failed to load config.json", err));
   }, []);
 
-  // 🎤 Speech append (Handled for Rich Text HTML)
+  // 🎤 Speech append
   useEffect(() => {
     if (!speechText) return;
     if (speechText === lastProcessedSpeechRef.current) return;
@@ -85,7 +82,8 @@ const Editor = ({
         });
 
         if (!res.ok) {
-          throw new Error(`Server responded with ${res.status}`);
+          const errText = await res.text();
+          throw new Error(`Server responded with ${res.status}: ${errText}`);
         }
 
         const data = await res.json();
@@ -94,6 +92,7 @@ const Editor = ({
         }
       } catch (err) {
         console.error("Translation error:", err);
+        alert(`Translation Error: ${err.message}`);
       } finally {
         setIsTranslating(false);
         setTranslationCommand(null);
@@ -117,14 +116,13 @@ const Editor = ({
           body: JSON.stringify({
             text: plainText,
             sourceLang: "hi",
-            // Mapping English to 'Latn' and others to 'Deva'
             targetScript: transliterationCommand.script === "en" ? "Latn" : "Deva",
           }),
         });
 
-        // 🛑 SAFETY CHECK: Stop if server sends 404/500 before parsing JSON
         if (!res.ok) {
-          throw new Error(`Server responded with ${res.status}. Route might be missing.`);
+          const errText = await res.text();
+          throw new Error(`Server responded with ${res.status}: ${errText}`);
         }
 
         const data = await res.json();

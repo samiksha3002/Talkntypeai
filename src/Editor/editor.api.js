@@ -109,3 +109,33 @@ export async function generateDraftAPI(data) {
 
   return res.json();
 }
+// editor.api.js
+
+export const uploadPDF = async (e, setManualText, setLoadingState, API) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  setLoadingState(true);
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API}/upload-pdf`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (data.text) {
+      setManualText(data.text);
+    } else {
+      alert("Failed to extract text from PDF");
+    }
+  } catch (err) {
+    console.error("PDF upload error:", err);
+    alert("Error processing PDF");
+  } finally {
+    setLoadingState(false);
+  }
+};
+

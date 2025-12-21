@@ -6,23 +6,21 @@ import FontConvertCard from './FontConvertCard';
 
 const Sidebar = ({ 
   onSpeechInput, 
-  onTranslate, 
-  onTransliterate, // Using the prop from Dashboard
+  onTransliterate, 
   onFontConvert, 
-  isTranslating, 
-  isTransliterating, // Using the loading state from Dashboard
+  isTransliterating, 
   isConverting,
-  editorText 
+  editorText,
+  setManualText   // ✅ accept this from Dashboard
 }) => {
 
-  // This handles the local check before sending the command up to Dashboard
+  // Local check before sending transliteration command
   const handleTransliterate = (targetScript) => {
     if (!editorText || !editorText.trim()) {
       alert("⚠️ Please enter text in the editor first.");
       return;
     }
     
-    // Call the command handler passed down from Dashboard
     if (onTransliterate) {
       onTransliterate(targetScript);
     }
@@ -38,19 +36,19 @@ const Sidebar = ({
       </div>
 
       <div className="flex-shrink-0">
+        {/* TranslationCard now handles its own API call and updates editor */}
         <TranslationCard 
-          onTranslate={onTranslate}  
-          isTranslating={isTranslating}
           editorText={editorText} 
+          onTranslationComplete={setManualText}  // ✅ pass directly
         />
       </div>
 
       <div className="flex-shrink-0">
         <TransliterationCard 
-          onTransliterate={handleTransliterate} 
-          isTransliterating={isTransliterating}
-          editorText={editorText} 
-        />
+  editorText={editorText} 
+  onTransliterationComplete={setManualText} 
+/>
+
       </div>
 
       <div className="flex-shrink-0">

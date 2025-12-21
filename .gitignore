@@ -27,7 +27,7 @@ dist-ssr
 service-account-key.json.json
 credentials.json
 google-key.json
-
+translation api.json
 
 .env
 .env.local
