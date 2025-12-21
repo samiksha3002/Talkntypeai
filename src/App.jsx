@@ -31,6 +31,7 @@ import ManageCasesPage from "./pages/ManageCasesPage";
 import BusinessCardRequest from "./components/BusinessCardRequest";
 import ImportECourtPage from "./pages/ImportECourtPage";
 import ManageTeamPage from "./pages/ManageTeamPage"; 
+import WebsiteShowcase from "./components/WebsiteShowcase";
 
 // Landing Page
 const LandingPage = () => {
@@ -109,7 +110,7 @@ function App() {
               <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
               <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
               <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
-
+              <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
 
               {/* ADMIN ROUTE */}
               <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />

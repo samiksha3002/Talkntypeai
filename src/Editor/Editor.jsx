@@ -69,9 +69,7 @@ const Editor = ({
 
       try {
         setIsTranslating(true);
-
         const plainText = translationCommand.textToTranslate.replace(/<[^>]*>/g, "");
-
         const res = await fetch(`${API_BASE_URL}/api/translate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -109,7 +107,6 @@ const Editor = ({
       try {
         setIsTransliterating(true);
         const plainText = transliterationCommand.textToTransliterate.replace(/<[^>]*>/g, "");
-
         const res = await fetch(`${API_BASE_URL}/api/transliterate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -167,8 +164,13 @@ const Editor = ({
   }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
 
   return (
-    <div className="flex-1 w-full h-full p-4 flex flex-col bg-gray-50 relative">
-      <div className="flex-1 bg-white rounded-xl border-2 border-gray-200 shadow-xl overflow-hidden flex flex-col mb-4">
+    /* REMOVED: p-4 and bg-gray-50 to make it sit flush against sidebar and footer */
+    <div className="flex-1 w-full h-full flex flex-col bg-white relative overflow-hidden">
+      
+      {/* Container wrapper handles the single professional border */}
+      <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden min-h-0">
+        
+        {/* Editor Toolbar */}
         <EditorActions
           manualText={manualText}
           setManualText={setManualText}
@@ -184,7 +186,8 @@ const Editor = ({
           API={API_BASE_URL}
         />
 
-        <div className="flex-1 flex flex-col min-h-0 relative">
+        {/* Text Area: This flex-1 is critical to stretch the writing area */}
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           <EditorTextarea
             manualText={manualText}
             setManualText={setManualText}
@@ -192,6 +195,7 @@ const Editor = ({
           />
         </div>
 
+        {/* Status Bar sits at the very bottom line */}
         <EditorStatusBar
           manualText={manualText}
           speechText={speechText}

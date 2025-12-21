@@ -71,12 +71,31 @@ const EditorActions = ({
     }
   };
 
-  const COMMANDS = [
-    { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
-    { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
-    { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },
-    { symbol: "?", en: "question mark", hi: "प्रश्नवाचक", mr: "प्रश्नचिन्ह" },
-  ];
+ const COMMANDS = [
+  // Punctuation
+  { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
+  { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
+  { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },
+  { symbol: "?", en: "question mark", hi: "प्रश्नवाचक", mr: "प्रश्नचिन्ह" },
+  { symbol: ":", en: "colon", hi: "अपूर्ण विराम", mr: "अपूर्णविराम" },
+  { symbol: ";", en: "semi colon", hi: "अर्धविराम", mr: "अर्धविराम" },
+  
+  // Quotes & Brackets
+  { symbol: '"', en: "double quote", hi: "दोहरा उद्धरण", mr: "दुहेरी अवतरण" },
+  { symbol: "'", en: "single quote", hi: "एकल उद्धरण", mr: "एकेरी अवतरण" },
+  { symbol: "(", en: "open bracket", hi: "कोष्ठक शुरू", mr: "कंस सुरू" },
+  { symbol: ")", en: "close bracket", hi: "कोष्ठक बंद", mr: "कंस बंद" },
+  
+  // Math & Special
+  { symbol: "-", en: "hyphen", hi: "योजक चिन्ह", mr: "संयोग चिन्ह" },
+  { symbol: "/", en: "slash", hi: "तिरछी रेखा", mr: "तिरकी रेघ" },
+  { symbol: "@", en: "at the rate", hi: "एट द रेट", mr: "एट द रेट" },
+  { symbol: "+", en: "plus sign", hi: "जमा चिन्ह", mr: "बेरीज चिन्ह" },
+  
+  // Navigation (Commonly seen in these lists)
+  { symbol: "↵", en: "new line", hi: "नई लाइन", mr: "नवीन ओळ" },
+  { symbol: "⇥", en: "new paragraph", hi: "नया पैराग्राफ", mr: "नवीन परिच्छेद" }
+];
 
   return (
     <div className="bg-indigo-50 border-b p-2 flex items-center justify-between flex-wrap gap-2 font-sans">

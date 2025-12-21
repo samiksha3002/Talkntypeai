@@ -122,7 +122,7 @@ const DashboardNavbar = () => {
           }`}>
             <span className="text-lg">{isExpired ? "⚠️" : "📅"}</span>
             <span className="font-semibold">
-                {isExpired ? "Plan Expired" : `liscence: ${timeRemaining}`}
+                {isExpired ? "Plan Expired" : `licence: ${timeRemaining}`}
             </span>
           </div>
 

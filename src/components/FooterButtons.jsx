@@ -57,9 +57,9 @@ const FooterButtons = () => {
   };
 
   // 4. Navigation for Create Website
-  const handleWebsiteClick = () => {
+const handleWebsiteClick = () => {
     console.log("Navigating to /create-website");
-    navigate('/create-website'); 
+   navigate('/website-showcase');
   };
 
   return (
