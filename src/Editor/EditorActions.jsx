@@ -14,14 +14,14 @@ const EditorActions = ({
   setManualText,
   showChat,
   setShowChat,
-  setIsTranslating,
+  setIsTranslating, // Used as a loading state for Grammar/Expand
   isOCRLoading,
   setIsOCRLoading,
   isAudioLoading,
   setIsAudioLoading,
   setShowDraftPopup,
   isAIGenerating,
-  API, // This prop should ideally be https://tnt-gi49.onrender.com
+  API, // Still used for Dictionary, but NOT passed to editor.api functions anymore
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
@@ -43,7 +43,7 @@ const EditorActions = ({
     setDefinition("");
 
     try {
-      // Ensuring we hit the correct backend endpoint
+      // API Prop is still used here for Axios
       const response = await axios.get(`${API}/api/dictionary/define/${searchTerm}`);
       if (response.data && response.data.definition) {
         setDefinition(response.data.definition);
@@ -58,10 +58,12 @@ const EditorActions = ({
     }
   };
 
+  // ✅ Updated File Select Handler
+  // Removed the extra 'API' argument to match the new editor.api.js signature
   const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
     if (e.target.files && e.target.files[0]) {
       try {
-        await uploadFunction(e, setManualText, setLoadingState, API);
+        await uploadFunction(e, setManualText, setLoadingState);
       } catch (err) {
         console.error("File upload error:", err);
         alert("Failed to process file");
@@ -92,7 +94,7 @@ const EditorActions = ({
   { symbol: "@", en: "at the rate", hi: "एट द रेट", mr: "एट द रेट" },
   { symbol: "+", en: "plus sign", hi: "जमा चिन्ह", mr: "बेरीज चिन्ह" },
   
-  // Navigation (Commonly seen in these lists)
+  // Navigation
   { symbol: "↵", en: "new line", hi: "नई लाइन", mr: "नवीन ओळ" },
   { symbol: "⇥", en: "new paragraph", hi: "नया पैराग्राफ", mr: "नवीन परिच्छेद" }
 ];
@@ -105,7 +107,10 @@ const EditorActions = ({
         <AiButton
           label="✨ Fix Grammar"
           color="blue"
-          onClick={() => fixGrammar(manualText, setManualText, setIsTranslating, API)}
+          // ✅ Corrected: No API argument needed.
+          // Note: ensuring setIsTranslating is passed correctly. 
+          // If undefined, the new API code won't crash.
+          onClick={() => fixGrammar(manualText, setManualText, setIsTranslating)}
         />
 
         <AiButton
@@ -138,7 +143,8 @@ const EditorActions = ({
         <AiButton
           label="↔️ Expand"
           color="green"
-          onClick={() => expandText(manualText, setManualText, setIsTranslating, API)}
+           // ✅ Corrected: No API argument needed.
+          onClick={() => expandText(manualText, setManualText, setIsTranslating)}
         />
 
         {/* ✅ LEGAL DICTIONARY BUTTON */}
@@ -157,6 +163,7 @@ const EditorActions = ({
         <button onClick={() => setManualText("")} className="px-2 py-1.5 bg-red-100 text-red-600 border border-red-200 rounded text-xs font-bold hover:bg-red-200 transition">🗑️</button>
 
         <button onClick={() => pdfRef.current.click()} className="p-1.5 bg-white border rounded hover:bg-gray-50 transition" title="Import PDF">📄</button>
+        {/* ✅ Corrected: Reusing handleFileSelect for PDF */}
         <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => handleFileSelect(e, uploadPDF, setIsTranslating)} />
       </div>
 

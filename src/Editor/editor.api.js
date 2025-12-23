@@ -1,10 +1,20 @@
+// editor.api.js
+
 // ✅ Always use hardcoded API base URL (production safe)
 const API = "https://tnt-gi49.onrender.com";
+
+// ✅ Safety Helper: Prevents crash if setLoading is undefined
+const safeSetLoading = (setLoading, value) => {
+  if (typeof setLoading === "function") {
+    setLoading(value);
+  }
+};
 
 // ✅ Grammar Fix
 export const fixGrammar = async (text, setText, setLoading) => {
   if (!text?.trim()) return alert("Type something first");
-  setLoading(true);
+  
+  safeSetLoading(setLoading, true); // Safe call
 
   try {
     const res = await fetch(`${API}/api/fix-grammar`, {
@@ -19,14 +29,14 @@ export const fixGrammar = async (text, setText, setLoading) => {
     console.error("Grammar API error:", err);
     alert("Failed to fix grammar");
   } finally {
-    setLoading(false);
+    safeSetLoading(setLoading, false); // Safe call
   }
 };
 
 // ✅ Expand Text
 export const expandText = async (text, setText, setLoading) => {
   if (!text?.trim()) return;
-  setLoading(true);
+  safeSetLoading(setLoading, true);
 
   try {
     const res = await fetch(`${API}/api/expand`, {
@@ -41,7 +51,7 @@ export const expandText = async (text, setText, setLoading) => {
     console.error("Expand API error:", err);
     alert("Failed to expand text");
   } finally {
-    setLoading(false);
+    safeSetLoading(setLoading, false);
   }
 };
 
@@ -50,7 +60,7 @@ export const uploadOCR = async (e, setText, setLoading) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  setLoading(true);
+  safeSetLoading(setLoading, true);
   try {
     const fd = new FormData();
     fd.append("image", file);
@@ -66,7 +76,7 @@ export const uploadOCR = async (e, setText, setLoading) => {
     console.error("OCR API error:", err);
     alert("Failed to process OCR");
   } finally {
-    setLoading(false);
+    safeSetLoading(setLoading, false);
   }
 };
 
@@ -75,7 +85,7 @@ export const uploadAudio = async (e, setText, setLoading) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  setLoading(true);
+  safeSetLoading(setLoading, true);
   try {
     const fd = new FormData();
     fd.append("audio", file);
@@ -91,7 +101,7 @@ export const uploadAudio = async (e, setText, setLoading) => {
     console.error("Audio API error:", err);
     alert("Failed to process audio");
   } finally {
-    setLoading(false);
+    safeSetLoading(setLoading, false);
   }
 };
 
@@ -109,18 +119,20 @@ export async function generateDraftAPI(data) {
 
   return res.json();
 }
-// editor.api.js
 
-export const uploadPDF = async (e, setManualText, setLoadingState, API) => {
+// ✅ PDF Upload
+// Updated to match other functions (no longer needs API arg)
+export const uploadPDF = async (e, setManualText, setLoadingState) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  setLoadingState(true);
+  safeSetLoading(setLoadingState, true);
   try {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${API}/upload-pdf`, {
+    // Using the hardcoded API const defined at the top
+    const response = await fetch(`${API}/api/upload-pdf`, { 
       method: "POST",
       body: formData,
     });
@@ -135,7 +147,6 @@ export const uploadPDF = async (e, setManualText, setLoadingState, API) => {
     console.error("PDF upload error:", err);
     alert("Error processing PDF");
   } finally {
-    setLoadingState(false);
+    safeSetLoading(setLoadingState, false);
   }
 };
-
