@@ -38,10 +38,10 @@ const LandingPage = () => {
   return (
     <>
       <Navbar />
-      <Hero />
-      <Features />
-      <Testimonials />
-      <Contact />
+      <section id="home-section"><Hero /></section>
+      <section id="features-section"><Features /></section>
+      <section id="testimonials-section"><Testimonials /></section>
+      <section id="contact-section"><Contact /></section>
       <Footer />
     </>
   );
