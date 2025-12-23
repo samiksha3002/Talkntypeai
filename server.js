@@ -6,7 +6,7 @@ import cors from "cors";
 // ----------------------
 // LOAD ENV VARIABLES
 // ----------------------
-dotenv.config(); 
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +35,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
@@ -44,7 +45,6 @@ app.use(
     credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    optionsSuccessStatus: 204,
   })
 );
 
@@ -96,15 +96,14 @@ app.use("/api/inquiries", inquiriesRouter);
 app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
-app.use("/api/dictionary", dictionaryRoutes); // ✅ Dictionary Route
+app.use("/api/dictionary", dictionaryRoutes);
 
 // ----------------------
 // ERROR HANDLER
 // ----------------------
 app.use((err, req, res, next) => {
   console.error("🔥 Server Error:", err.stack || err.message);
-  const statusCode = err.message?.includes("CORS") ? 403 : 500;
-  res.status(statusCode).json({
+  res.status(500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });
@@ -121,13 +120,15 @@ app.listen(PORT, () => {
   if (app._router && app._router.stack) {
     app._router.stack.forEach((r) => {
       if (r.route && r.route.path) {
-        console.log(`- ${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
-      } else if (r.name === 'router') {
+        console.log(`- ${Object.keys(r.route.methods).join(",").toUpperCase()} ${r.route.path}`);
+      } else if (r.name === "router") {
         r.handle.stack.forEach((handler) => {
           if (handler.route) {
-            // Cleans regex to show human-readable path
-            const base = r.regexp.source.replace("^\\", "").replace("\\/?(?=\\/|$)", "").replace(/\\\//g, "/");
-            console.log(`- ${Object.keys(handler.route.methods).join(',').toUpperCase()} ${base}${handler.route.path}`);
+            const base = r.regexp.source
+              .replace("^\\", "")
+              .replace("\\/?(?=\\/|$)", "")
+              .replace(/\\\//g, "/");
+            console.log(`- ${Object.keys(handler.route.methods).join(",").toUpperCase()} ${base}${handler.route.path}`);
           }
         });
       }
