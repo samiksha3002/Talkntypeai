@@ -5,46 +5,55 @@ import OpenAI from "openai";
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const client = new OpenAI({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 router.post("/image-to-text", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: "Image not provided" });
+      return res.status(400).json({
+        success: false,
+        error: "Image not provided",
+      });
     }
 
+    // Convert image to Base64
     const base64Image = req.file.buffer.toString("base64");
 
-    // Using GPT-4o Vision (Render-compatible method)
-    const result = await client.chat.completions.create({
+    // Use OpenAI Vision OCR
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
             {
-              type: "text",
-              text: "Extract all text from this image:",
+              type: "input_image",
+              image_url: `data:image/png;base64,${base64Image}`,
             },
             {
               type: "text",
-              text: `data:image/png;base64,${base64Image}`,
+              text: "Extract all text from this image clearly.",
             },
           ],
         },
       ],
     });
 
-    const text = result.choices[0].message.content;
-    res.json({ success: true, text });
+    const extractedText = response.choices[0].message.content;
+
+    res.json({
+      success: true,
+      text: extractedText,
+    });
 
   } catch (error) {
-    console.error("🔥 Render OCR Error:", error);
+    console.error("🔥 OCR Error:", error);
+
     res.status(500).json({
       success: false,
-      error: error.message || "OCR failed",
+      error: error.message || "OCR processing failed",
     });
   }
 });
