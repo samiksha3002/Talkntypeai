@@ -84,6 +84,8 @@ export const uploadOCR = async (e, setText, setLoading) => {
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 // ------------------------------------------------------
+
+
 export const uploadAudio = async (e, setText, setLoading) => {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -110,6 +112,7 @@ export const uploadAudio = async (e, setText, setLoading) => {
     safeSetLoading(setLoading, false);
   }
 };
+
 
 // ------------------------------------------------------
 // ✔ PDF → TEXT

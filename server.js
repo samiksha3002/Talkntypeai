@@ -110,7 +110,7 @@ app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
-app.use("/api", pdfRoutes);
+app.use("/pdf", pdfRoutes);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

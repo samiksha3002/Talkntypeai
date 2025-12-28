@@ -1,3 +1,4 @@
+// backend/routes/audio.js
 import express from "express";
 import multer from "multer";
 import OpenAI from "openai";
@@ -23,10 +24,10 @@ router.post("/audio-to-text", upload.single("audio"), async (req, res) => {
 
     const filePath = req.file.path;
 
-    // 🔥 NEW OpenAI Whisper API (2025 format)
+    // ✅ Correct OpenAI Whisper transcription call
     const response = await openai.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
-      model: "gpt-4o-mini-transcribe", // Whisper successor
+      model: "whisper-1", // official transcription model
     });
 
     // Remove temp audio file
@@ -36,7 +37,6 @@ router.post("/audio-to-text", upload.single("audio"), async (req, res) => {
       success: true,
       text: response.text || "",
     });
-
   } catch (error) {
     console.error("🔥 AUDIO Error:", error);
     res.status(500).json({
