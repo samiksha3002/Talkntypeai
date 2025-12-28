@@ -1,204 +1,94 @@
-import React, { useState, useEffect, useRef } from "react";
-import EditorActions from "./EditorActions";
-import EditorTextarea from "./EditorTextarea";
-import EditorStatusBar from "./EditorStatusBar";
-import DraftPopup from "./DraftPopup";
+import { useState } from "react";
 
-// 🔠 FONT CONVERTER
-import { mangalToKruti } from "../../utils/mangalToKruti";
+const EditorToolbar = ({ setManualText }) => {
+  const [showCommands, setShowCommands] = useState(false);
 
-const Editor = ({
-  speechText,
-  manualText,
-  setManualText,
-  setIsTranslating,
-  setIsTransliterating,
-  setIsConverting,
-  isTranslating,
-  isTransliterating,
-  isConverting,
+  const COMMANDS = [
+    { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
+    { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
+    { symbol: ".", en: "dot", hi: "डॉट", mr: "डॉट" },
+    { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक चिन्ह", mr: "आश्चर्यवाचक चिन्ह" },
+    { symbol: "?", en: "question mark", hi: "प्रश्नवाचक चिन्ह", mr: "प्रश्नचिन्ह" },
+    { symbol: ":", en: "colon", hi: "कोलन", mr: "कोलन" },
+    { symbol: ";", en: "semi colon", hi: "अर्धविराम", mr: "अर्धविराम" },
+    { symbol: "-", en: "dash", hi: "डैश", mr: "डॅश" },
+    { symbol: "/", en: "slash", hi: "स्लैश", mr: "स्लॅश" }
+  ];
 
-  // Commands from Dashboard/Sidebar
-  translationCommand,
-  setTranslationCommand,
-  transliterationCommand,
-  setTransliterationCommand,
-  fontConvertCommand,
-  setFontConvertCommand,
-}) => {
-  const lastProcessedSpeechRef = useRef("");
-
-  const [showChat, setShowChat] = useState(false);
-  const [isOCRLoading, setIsOCRLoading] = useState(false);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-
-  // 🟣 Draft states
-  const [showDraftPopup, setShowDraftPopup] = useState(false);
-  const [isAIGenerating, setIsAIGenerating] = useState(false);
-
-  // 🌐 API Base URL (runtime + fallback)
-  const [API_BASE_URL, setApiBaseUrl] = useState(
-    import.meta.env.VITE_API_URL || "http://localhost:5000"
-  );
-
-  // Load runtime config.json if available
-  useEffect(() => {
-    fetch("/config.json")
-      .then((res) => res.json())
-      .then((cfg) => {
-        if (cfg.API_URL) {
-          setApiBaseUrl(cfg.API_URL);
-          console.log("Runtime API URL loaded:", cfg.API_URL);
-        }
-      })
-      .catch((err) => console.error("Failed to load config.json", err));
-  }, []);
-
-  // 🎤 Speech append
-  useEffect(() => {
-    if (!speechText) return;
-    if (speechText === lastProcessedSpeechRef.current) return;
-
-    setManualText((prev) => (prev ? prev + " " + speechText : speechText));
-    lastProcessedSpeechRef.current = speechText;
-  }, [speechText, setManualText]);
-
-  // 🌐 Translation Effect
-  useEffect(() => {
-    const runTranslation = async () => {
-      if (!translationCommand?.textToTranslate || !translationCommand?.lang) return;
-
-      try {
-        setIsTranslating(true);
-        const res = await fetch(`${API_BASE_URL}/api/translate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: translationCommand.textToTranslate,
-            targetLang: translationCommand.lang,
-          }),
-        });
-
-        const data = await res.json();
-        if (data.translatedText) setManualText(data.translatedText);
-      } catch (err) {
-        console.error("Translation error:", err.message);
-      } finally {
-        setIsTranslating(false);
-        setTranslationCommand(null);
-      }
-    };
-    runTranslation();
-  }, [translationCommand, API_BASE_URL]);
-
-  // ✍️ Transliteration Effect
-  useEffect(() => {
-    const runTransliteration = async () => {
-      if (!transliterationCommand) return;
-
-      try {
-        setIsTransliterating(true);
-        const res = await fetch(`${API_BASE_URL}/api/transliterate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: transliterationCommand.textToTransliterate,
-            sourceLang: "hi",
-            targetLang: transliterationCommand.script,
-          }),
-        });
-
-        const data = await res.json();
-        if (data.transliteratedText) setManualText(data.transliteratedText);
-      } catch (err) {
-        console.error("Transliteration error:", err.message);
-      } finally {
-        setIsTransliterating(false);
-        setTransliterationCommand(null);
-      }
-    };
-    runTransliteration();
-  }, [transliterationCommand, API_BASE_URL]);
-
-  // 🔠 FONT CONVERSION (MANGAL → KRUTIDEV / UNICODE)
-  useEffect(() => {
-    const runFontConversion = () => {
-      if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-
-      try {
-        setIsConverting(true);
-
-        if (fontConvertCommand.font === "krutidev") {
-          const convertedText = mangalToKruti(fontConvertCommand.textToConvert);
-          setManualText(convertedText);
-        } else if (fontConvertCommand.font === "unicode") {
-          setManualText(fontConvertCommand.textToConvert);
-        }
-      } catch (err) {
-        console.error("Font conversion error:", err.message);
-      } finally {
-        setIsConverting(false);
-        setFontConvertCommand(null);
-      }
-    };
-
-    runFontConversion();
-  }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
+  // सामान्य बटन शैली: कोई बॉक्स नहीं, सिर्फ बड़ा आइकन, होवर पर हल्का प्रभाव
+  const buttonStyle = "p-2 text-3xl hover:bg-gray-100 rounded-full transition-colors";
 
   return (
-    <div className="flex-1 w-full h-full p-4 flex flex-col bg-gray-50 relative">
-      {/* FIXED: 
-        1. Added 'border-2 border-gray-200' to clearly define the box limits.
-        2. Added 'mb-4' (margin bottom) so the box ends BEFORE the bottom navigation bar.
-        3. Removed 'overflow-hidden' if the status bar needs to show shadows, or kept it for clean edges.
+    <>
+      {/* कंटेनर को दाईं ओर संरेखित किया गया (justify-end)।
+         बटनों के बीच गैप बढ़ाया (gap-4)।
+         आइकनों को लंबवत केंद्रित किया (items-center)।
       */}
-      <div className="flex-1 bg-white rounded-xl border-2 border-gray-200 shadow-xl overflow-hidden flex flex-col mb-4">
+      <div className="flex justify-end items-center mb-2 gap-4">
+        <button className={buttonStyle} title="Save">
+          💾
+        </button>
+        <button className={buttonStyle} title="Print">
+          🖨️
+        </button>
         
-        {/* Top Actions: AI Tools and Integrated Toolbar (Save, Print, etc.) */}
-        <EditorActions
-          manualText={manualText}
-          setManualText={setManualText}
-          showChat={showChat}
-          setShowChat={setShowChat}
-          setIsTranslating={setIsTranslating}
-          isOCRLoading={isOCRLoading}
-          setIsOCRLoading={setIsOCRLoading}
-          isAudioLoading={isAudioLoading}
-          setIsAudioLoading={setIsAudioLoading}
-          setShowDraftPopup={setShowDraftPopup}
-          setIsAIGenerating={setIsAIGenerating}
-          API={API_BASE_URL}
-        />
+        {/* Commands Button */}
+        <button
+          onClick={() => setShowCommands(true)}
+          className={`${buttonStyle} text-indigo-600 hover:bg-indigo-50`}
+          title="Voice Commands"
+        >
+          🎙️
+        </button>
 
-        {/* Textarea Container with its own flex growth */}
-        <div className="flex-1 flex flex-col min-h-0 relative">
-          <EditorTextarea
-            manualText={manualText}
-            setManualText={setManualText}
-            showChat={showChat}
-          />
-        </div>
-
-        {/* Status Bar: Defined as the bottom cap of the box */}
-        <EditorStatusBar
-          manualText={manualText}
-          speechText={speechText}
-          isTranslating={isTranslating}
-          isTransliterating={isTransliterating}
-          isConverting={isConverting}
-          isOCRLoading={isOCRLoading}
-        />
+        {/* Clear Button */}
+        <button
+          onClick={() => setManualText("")}
+          className={`${buttonStyle} text-red-600 hover:bg-red-50`}
+          title="Clear Text"
+        >
+          🗑️
+        </button>
       </div>
 
-      {showDraftPopup && (
-        <DraftPopup
-          onClose={() => setShowDraftPopup(false)}
-          setManualText={setManualText}
-          setIsAIGenerating={setIsAIGenerating}
-        />
+      {/* Voice Commands Modal (Unchanged) */}
+      {showCommands && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white w-[500px] rounded-xl shadow-xl p-6">
+            <h2 className="text-xl font-semibold mb-4">🎙️ Voice Commands</h2>
+            <table className="w-full text-sm border">
+              <thead>
+                <tr className="bg-indigo-50">
+                  <th className="border p-2">Symbol</th>
+                  <th className="border p-2">English</th>
+                  <th className="border p-2">Hindi</th>
+                  <th className="border p-2">Marathi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMMANDS.map((cmd, i) => (
+                  <tr key={i}>
+                    <td className="border p-2 text-center">{cmd.symbol}</td>
+                    <td className="border p-2">{cmd.en}</td>
+                    <td className="border p-2">{cmd.hi}</td>
+                    <td className="border p-2">{cmd.mr}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowCommands(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 };
 
-export default Editor;
+export default EditorToolbar;

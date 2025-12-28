@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import AiButton from "./AiButton"; 
 import axios from "axios"; 
+
 import {
   fixGrammar,
   expandText,
@@ -156,15 +157,54 @@ const EditorActions = ({
       </div>
 
       {/* --- Right Side: Toolbar Actions --- */}
-      <div className="flex gap-2 ml-auto border-l pl-2 border-indigo-200">
-        <button className="p-1.5 bg-white border rounded hover:bg-gray-50 transition" title="Save">💾</button>
-        <button className="p-1.5 bg-white border rounded hover:bg-gray-50 transition" title="Print">🖨️</button>
-        <button onClick={() => setShowCommands(true)} className="px-2 py-1.5 bg-indigo-100 text-indigo-600 border border-indigo-200 rounded text-xs font-bold hover:bg-indigo-200 transition">🎙️</button>
-        <button onClick={() => setManualText("")} className="px-2 py-1.5 bg-red-100 text-red-600 border border-red-200 rounded text-xs font-bold hover:bg-red-200 transition">🗑️</button>
+     <div className="flex items-center gap-1 ml-auto border-l pl-2 border-indigo-200">
+        
+        {/* Save Button */}
+        <button className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Save">
+            <Save size={18} strokeWidth={2} />
+        </button>
 
-        <button onClick={() => pdfRef.current.click()} className="p-1.5 bg-white border rounded hover:bg-gray-50 transition" title="Import PDF">📄</button>
-        {/* ✅ Corrected: Reusing handleFileSelect for PDF */}
-        <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => handleFileSelect(e, uploadPDF, setIsTranslating)} />
+        {/* Print Button */}
+        <button className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Print">
+            <Printer size={18} strokeWidth={2} />
+        </button>
+
+        {/* Voice Commands (Mic) - थोड़ा Highlighted */}
+        <button 
+            onClick={() => setShowCommands(true)} 
+            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" 
+            title="Voice Commands"
+        >
+            <Mic size={20} strokeWidth={2.5} />
+        </button>
+
+        {/* Clear Text (Trash) - Red Highlight */}
+        <button 
+            onClick={() => setManualText("")} 
+            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all" 
+            title="Clear All"
+        >
+            <Trash2 size={18} strokeWidth={2} />
+        </button>
+
+        {/* Import PDF */}
+        <button 
+            onClick={() => pdfRef.current.click()} 
+            className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" 
+            title="Import PDF"
+        >
+            <FileUp size={18} strokeWidth={2} />
+        </button>
+
+        {/* Hidden Input (Functionality Same) */}
+        <input 
+            ref={pdfRef} 
+            type="file" 
+            accept="application/pdf" 
+            hidden 
+            onChange={(e) => handleFileSelect(e, uploadPDF, setIsTranslating)} 
+        />
+
       </div>
 
       {/* --- LEGAL DICTIONARY MODAL --- */}

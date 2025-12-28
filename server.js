@@ -80,7 +80,7 @@ import inquiriesRouter from "./routes/inquiries.js";
 import teamRoute from "./routes/team.js";
 import reportsRoute from "./routes/reports.js";
 import paymentsRoute from "./routes/payments.js";
-
+import pdfRoutes from "./routes/pdf.js";
 // ----------------------
 // ROUTES
 // ----------------------
@@ -110,6 +110,9 @@ app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
+app.use("/api", pdfRoutes);
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ----------------------
 // ERROR HANDLER
