@@ -23,7 +23,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ----------------------
-// ✅ GLOBAL CORS CONFIG
+// ✅ GLOBAL CORS (PERFECT SETUP)
 // ----------------------
 const allowedOrigins = [
   "https://www.talkntype.com",
@@ -32,10 +32,22 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
+// Always allow OPTIONS preflight first
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
@@ -43,13 +55,11 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 // ----------------------
-// ROUTE IMPORTS (ESM)
+// ROUTE IMPORTS
 // ----------------------
 import draftRouter from "./routes/draft.routes.js";
 import authRoutes from "./routes/auth.js";
@@ -85,7 +95,10 @@ app.use("/api/cases", casesRoutes);
 app.use("/api/chattranslate", chatTranslateRoute);
 app.use("/api/chat", aiChatRoutes);
 app.use("/api/ocr", ocrRoutes);
+
+// IMPORTANT: audio route must ALWAYS send CORS headers
 app.use("/api/audio-to-text", audioToTextRoutes);
+
 app.use("/api/expand", expandRoute);
 app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRouter);
@@ -115,7 +128,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 
-  // ✅ DEBUG: Safely print all registered routes
   console.log("📍 Active Routes Check:");
   if (app._router && app._router.stack) {
     app._router.stack.forEach((r) => {
@@ -133,7 +145,5 @@ app.listen(PORT, () => {
         });
       }
     });
-  } else {
-    console.log("Router stack not yet initialized.");
   }
 });

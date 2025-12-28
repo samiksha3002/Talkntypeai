@@ -1,53 +1,62 @@
 import express from "express";
 import multer from "multer";
+import OpenAI from "openai";
 import fs from "fs";
-// 1. Corrected Import: Use DeepgramClient for SDK v3+
-import { DeepgramClient } from "@deepgram/sdk";
 
 const router = express.Router();
-// multer setup for handling file uploads
-const upload = multer({ dest: "uploads/" });
 
-// 2. Corrected Initialization: Use DeepgramClient with apiKey in an object
-const deepgram = new DeepgramClient({ apiKey: process.env.DEEPGRAM_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No audio file uploaded" });
+      return res.status(400).json({
+        success: false,
+        message: "No audio file provided",
+      });
     }
 
-    const filePath = req.file.path;
-    const audioBuffer = fs.readFileSync(filePath);
+    console.log("🎤 Audio uploaded:", req.file.originalname);
 
-    // 3. Corrected Method: Use deepgram.listen.prerecorded
-    const response = await deepgram.listen.prerecorded(
-      // Source: audio buffer and mimetype
-      { buffer: audioBuffer, mimetype: req.file.mimetype },
-      // Options: model and features
-      { model: "nova-2", smart_format: true }
-    );
+    // Convert buffer into a temp file (OpenAI requires a file stream)
+    const tempPath = `/tmp/${Date.now()}-${req.file.originalname}`;
+    fs.writeFileSync(tempPath, req.file.buffer);
 
-    // Clean up the temporary file after transcription
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Call OpenAI transcription API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-audio-preview",  // correct model for transcription
+      modalities: ["text"],
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_audio",
+              audio_url: `file://${tempPath}`,
+            },
+          ],
+        },
+      ],
+    });
 
-    const transcript = response.results?.channels[0]?.alternatives[0]?.transcript;
+    const output = response.output_text;
+    console.log("📝 Transcription:", output);
 
-    if (!transcript) {
-      throw new Error("Deepgram returned no transcript.");
-    }
+    res.json({
+      success: true,
+      text: output,
+    });
 
-    return res.json({ text: transcript });
   } catch (error) {
-    console.error("Transcription Error:", error);
-
-    // Ensure the temporary file is deleted even if transcription fails
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
-    // Return a 500 status with error details
-    return res.status(500).json({ error: "Transcription failed", details: error.message });
+    console.error("🔥 AUDIO ERROR:", error);
+    res.status(500).json({
+      success: false,
+      error: error?.message || "Audio transcription failed",
+    });
   }
 });
 

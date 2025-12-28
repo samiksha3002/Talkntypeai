@@ -9,14 +9,12 @@ const Hero = () => {
     '/hero1.png',
     '/hero3.png',
     '/hero7.png'
-   
-   
   ];
 
   // --- स्लाइडर सेटिंग्स ---
-  const widthPercent = 100;  
-  const heightPercent = 100; 
-  const imageFit = "fill";   
+  const widthPercent = 100;
+  const heightPercent = 100;
+  const imageFit = "fill"; 
   // ----------------------
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -24,13 +22,14 @@ const Hero = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-    }, 5000); // 5 सेकंड में स्लाइड बदलेगा
+    }, 5000); 
 
     return () => clearInterval(timer);
   }, [images.length]);
 
   return (
-    <div className="relative w-full h-[90vh] bg-black overflow-hidden">
+    // CHANGE HERE: h-[90vh] को बदलकर h-screen कर दिया गया है
+    <div className="relative w-full h-screen bg-black overflow-hidden">
       
       {/* Sliding Container */}
       <div 

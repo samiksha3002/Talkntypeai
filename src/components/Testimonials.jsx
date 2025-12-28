@@ -16,27 +16,28 @@ const Testimonials = () => {
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           
-          {/* User 1 */}
+          {/* User 1 - Khushi (Female) */}
           <TestimonialCard 
-            name="Sarah Jenkins"
-            role="Content Creator"
-            image="https://randomuser.me/api/portraits/women/44.jpg"
+            name="Khushi Vinchurkar"
+            role="Advocate"
+            image="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&h=300"
             text="TalknType has completely changed how I write my scripts. The accuracy in English and Hindi is mind-blowing. I save hours every week!"
           />
 
-          {/* User 2 */}
+          {/* User 2 - Praveen (Male) */}
           <TestimonialCard 
-            name="Rahul Verma"
-            role="Journalist"
-            image="https://randomuser.me/api/portraits/men/32.jpg"
+            name="Praveen Jaiswal"
+            role="Senior Advocate"
+            image="https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=300&h=300"
             text="As a journalist, I need quick transcriptions. This tool is faster than manual typing and the punctuation command feature is a lifesaver."
           />
 
-          {/* User 3 */}
+          {/* User 3 - Ashwini (Female) */}
           <TestimonialCard 
-            name="Priya Sharma"
-            role="Medical Student"
-            image="https://randomuser.me/api/portraits/women/68.jpg"
+            name="Ashwini Pandey"
+            role="Advocate" 
+            // Updated Image: Professional Indian Woman
+            image="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&h=300"
             text="I use it to take notes during lectures. The multi-language support helps me capture everything accurately. Highly recommended!"
           />
 
