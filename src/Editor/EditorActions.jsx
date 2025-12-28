@@ -2,6 +2,9 @@ import React, { useState, useRef } from "react";
 import AiButton from "./AiButton"; 
 import axios from "axios"; 
 
+// ✅ FIX: Import the missing icons
+import { Save, Printer, Mic, Trash2, FileUp } from "lucide-react";
+
 import {
   fixGrammar,
   expandText,
@@ -157,7 +160,7 @@ const EditorActions = ({
       </div>
 
       {/* --- Right Side: Toolbar Actions --- */}
-     <div className="flex items-center gap-1 ml-auto border-l pl-2 border-indigo-200">
+      <div className="flex items-center gap-1 ml-auto border-l pl-2 border-indigo-200">
         
         {/* Save Button */}
         <button className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Save">
