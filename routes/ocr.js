@@ -21,20 +21,17 @@ router.post("/image-to-text", upload.single("image"), async (req, res) => {
     // Convert image to Base64
     const base64Image = req.file.buffer.toString("base64");
 
-    // Use OpenAI Vision OCR
+    // Call OpenAI Vision
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // or "gpt-4o" for higher quality
       messages: [
         {
           role: "user",
           content: [
+            { type: "text", text: "Extract all text from this image clearly." },
             {
-              type: "input_image",
-              image_url: `data:image/png;base64,${base64Image}`,
-            },
-            {
-              type: "text",
-              text: "Extract all text from this image clearly.",
+              type: "image_url",
+              image_url: { url: `data:image/png;base64,${base64Image}` },
             },
           ],
         },

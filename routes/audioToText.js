@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import OpenAI from "openai";
 import fs from "fs";
+import path from "path";
 
 const router = express.Router();
 
@@ -9,7 +10,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Use disk storage for compatibility with OpenAI's file stream
+const upload = multer({ dest: "/tmp" });
 
 router.post("/", upload.single("audio"), async (req, res) => {
   try {
@@ -22,33 +24,26 @@ router.post("/", upload.single("audio"), async (req, res) => {
 
     console.log("🎤 Audio uploaded:", req.file.originalname);
 
-    // Convert buffer into a temp file (OpenAI requires a file stream)
-    const tempPath = `/tmp/${Date.now()}-${req.file.originalname}`;
-    fs.writeFileSync(tempPath, req.file.buffer);
+    // Create readable stream from uploaded file
+    const audioStream = fs.createReadStream(req.file.path);
 
-    // Call OpenAI transcription API
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-audio-preview",  // correct model for transcription
-      modalities: ["text"],
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_audio",
-              audio_url: `file://${tempPath}`,
-            },
-          ],
-        },
-      ],
+    // Call OpenAI Whisper transcription API
+    const response = await openai.audio.transcriptions.create({
+      file: audioStream,
+      model: "whisper-1",
+      response_format: "json",
     });
 
-    const output = response.output_text;
-    console.log("📝 Transcription:", output);
+    console.log("📝 Transcription:", response.text);
 
     res.json({
       success: true,
-      text: output,
+      text: response.text,
+    });
+
+    // Clean up temp file
+    fs.unlink(req.file.path, (err) => {
+      if (err) console.error("🧹 Cleanup error:", err);
     });
 
   } catch (error) {
