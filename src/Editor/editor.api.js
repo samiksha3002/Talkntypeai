@@ -1,9 +1,11 @@
 // editor.api.js
+import axios from "axios";
 
 // 🔥 Universal API Base URL (Production + Localhost safe)
-const API = window.location.hostname === "localhost"
-  ? "http://localhost:5000"
-  : "https://tnt-gi49.onrender.com";
+const API =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://tnt-gi49.onrender.com";
 
 // 🔒 Safe call for setLoading
 const safeSetLoading = (fn, val) => {
@@ -14,33 +16,21 @@ const safeSetLoading = (fn, val) => {
 // ✔ FIX GRAMMAR
 // ------------------------------------------------------
 export const fixGrammar = async (text, setText, setLoading) => {
-  if (!text?.trim()) return alert("Type something first");
-
+  if (!text?.trim()) {
+    alert("Type something first");
+    return;
+  }
   safeSetLoading(setLoading, true);
 
   try {
-    const res = await fetch(`${API}/api/fix-grammar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error("Grammar API returned non-JSON:", text);
-      alert("Grammar API failed");
-      return;
-    }
-
-    const data = await res.json();
+    const { data } = await axios.post(`${API}/api/fix-grammar`, { text });
     setText(data.fixed || "");
   } catch (err) {
-    console.error("Grammar API error:", err);
+    console.error("Grammar API error:", err.response?.data || err.message);
     alert("Failed to fix grammar.");
+  } finally {
+    safeSetLoading(setLoading, false);
   }
-
-  safeSetLoading(setLoading, false);
 };
 
 // ------------------------------------------------------
@@ -48,164 +38,120 @@ export const fixGrammar = async (text, setText, setLoading) => {
 // ------------------------------------------------------
 export const expandText = async (text, setText, setLoading) => {
   if (!text?.trim()) return;
-
   safeSetLoading(setLoading, true);
 
   try {
-    const res = await fetch(`${API}/api/expand`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error("Expand API returned non-JSON:", text);
-      alert("Expand API failed");
-      return;
-    }
-
-    const data = await res.json();
+    const { data } = await axios.post(`${API}/api/expand`, { text });
     setText(data.expanded || "");
   } catch (err) {
-    console.error("Expand API error:", err);
+    console.error("Expand API error:", err.response?.data || err.message);
     alert("Failed to expand text.");
+  } finally {
+    safeSetLoading(setLoading, false);
   }
-
-  safeSetLoading(setLoading, false);
 };
 
 // ------------------------------------------------------
 // ✔ IMAGE → TEXT (OCR)
 // ------------------------------------------------------
 export const uploadOCR = async (e, setText, setLoading) => {
-  const file = e.target.files[0];
+  const file = e.target.files?.[0];
   if (!file) return;
+
+  const fd = new FormData();
+  fd.append("image", file);
 
   safeSetLoading(setLoading, true);
 
   try {
-    const fd = new FormData();
-    fd.append("image", file);
-
-    const res = await fetch(`${API}/api/ocr/image-to-text`, {
-      method: "POST",
-      body: fd
+    const { data } = await axios.post(`${API}/api/ocr/image-to-text`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
 
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error("OCR API returned non-JSON:", text);
-      alert("OCR API failed");
-      return;
+    if (data.success && data.text) {
+      setText((prev) => (prev + "\n" + data.text).trim());
+    } else {
+      alert(data.error || "No text found in the image.");
     }
-
-    const data = await res.json();
-    const extracted = data.text || "No text found";
-
-    setText(prev => (prev + "\n" + extracted).trim());
   } catch (err) {
-    console.error("OCR API error:", err);
-    alert("Failed to process OCR.");
+    console.error("OCR API error:", err.response?.data || err.message);
+    alert("Failed to extract text from image.");
+  } finally {
+    safeSetLoading(setLoading, false);
   }
-
-  safeSetLoading(setLoading, false);
 };
 
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 // ------------------------------------------------------
 export const uploadAudio = async (e, setText, setLoading) => {
-  const file = e.target.files[0];
+  const file = e.target.files?.[0];
   if (!file) return;
+
+  const fd = new FormData();
+  fd.append("audio", file);
 
   safeSetLoading(setLoading, true);
 
   try {
-    const fd = new FormData();
-    fd.append("audio", file);
-
-    const res = await fetch(`${API}/api/audio-to-text`, {
-      method: "POST",
-      body: fd
+    const { data } = await axios.post(`${API}/api/audio-to-text`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
 
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error("Audio API returned non-JSON:", text);
-      alert("Audio API failed");
-      return;
+    if (data.text) {
+      setText((prev) => (prev + "\n" + data.text).trim());
+    } else {
+      alert("Could not transcribe audio.");
     }
-
-    const data = await res.json();
-    const extracted = data.text || "Could not transcribe audio";
-
-    setText(prev => (prev + "\n" + extracted).trim());
   } catch (err) {
-    console.error("Audio API error:", err);
+    console.error("Audio API error:", err.response?.data || err.message);
     alert("Failed to process audio.");
+  } finally {
+    safeSetLoading(setLoading, false);
   }
+};
 
-  safeSetLoading(setLoading, false);
+// ------------------------------------------------------
+// ✔ PDF → TEXT
+// ------------------------------------------------------
+export const uploadPDF = async (e, setText, setLoading) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  safeSetLoading(setLoading, true);
+
+  try {
+    const { data } = await axios.post(`${API}/api/upload-pdf`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (data.text) {
+      setText(data.text);
+    } else {
+      alert(data.error || "Failed to extract text from PDF.");
+    }
+  } catch (err) {
+    console.error("PDF API error:", err.response?.data || err.message);
+    alert("Error processing PDF.");
+  } finally {
+    safeSetLoading(setLoading, false);
+  }
 };
 
 // ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
 // ------------------------------------------------------
-export async function generateDraftAPI(body) {
-  const res = await fetch(`${API}/api/draft/generate-draft`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    throw new Error("Draft API failed");
-  }
-
-  return res.json();
-}
-
-// ------------------------------------------------------
-// ✔ PDF → TEXT
-// ------------------------------------------------------
-export const uploadPDF = async (e, setManualText, setLoading) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  safeSetLoading(setLoading, true);
-
+export const generateDraftAPI = async (body) => {
   try {
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const res = await fetch(`${API}/api/upload-pdf`, {
-      method: "POST",
-      body: fd
+    const { data } = await axios.post(`${API}/api/draft/generate-draft`, body, {
+      headers: { "Content-Type": "application/json" },
     });
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await res.text();
-      console.error("PDF API returned non-JSON:", text);
-      alert("PDF upload failed. Check console for details.");
-      return;
-    }
-
-    const data = await res.json();
-
-    if (data.text) {
-      setManualText(data.text);
-    } else {
-      alert("Failed to extract text from PDF.");
-    }
+    return data;
   } catch (err) {
-    console.error("PDF API error:", err);
-    alert("Error processing PDF.");
+    console.error("Draft API error:", err.response?.data || err.message);
+    throw new Error("Failed to generate draft");
   }
-
-  safeSetLoading(setLoading, false);
 };
