@@ -4,61 +4,6 @@ import connectDB from "./config/db.js";
 import cors from "cors";
 
 // ----------------------
-// LOAD ENV VARIABLES
-// ----------------------
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// ----------------------
-// CONNECT DATABASE
-// ----------------------
-connectDB();
-
-// ----------------------
-// BODY PARSER
-// ----------------------
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-
-// ----------------------
-// ✅ GLOBAL CORS (PERFECT SETUP)
-// ----------------------
-const allowedOrigins = [
-  "https://www.talkntype.com",
-  "https://talkntype.com",
-  "http://localhost:3000",
-  "http://localhost:5173",
-];
-
-// Always allow OPTIONS preflight first
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      console.warn("❌ Blocked by CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
-
-// ----------------------
 // ROUTE IMPORTS
 // ----------------------
 import draftRouter from "./routes/draft.routes.js";
@@ -69,7 +14,6 @@ import chatTranslateRoute from "./routes/chatTranslate.js";
 import casesRoutes from "./routes/cases.js";
 import aiChatRoutes from "./routes/aiChat.js";
 import ocrRoutes from "./routes/ocr.js";
-import audioToTextRoutes from "./routes/audioToText.js";
 import expandRoute from "./routes/expand.js";
 import fixGrammarRoute from "./routes/fixGrammar.js";
 import fontConvertRouter from "./routes/fontConvert.js";
@@ -80,9 +24,56 @@ import inquiriesRouter from "./routes/inquiries.js";
 import teamRoute from "./routes/team.js";
 import reportsRoute from "./routes/reports.js";
 import paymentsRoute from "./routes/payments.js";
+
+// --- THE CRITICAL ROUTES ---
 import pdfRoutes from "./routes/pdf.js";
+import audioRoutes from "./routes/audio.js";
+
 // ----------------------
-// ROUTES
+// CONFIGURATION
+// ----------------------
+dotenv.config();
+connectDB();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// ----------------------
+// MIDDLEWARE
+// ----------------------
+// Increase limit for large files (Audio/PDF)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// ----------------------
+// CORS SETUP
+// ----------------------
+const allowedOrigins = [
+  "https://www.talkntype.com",
+  "https://talkntype.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn("❌ CORS Blocked:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// ----------------------
+// ROUTE MOUNTING
 // ----------------------
 app.get("/", (req, res) => {
   res.send("TalkNType Server is Running!");
@@ -95,10 +86,6 @@ app.use("/api/cases", casesRoutes);
 app.use("/api/chattranslate", chatTranslateRoute);
 app.use("/api/chat", aiChatRoutes);
 app.use("/api/ocr", ocrRoutes);
-
-// IMPORTANT: audio route must ALWAYS send CORS headers
-app.use("/api/audio-to-text", audioToTextRoutes);
-
 app.use("/api/expand", expandRoute);
 app.use("/api/fix-grammar", fixGrammarRoute);
 app.use("/api/font-convert", fontConvertRouter);
@@ -110,9 +97,13 @@ app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
+
+// --- PDF & AUDIO ---
+// These are mounted at /api, so the full paths will be:
+// /api/upload-pdf
+// /api/audio-to-text
 app.use("/api", pdfRoutes);
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use("/api", audioRoutes);
 
 // ----------------------
 // ERROR HANDLER
@@ -130,23 +121,4 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-
-  console.log("📍 Active Routes Check:");
-  if (app._router && app._router.stack) {
-    app._router.stack.forEach((r) => {
-      if (r.route && r.route.path) {
-        console.log(`- ${Object.keys(r.route.methods).join(",").toUpperCase()} ${r.route.path}`);
-      } else if (r.name === "router") {
-        r.handle.stack.forEach((handler) => {
-          if (handler.route) {
-            const base = r.regexp.source
-              .replace("^\\", "")
-              .replace("\\/?(?=\\/|$)", "")
-              .replace(/\\\//g, "/");
-            console.log(`- ${Object.keys(handler.route.methods).join(",").toUpperCase()} ${base}${handler.route.path}`);
-          }
-        });
-      }
-    });
-  }
 });

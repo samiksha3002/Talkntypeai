@@ -84,36 +84,27 @@ export const uploadOCR = async (e, setText, setLoading) => {
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 // ------------------------------------------------------
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-
-export const uploadAudio = async (e, setText, setLoading) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  const fd = new FormData();
-  fd.append("audio", file);
-
-  safeSetLoading(setLoading, true);
-
+export const uploadAudio = async (file) => {
   try {
-    const { data } = await axios.post(`${API}/api/audio-to-text`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const formData = new FormData();
+    formData.append("file", file);
 
-    if (data.text) {
-      setText((prev) => (prev + "\n" + data.text).trim());
-    } else {
-      alert("Could not transcribe audio.");
-    }
-  } catch (err) {
-    console.error("Audio API error:", err.response?.data || err.message);
-    alert("Failed to process audio.");
-  } finally {
-    safeSetLoading(setLoading, false);
+    const response = await axios.post(
+      `${API_URL}/api/audio/audio-to-text`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Audio Upload Error:", error.response?.data || error.message);
+    throw error;
   }
 };
-
-
 // ------------------------------------------------------
 // ✔ PDF → TEXT
 // ------------------------------------------------------
