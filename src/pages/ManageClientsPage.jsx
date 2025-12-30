@@ -36,8 +36,9 @@ const ManageClientsPage = () => {
     }
   };
 
+  // ✅ FIX 1: c.fullName ki jagah c.name use kiya
   const filteredClients = clients.filter(c => 
-    c.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -76,7 +77,8 @@ const ManageClientsPage = () => {
           {filteredClients.map((client) => (
             <div key={client._id} className="bg-slate-800 border border-slate-700 p-4 rounded-2xl flex justify-between items-center shadow-lg hover:border-green-500/50 transition">
               <div>
-                <h3 className="font-bold text-lg text-slate-100">{client.fullName}</h3>
+                {/* ✅ FIX 2: client.fullName ki jagah client.name use kiya */}
+                <h3 className="font-bold text-lg text-slate-100">{client.name}</h3>
                 <div className="flex flex-col space-y-1 mt-1">
                   <span className="text-sm text-slate-400 flex items-center"><Phone size={14} className="mr-2" /> {client.phone}</span>
                   {client.email && <span className="text-sm text-slate-400 flex items-center"><Mail size={14} className="mr-2" /> {client.email}</span>}

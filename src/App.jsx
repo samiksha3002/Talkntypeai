@@ -32,6 +32,7 @@ import BusinessCardRequest from "./components/BusinessCardRequest";
 import ImportECourtPage from "./pages/ImportECourtPage";
 import ManageTeamPage from "./pages/ManageTeamPage"; 
 import WebsiteShowcase from "./components/WebsiteShowcase";
+import ManageClientsPage from "./pages/ManageClientsPage";
 
 // Landing Page
 const LandingPage = () => {
@@ -99,7 +100,7 @@ function App() {
               <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
               <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
 
-<Route path="/manage-team" element={<ManageTeamPage />} />
+             <Route path="/manage-team" element={<ManageTeamPage />} />
 
               <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
               <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
@@ -111,7 +112,7 @@ function App() {
               <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
               <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
               <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
-
+              <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
               {/* ADMIN ROUTE */}
               <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
               

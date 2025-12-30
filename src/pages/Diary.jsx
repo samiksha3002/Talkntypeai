@@ -78,15 +78,23 @@ const Diary = () => {
         path: "/manage-inquiries", // Path for the LIST
       },
     ],
-    teamAccess: [
-      {
-        id: 6,
-        title: "Add Team Member",
-        desc: "Enable multi-user access.",
-        icon: <Users className="w-6 h-6 text-teal-400" />,
-        path: "/team",
-      },
-    ],
+  // Diary.jsx ke andar menuOptions object mein ye change karein
+teamAccess: [
+  {
+    id: 6,
+    title: "Add Team Member",
+    desc: "Enable multi-user access for your staff.",
+    icon: <UserPlus className="w-6 h-6 text-teal-400" />,
+    path: "/team", // Isse naya member add karne ka form khulega
+  },
+  {
+    id: 13,
+    title: "Manage Team",
+    desc: "View, edit, or remove team members.",
+    icon: <Users className="w-6 h-6 text-blue-400" />, 
+    path: "/manage-team", // Isse list view khulega
+  },
+],
     reportsPayments: [
       {
         id: 4,
