@@ -85,17 +85,16 @@ export const uploadOCR = async (e, setText, setLoading) => {
 // ✔ AUDIO → TEXT
 // ------------------------------------------------------
 // editor.api.js
+// ------------------------------------------------------
+// ✔ AUDIO → TEXT - Final Updated Version
+// ------------------------------------------------------
 export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) => {
   const file = e.target.files ? e.target.files[0] : e;
   if (!file) return;
 
-  // Agar API_URL (prop) nahi mila, toh file ke upar wala 'API' use karo
   const finalURL = API_URL || API; 
-
-  console.log("Requesting URL:", `${finalURL}/api/audio/transcribe`);
-
   const formData = new FormData();
-  formData.append("audio", file); // Backend upload.single('audio') se match hona chahiye
+  formData.append("audio", file);
 
   setIsAudioLoading(true);
 
@@ -106,21 +105,31 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
     });
 
     if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+        throw new Error(`Server Error: ${response.status}`);
     }
 
     const data = await response.json();
-    if (data.success) {
-      // Transcript ko editor mein space ke sath add karein
-      setManualText((prev) => prev + " " + data.transcript);
+    console.log("Deepgram Raw Data:", data); // Isse console mein check karein structure
+
+    // ✅ Deepgram response structure check
+    const transcript = data.transcript || 
+                       data.results?.channels[0]?.alternatives[0]?.transcript;
+
+    if (data.success && transcript) {
+      setManualText((prev) => {
+        const currentText = typeof prev === 'string' ? prev : "";
+        return currentText ? `${currentText} ${transcript}` : transcript;
+      });
     } else {
-      alert("Transcription failed: " + data.error);
+      // Agar transcript khali hai toh user ko informative message mile
+      alert("Deepgram ne audio sun li par koi text nahi mila. Kya audio clear hai?");
     }
   } catch (error) {
     console.error("Audio upload error:", error);
-    alert("Backend server se connect nahi ho pa raha hai.");
+    alert("Backend connect hua par error aaya. Console check karein.");
   } finally {
     setIsAudioLoading(false);
+    if (e.target && e.target.type === 'file') e.target.value = null;
   }
 };
 // ------------------------------------------------------

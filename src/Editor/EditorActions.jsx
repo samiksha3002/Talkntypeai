@@ -96,15 +96,16 @@ const EditorActions = ({
 
 
 <input 
-  ref={audioRef}
-  type="file"
-  accept="audio/*"
-  hidden
-  onChange={(e) =>
-    uploadAudio(e, setManualText, setIsAudioLoading, API)
-  }
+  ref={audioRef} 
+  type="file" 
+  accept="audio/*" 
+  hidden 
+  onChange={(e) => handleFileSelect(
+    e, 
+    (ev, setT, setL) => uploadAudio(ev, setT, setL, API), // Yahan 'API' wo prop hai jo Editor.jsx se aa raha hai
+    setIsAudioLoading
+  )} 
 />
-
         <AiButton label={showChat ? "❌ Close Chat" : "📝 AI Chat"} color="blue" onClick={() => setShowChat(!showChat)} />
         <AiButton label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"} color="purple" disabled={isAIGenerating} onClick={() => !isAIGenerating && setShowDraftPopup(true)} />
         <AiButton label="↔️ Expand" color="green" onClick={() => expandText(manualText, setManualText, setIsTranslating)} />
