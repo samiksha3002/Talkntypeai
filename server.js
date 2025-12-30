@@ -103,7 +103,7 @@ app.use("/api/dictionary", dictionaryRoutes);
 // /api/upload-pdf
 // /api/audio-to-text
 app.use("/api", pdfRoutes);
-app.use("/api", audioRoutes);
+app.use("/api/audio", audioRoutes);
 
 // ----------------------
 // ERROR HANDLER

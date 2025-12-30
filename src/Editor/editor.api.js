@@ -84,25 +84,43 @@ export const uploadOCR = async (e, setText, setLoading) => {
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 // ------------------------------------------------------
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// editor.api.js
+export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) => {
+  const file = e.target.files ? e.target.files[0] : e;
+  if (!file) return;
 
-export const uploadAudio = async (file) => {
+  // Agar API_URL (prop) nahi mila, toh file ke upar wala 'API' use karo
+  const finalURL = API_URL || API; 
+
+  console.log("Requesting URL:", `${finalURL}/api/audio/transcribe`);
+
+  const formData = new FormData();
+  formData.append("audio", file); // Backend upload.single('audio') se match hona chahiye
+
+  setIsAudioLoading(true);
+
   try {
-    const formData = new FormData();
-    formData.append("file", file);
+    const response = await fetch(`${finalURL}/api/audio/transcribe`, {
+      method: "POST",
+      body: formData,
+    });
 
-    const response = await axios.post(
-      `${API_URL}/api/audio/audio-to-text`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+    if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+    }
 
-    return response.data;
+    const data = await response.json();
+    if (data.success) {
+      // Transcript ko editor mein space ke sath add karein
+      setManualText((prev) => prev + " " + data.transcript);
+    } else {
+      alert("Transcription failed: " + data.error);
+    }
   } catch (error) {
-    console.error("Audio Upload Error:", error.response?.data || error.message);
-    throw error;
+    console.error("Audio upload error:", error);
+    alert("Backend server se connect nahi ho pa raha hai.");
+  } finally {
+    setIsAudioLoading(false);
   }
 };
 // ------------------------------------------------------

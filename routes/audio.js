@@ -4,55 +4,37 @@ import { createClient } from "@deepgram/sdk";
 import dotenv from "dotenv";
 
 dotenv.config();
-
 const router = express.Router();
+const upload = multer();
 
-// 1. Setup Multer (Keep file in memory)
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB limit
-});
-
-// 2. Initialize Deepgram Client
+// Deepgram Client
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
-router.post("/audio-to-text", upload.single("file"), async (req, res) => {
+// POST request on /api/audio/transcribe (kyunki server.js mein prefix set hai)
+router.post("/transcribe", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No audio file uploaded" });
+      return res.status(400).json({ success: false, error: "No audio file uploaded" });
     }
 
-    console.log(`🎤 Deepgram Processing: ${req.file.originalname} (${req.file.mimetype})`);
-
-    // 3. Send Buffer Directly to Deepgram
     const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
       req.file.buffer,
       {
-        mimetype: req.file.mimetype,
         model: "nova-2",
-        language: "en",
-        smart_format: true, // Auto-punctuates and formats numbers
-        punctuate: true,
+        smart_format: true,
+        mimetype: req.file.mimetype,
       }
     );
 
-    if (error) {
-      console.error("Deepgram API Error:", error);
-      throw error;
-    }
+    if (error) throw error;
 
-    // 4. Extract Transcript Safely
-    // We use ?. (optional chaining) to prevent crashes if the audio was silent
-    const transcript =
-      result?.results?.channels[0]?.alternatives[0]?.transcript || "";
-
-    console.log("✅ Deepgram Success!");
-    res.json({ text: transcript });
-
-  } catch (error) {
-    console.error("❌ Transcription Error:", error);
-    res.status(500).json({ error: "Failed to transcribe audio" });
+    res.json({
+      success: true,
+      transcript: result.results.channels[0].alternatives[0].transcript,
+    });
+  } catch (err) {
+    console.error("Deepgram Error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

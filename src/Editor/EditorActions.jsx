@@ -88,8 +88,23 @@ const EditorActions = ({
         <AiButton label="✨ Fix Grammar" color="blue" onClick={() => fixGrammar(manualText, setManualText, setIsTranslating)} />
         <AiButton label={isOCRLoading ? "⏳ Extracting..." : "🖼️ Image → Text"} color="purple" onClick={() => !isOCRLoading && ocrRef.current.click()} />
         <input ref={ocrRef} type="file" accept="image/*" hidden onChange={(e) => handleFileSelect(e, uploadOCR, setIsOCRLoading)} />
-        <AiButton label={isAudioLoading ? "⏳ Converting..." : "🎵 Audio → Text"} color="green" onClick={() => !isAudioLoading && audioRef.current.click()} />
-        <input ref={audioRef} type="file" accept="audio/*" hidden onChange={(e) => handleFileSelect(e, uploadAudio, setIsAudioLoading)} />
+       <AiButton 
+  label={isAudioLoading ? "⏳ Converting..." : "🎵 Audio → Text"} 
+  color="green" 
+  onClick={() => !isAudioLoading && audioRef.current.click()} 
+/>
+
+
+<input 
+  ref={audioRef}
+  type="file"
+  accept="audio/*"
+  hidden
+  onChange={(e) =>
+    uploadAudio(e, setManualText, setIsAudioLoading, API)
+  }
+/>
+
         <AiButton label={showChat ? "❌ Close Chat" : "📝 AI Chat"} color="blue" onClick={() => setShowChat(!showChat)} />
         <AiButton label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"} color="purple" disabled={isAIGenerating} onClick={() => !isAIGenerating && setShowDraftPopup(true)} />
         <AiButton label="↔️ Expand" color="green" onClick={() => expandText(manualText, setManualText, setIsTranslating)} />
