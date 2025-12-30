@@ -171,15 +171,32 @@ teamAccess: [
         </div>
 
         {/* Right Side: Selected Date Cases/Diary Entries */}
-        <div className="lg:col-span-1">
-          <h3 className="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-4">
-            📅 {format(selectedDate, "d MMM, EEEE")} Hearings
-          </h3>
+       {/* Right Side: Selected Date Cases/Diary Entries */}
+<div className="lg:col-span-1">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-slate-400 text-sm font-semibold uppercase tracking-wider">
+      📅 {format(selectedDate, "d MMM, EEEE")} Hearings
+    </h3>
+    {/* Agar user current date par nahi hai, toh "Today" par wapas aane ki button */}
+    {format(selectedDate, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd") && (
+      <button 
+        onClick={() => setSelectedDate(new Date())}
+        className="text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-600/40 transition"
+      >
+        Today
+      </button>
+    )}
+  </div>
 
-          <CaseDiaryView selectedDate={selectedDate} navigate={navigate} />
-          
-          {/* Note: InquiryList is removed from here to keep the UI clean */}
-        </div>
+  {/* Ye component backend se data fetch karega selectedDate ke base par */}
+  <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+    <CaseDiaryView selectedDate={selectedDate} navigate={navigate} />
+  </div>
+
+  <p className="text-[10px] text-slate-500 mt-4 italic">
+    * Showing hearings scheduled for the date selected in the calendar above.
+  </p>
+</div>
       </div>
 
       {/* --- Section 3: Bottom Footer / QR --- */}

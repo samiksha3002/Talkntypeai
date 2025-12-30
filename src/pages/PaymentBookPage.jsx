@@ -16,8 +16,7 @@ const PaymentBookPage = () => {
     date: new Date().toISOString().split("T")[0],
     caseId: "",
   });
-
-  const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "https://tnt-gi49.onrender.com";
 
   useEffect(() => {
     fetchPayments();
