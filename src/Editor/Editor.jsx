@@ -3,60 +3,55 @@ import EditorActions from "./EditorActions";
 import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
-
-// 🔠 FONT CONVERTER
 import { mangalToKruti } from "../../utils/mangalToKruti";
 
 const Editor = ({
+  user,
   speechText,
   manualText,
   setManualText,
-  setIsTranslating,
-  setIsTransliterating,
-  setIsConverting,
-  isTranslating,
-  isTransliterating,
-  isConverting,
 
+  // Commands from Dashboard
   translationCommand,
   setTranslationCommand,
   transliterationCommand,
   setTransliterationCommand,
   fontConvertCommand,
   setFontConvertCommand,
+
+  // Loading States & Setters (Passed from Dashboard for Global Screen)
+  isTranslating, setIsTranslating,
+  isTransliterating, setIsTransliterating,
+  isConverting, setIsConverting,
+  isOCRLoading, setIsOCRLoading,
+  isAudioLoading, setIsAudioLoading,
+  isAIGenerating, setIsAIGenerating
 }) => {
   const lastProcessedSpeechRef = useRef("");
-
   const [showChat, setShowChat] = useState(false);
-  const [isOCRLoading, setIsOCRLoading] = useState(false);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-
   const [showDraftPopup, setShowDraftPopup] = useState(false);
-  const [isAIGenerating, setIsAIGenerating] = useState(false);
 
   // 🌐 API Base URL
   const [API_BASE_URL, setApiBaseUrl] = useState(
     import.meta.env.VITE_API_URL || "http://localhost:5000"
   );
 
+  // Load Config
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
       .then((cfg) => {
-        if (cfg.API_URL) {
-          setApiBaseUrl(cfg.API_URL);
-          console.log("Runtime API URL loaded:", cfg.API_URL);
-        }
+        if (cfg.API_URL) setApiBaseUrl(cfg.API_URL);
       })
       .catch((err) => console.error("Failed to load config.json", err));
   }, []);
 
-  // 🎤 Speech append
+  // 🎤 Speech Append Logic
   useEffect(() => {
     if (!speechText) return;
     if (speechText === lastProcessedSpeechRef.current) return;
-
-    setManualText((prev) =>
+    
+    setManualText((prev) => 
       prev ? prev + " " + speechText : `<p>${speechText}</p>`
     );
     lastProcessedSpeechRef.current = speechText;
@@ -66,33 +61,31 @@ const Editor = ({
   useEffect(() => {
     const runTranslation = async () => {
       if (!translationCommand?.textToTranslate || !translationCommand?.lang) return;
-
+      
       try {
-        setIsTranslating(true);
+        setIsTranslating(true); // Triggers Global Loading
         const plainText = translationCommand.textToTranslate.replace(/<[^>]*>/g, "");
+        
         const res = await fetch(`${API_BASE_URL}/api/translate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: plainText,
-            targetLang: translationCommand.lang,
+          body: JSON.stringify({ 
+            text: plainText, 
+            targetLang: translationCommand.lang 
           }),
         });
 
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Server responded with ${res.status}: ${errText}`);
-        }
-
+        if (!res.ok) throw new Error("Translation Failed");
         const data = await res.json();
+        
         if (data.translatedText) {
           setManualText(`<p>${data.translatedText}</p>`);
         }
       } catch (err) {
         console.error("Translation error:", err);
-        alert(`Translation Error: ${err.message}`);
+        alert("Translation Error. Please try again.");
       } finally {
-        setIsTranslating(false);
+        setIsTranslating(false); // Hides Global Loading
         setTranslationCommand(null);
       }
     };
@@ -103,10 +96,11 @@ const Editor = ({
   useEffect(() => {
     const runTransliteration = async () => {
       if (!transliterationCommand) return;
-
+      
       try {
-        setIsTransliterating(true);
+        setIsTransliterating(true); // Triggers Global Loading
         const plainText = transliterationCommand.textToTransliterate.replace(/<[^>]*>/g, "");
+        
         const res = await fetch(`${API_BASE_URL}/api/transliterate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -117,76 +111,91 @@ const Editor = ({
           }),
         });
 
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Server responded with ${res.status}: ${errText}`);
-        }
-
+        if (!res.ok) throw new Error("Transliteration Failed");
         const data = await res.json();
+        
         if (data.transliteratedText) {
           setManualText(`<p>${data.transliteratedText}</p>`);
         }
       } catch (err) {
         console.error("Transliteration error:", err);
-        alert(`Transliteration Error: ${err.message}`);
+        alert("Transliteration Error. Please try again.");
       } finally {
-        setIsTransliterating(false);
+        setIsTransliterating(false); // Hides Global Loading
         setTransliterationCommand(null);
       }
     };
     runTransliteration();
   }, [transliterationCommand, API_BASE_URL, setManualText, setIsTransliterating, setTransliterationCommand]);
 
-  // 🔠 FONT CONVERSION
+  // 🔠 Font Conversion Effect
   useEffect(() => {
     const runFontConversion = () => {
       if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-
+      
       try {
-        setIsConverting(true);
-        const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
+        setIsConverting(true); // Triggers Global Loading
+        
+        // Small timeout to ensure the loading screen appears for fast operations
+        setTimeout(() => {
+            const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
 
-        if (fontConvertCommand.font === "krutidev") {
-          const convertedText = mangalToKruti(plainText);
-          setManualText(`<p>${convertedText}</p>`);
-        } else if (fontConvertCommand.font === "unicode") {
-          setManualText(`<p>${plainText}</p>`);
-        }
+            if (fontConvertCommand.font === "krutidev") {
+              const convertedText = mangalToKruti(plainText);
+              setManualText(`<p>${convertedText}</p>`);
+            } else if (fontConvertCommand.font === "unicode") {
+              setManualText(`<p>${plainText}</p>`);
+            }
+            
+            setIsConverting(false); // Hides Global Loading
+            setFontConvertCommand(null);
+        }, 500);
       } catch (err) {
         console.error("Font conversion error:", err);
-      } finally {
         setIsConverting(false);
-        setFontConvertCommand(null);
       }
     };
 
     runFontConversion();
   }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
 
+  // Helper to clear storage (Triggered from Toolbar)
+  const clearAutoSave = () => {
+     if(user?._id) {
+         localStorage.removeItem(`autosave_${user._id}`);
+         setManualText(''); 
+     }
+  }
+
   return (
-    /* REMOVED: p-4 and bg-gray-50 to make it sit flush against sidebar and footer */
     <div className="flex-1 w-full h-full flex flex-col bg-white relative overflow-hidden">
       
-      {/* Container wrapper handles the single professional border */}
+      {/* Container wrapper */}
       <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden min-h-0">
         
-        {/* Editor Toolbar */}
+        {/* Editor Toolbar - Passes Setters to Buttons */}
         <EditorActions
           manualText={manualText}
           setManualText={setManualText}
           showChat={showChat}
           setShowChat={setShowChat}
+          
           setIsTranslating={setIsTranslating}
+          
           isOCRLoading={isOCRLoading}
           setIsOCRLoading={setIsOCRLoading}
+          
           isAudioLoading={isAudioLoading}
           setIsAudioLoading={setIsAudioLoading}
+          
           setShowDraftPopup={setShowDraftPopup}
           setIsAIGenerating={setIsAIGenerating}
+          
           API={API_BASE_URL}
+          onClear={clearAutoSave}
         />
 
-        {/* Text Area: This flex-1 is critical to stretch the writing area */}
+        {/* Text Area */}
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           <EditorTextarea
             manualText={manualText}
@@ -195,7 +204,7 @@ const Editor = ({
           />
         </div>
 
-        {/* Status Bar sits at the very bottom line */}
+        {/* Status Bar - Shows status indicators */}
         <EditorStatusBar
           manualText={manualText}
           speechText={speechText}
@@ -203,6 +212,8 @@ const Editor = ({
           isTransliterating={isTransliterating}
           isConverting={isConverting}
           isOCRLoading={isOCRLoading}
+          isAudioLoading={isAudioLoading}
+          isAIGenerating={isAIGenerating}
         />
       </div>
 

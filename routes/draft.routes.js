@@ -19,13 +19,22 @@ router.post("/generate-draft", async (req, res) => {
 
     // Call OpenAI Chat Completion
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // Ya gpt-3.5-turbo agar budget kam rakhna hai
       messages: [
         {
           role: "system",
+          // 👇 YAHAN CHANGE KIYA HAI 👇
+          // Humne AI ko instruct kiya hai ki HTML tags use kare (Markdown nahi)
           content: `You are a professional legal document drafting assistant.
-Draft Type: ${draftType}
-Language: ${language}`,
+          Draft Type: ${draftType}
+          Language: ${language}
+          
+          CRITICAL INSTRUCTION: 
+          - Provide the output in clean **HTML format** only.
+          - Use <h3> for headings, <p> for paragraphs, <ul>/<li> for lists, and <strong> for bold text.
+          - Do NOT use Markdown (like **text** or # Header).
+          - Use <br> for line breaks where necessary.
+          - Do not include \`\`\`html code blocks, just return the raw HTML string.`,
         },
         {
           role: "user",
@@ -35,8 +44,7 @@ Language: ${language}`,
     });
 
     // Extract draft text safely
-    const draftText =
-      completion?.choices?.[0]?.message?.content?.trim() || null;
+    const draftText = completion?.choices?.[0]?.message?.content?.trim() || null;
 
     if (!draftText) {
       return res.status(500).json({
@@ -46,7 +54,9 @@ Language: ${language}`,
     }
 
     // Success response
+    // Frontend par ye data.text ke roop mein milega
     return res.status(200).json({ text: draftText });
+    
   } catch (err) {
     console.error("🔥 Draft generation error:", err);
 
