@@ -1,133 +1,144 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import FooterButtons from './FooterButtons'; 
 
 const JudgementsPage = () => {
   const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
 
-  // Data for the buttons
+  // Buttons data with specific color themes
   const dashboardItems = [
-    { label: "New Criminal Laws" },
-    { label: "Latest Cases" },
-    { label: "Latest Law-Points" },
-    { label: "Latest News" },
-    { label: "Latest Amendments" },
-    { label: "Subject/Topic Search" },
-    { label: "Citation Search" },
-    { label: "Statutes Wise Search" },
-    { label: "Advance Search" },
-    { label: "Nominal Search" },
-    { label: "Judges/Adv. Search" },
-    { label: "Date Wise Search" },
-    { label: "Prosecution Page" },
-    { label: "Central Laws" },
-    { label: "Central Laws (Hindi)" },
-    { label: "State Laws" },
-    { label: "Overruled Cases" },
-    { label: "Assembly Debates" },
-    { label: "Law Comm. Reports" },
-    { label: "Bills in Parliament" },
-    { label: "Legal Dictionary" },
-    { label: "Articles" },
-    { label: "Deeds and Documents" },
-    { label: "My Saved Bookmarks" },
+    // RED - Urgent/New
+    { label: "Latest Cases", color: "bg-rose-500 hover:bg-rose-600 border-rose-700", type: "urgent" },
+    { label: "New Criminal Laws", color: "bg-rose-500 hover:bg-rose-600 border-rose-700", type: "urgent" },
+    { label: "Latest News", color: "bg-rose-500 hover:bg-rose-600 border-rose-700", type: "urgent" },
+    
+    // BLUE - Research/Search (Kanoon API Integration point)
+    { label: "Subject/Topic Search", color: "bg-sky-500 hover:bg-sky-600 border-sky-700", type: "search" },
+    { label: "Citation Search", color: "bg-sky-500 hover:bg-sky-600 border-sky-700", type: "search" },
+    { label: "Advance Search", color: "bg-sky-500 hover:bg-sky-600 border-sky-700", type: "search" },
+    { label: "Nominal Search", color: "bg-sky-500 hover:bg-sky-600 border-sky-700", type: "search" },
+    { label: "Judges/Adv. Search", color: "bg-sky-500 hover:bg-sky-600 border-sky-700", type: "search" },
+    
+    // GREEN - Laws & Reports
+    { label: "Central Laws", color: "bg-emerald-500 hover:bg-emerald-600 border-emerald-700", type: "resource" },
+    { label: "State Laws", color: "bg-emerald-500 hover:bg-emerald-600 border-emerald-700", type: "resource" },
+    { label: "Overruled Cases", color: "bg-emerald-500 hover:bg-emerald-600 border-emerald-700", type: "resource" },
+    { label: "Law Comm. Reports", color: "bg-emerald-500 hover:bg-emerald-600 border-emerald-700", type: "resource" },
   ];
 
-  // Uniform Sky Blue Button Style
-  const skyButtonClass = "bg-sky-500 hover:bg-sky-600 border-sky-600 text-white";
+  const handleButtonClick = () => {
+    setShowModal(true);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24"> 
+    <div className="min-h-screen bg-white pb-24 font-sans relative">
       
-      {/* ================= HEADER SECTION ================= */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          
-          {/* Top Row: Back Button & Title */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              {/* Icon */}
-              <div className="bg-sky-100 p-2 rounded-lg text-sky-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 leading-tight">Legal Judgements</h1>
-                <p className="text-sm text-gray-500">Repository of Acts, Rules & Rulings</p>
-              </div>
-            </div>
-
-            {/* Back Button */}
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="text-sm font-medium text-gray-500 hover:text-sky-600 flex items-center gap-1 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back
-            </button>
-          </div>
-
-          {/* Optional: Quick Search Bar for look & feel */}
-          <div className="relative">
-             <input 
-                type="text" 
-                placeholder="Quick Search for Judgements, Acts or Citations..." 
-                className="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-xl focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all outline-none text-gray-700"
-             />
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-             </svg>
-          </div>
-
+      {/* ================= 1. TOP INFINITE SCROLLING TICKER ================= */}
+      <div className="bg-slate-900 py-2 overflow-hidden border-b border-slate-700">
+        <div className="flex whitespace-nowrap animate-marquee">
+          <span className="text-white text-xs font-bold tracking-widest uppercase px-4">
+            🚀 NOTICE: The legal database and "Subject Search" engine are currently under maintenance for system upgrades. New judgements will be live shortly. Stay tuned! ⚖️
+          </span>
+          <span className="text-white text-xs font-bold tracking-widest uppercase px-4">
+             🚀 NOTICE: The legal database and "Subject Search" engine are currently under maintenance for system upgrades. New judgements will be live shortly. Stay tuned! ⚖️
+          </span>
         </div>
       </div>
-      {/* ================= END HEADER ================= */}
 
+      {/* ================= 2. HEADER SECTION ================= */}
+    <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+  <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+    
+    {/* ================= LOGO SECTION ================= */}
+    <div className="flex items-center gap-3">
+      {/* Agar aapka logo public folder mein 'tnt-logo.png' naam se hai */}
+      <div className="h-40 w-40 overflow-hidden rounded-lg">
+        <img 
+          src="/logo.png" 
+          alt="Talk N Type Logo" 
+          className="h-full w-full object-contain"
+        />
+      </div>
+      
+      <div>
+        <h1 className="text-xl font-black text-gray-800 tracking-tight italic leading-none">
+          
+        </h1>
+        <p className="text-[10px] font-bold text-sky-600 tracking-[0.2em] uppercase">
+          
+        </p>
+      </div>
+    </div>
 
-      {/* ================= GRID BUTTONS ================= */}
-      <div className="max-w-7xl mx-auto px-4 mt-6">
-        <h2 className="text-gray-600 font-semibold mb-4 text-sm uppercase tracking-wide">Quick Access Menu</h2>
-        
+    {/* BACK BUTTON */}
+    <button 
+      onClick={() => navigate('/dashboard')}
+      className="text-xs font-black bg-gray-100 px-4 py-2 rounded-lg text-gray-500 hover:bg-sky-50 hover:text-sky-600 transition-all border border-gray-200"
+    >
+      BACK TO DASHBOARD
+    </button>
+  </div>
+</div>
+
+      {/* ================= 3. GRID BUTTONS ================= */}
+      <div className="max-w-7xl mx-auto px-6 mt-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
-          {/* Main List Buttons */}
           {dashboardItems.map((item, index) => (
             <button
               key={index}
+              onClick={handleButtonClick}
               className={`
-                ${skyButtonClass}
-                py-4 px-4 rounded-xl shadow-sm hover:shadow-lg
-                text-lg font-medium 
-                transition-all active:scale-95 duration-200
+                ${item.color}
+                py-5 px-4 rounded-xl shadow-md text-white
+                text-[15px] font-black tracking-wide uppercase
+                transition-all active:scale-95 duration-150
                 flex items-center justify-center text-center
-                border-b-4
+                border-b-4 border-opacity-50
               `}
-              onClick={() => console.log(`Clicked ${item.label}`)}
             >
               {item.label}
             </button>
           ))}
           
-          {/* Search History Button */}
-          <button className={`
-              ${skyButtonClass}
-              py-4 px-4 rounded-xl shadow-sm hover:shadow-lg
-              text-lg font-medium 
-              border-b-4
-              flex items-center justify-center text-center
-              opacity-90 hover:opacity-100
-            `}>
-              Search History
-          </button>
-
+          {/* History Button - Keeping it Neutral */}
+         
         </div>
       </div>
 
-       {/* Footer would go here */}
-       {/* <FooterButtons /> */}
+      {/* ================= 4. UNDER UPDATION POPUP (MODAL) ================= */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">Under Updation</h2>
+            <p className="text-gray-500 font-medium mb-8 leading-relaxed">
+              We are integrating new data and improving search features. This section will be live very soon!
+            </p>
+            <button 
+              onClick={() => setShowModal(false)}
+              className="w-full bg-sky-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-sky-200 hover:bg-sky-700 active:scale-95 transition-all"
+            >
+              GOT IT
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Styles for Animation */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          animation: marquee 20s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };
