@@ -83,53 +83,29 @@ export const uploadOCR = async (e, setText, setLoading) => {
 
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
-// ------------------------------------------------------
-// editor.api.js
-// ------------------------------------------------------
-// ✔ AUDIO → TEXT - Final Updated Version
-// ------------------------------------------------------
+
 export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) => {
-  const file = e.target.files ? e.target.files[0] : e;
+  // Fix for "e is not defined"
+  const file = (e && e.target && e.target.files) ? e.target.files[0] : e;
   if (!file) return;
 
-  const finalURL = API_URL || API; 
   const formData = new FormData();
   formData.append("audio", file);
 
   setIsAudioLoading(true);
-
   try {
-    const response = await fetch(`${finalURL}/api/audio/transcribe`, {
+    const response = await fetch(`${API_URL}/api/audio/transcribe`, {
       method: "POST",
       body: formData,
     });
-
-    if (!response.ok) {
-        throw new Error(`Server Error: ${response.status}`);
-    }
-
     const data = await response.json();
-    console.log("Deepgram Raw Data:", data); // Isse console mein check karein structure
-
-    // ✅ Deepgram response structure check
-    const transcript = data.transcript || 
-                       data.results?.channels[0]?.alternatives[0]?.transcript;
-
-    if (data.success && transcript) {
-      setManualText((prev) => {
-        const currentText = typeof prev === 'string' ? prev : "";
-        return currentText ? `${currentText} ${transcript}` : transcript;
-      });
-    } else {
-      // Agar transcript khali hai toh user ko informative message mile
-      alert("Deepgram ne audio sun li par koi text nahi mila. Kya audio clear hai?");
+    if (data.success) {
+      setManualText(prev => prev ? `${prev} ${data.transcript}` : data.transcript);
     }
   } catch (error) {
-    console.error("Audio upload error:", error);
-    alert("Backend connect hua par error aaya. Console check karein.");
+    console.error("Transcription error:", error);
   } finally {
     setIsAudioLoading(false);
-    if (e.target && e.target.type === 'file') e.target.value = null;
   }
 };
 // ------------------------------------------------------

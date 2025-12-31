@@ -49,12 +49,13 @@ const EditorActions = ({
     }
   };
 
-  const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
+const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
     if (e.target.files && e.target.files[0]) {
       try {
-        await uploadFunction(e, setManualText, setLoadingState);
+        // Hum koi language pass nahi kar rahe, backend handle karega
+        await uploadFunction(e, setManualText, setLoadingState, API);
       } catch (err) {
-        console.error("File upload error:", err);
+        console.error("Upload error:", err);
         alert("Failed to process file");
       } finally {
         e.target.value = null;
@@ -88,24 +89,19 @@ const EditorActions = ({
         <AiButton label="✨ Fix Grammar" color="blue" onClick={() => fixGrammar(manualText, setManualText, setIsTranslating)} />
         <AiButton label={isOCRLoading ? "⏳ Extracting..." : "🖼️ Image → Text"} color="purple" onClick={() => !isOCRLoading && ocrRef.current.click()} />
         <input ref={ocrRef} type="file" accept="image/*" hidden onChange={(e) => handleFileSelect(e, uploadOCR, setIsOCRLoading)} />
-       <AiButton 
-  label={isAudioLoading ? "⏳ Converting..." : "🎵 Audio → Text"} 
-  color="green" 
-  onClick={() => !isAudioLoading && audioRef.current.click()} 
-/>
+      <AiButton 
+          label={isAudioLoading ? "⏳ Detecting & Converting..." : "🎵 Audio → Text"} 
+          color="green" 
+          onClick={() => !isAudioLoading && audioRef.current.click()} 
+        />
+        <input 
+          ref={audioRef}
+          type="file"
+          accept="audio/*"
+          hidden
+          onChange={(e) => handleFileSelect(e, uploadAudio, setIsAudioLoading)}
+        />
 
-
-<input 
-  ref={audioRef} 
-  type="file" 
-  accept="audio/*" 
-  hidden 
-  onChange={(e) => handleFileSelect(
-    e, 
-    (ev, setT, setL) => uploadAudio(ev, setT, setL, API), // Yahan 'API' wo prop hai jo Editor.jsx se aa raha hai
-    setIsAudioLoading
-  )} 
-/>
         <AiButton label={showChat ? "❌ Close Chat" : "📝 AI Chat"} color="blue" onClick={() => setShowChat(!showChat)} />
         <AiButton label={isAIGenerating ? "⏳ Generating..." : "🧠 Generate Draft"} color="purple" disabled={isAIGenerating} onClick={() => !isAIGenerating && setShowDraftPopup(true)} />
         <AiButton label="↔️ Expand" color="green" onClick={() => expandText(manualText, setManualText, setIsTranslating)} />

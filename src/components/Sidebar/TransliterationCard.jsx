@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 
+// ✅ Target Production API URL
+const API_URL = "https://tnt-gi49.onrender.com/api/transliterate";
+
 const scriptOptions = [
   { code: "en", label: "Roman Script (English letters)" },
   { code: "hi", label: "Devanagari (हिंदी)" },
@@ -19,12 +22,13 @@ const TransliterationCard = ({ editorText, onTransliterationComplete }) => {
     setIsTransliterating(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/transliterate", {
+      // ✅ Using direct Render API URL
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: editorText,
-          sourceLang: "hi",       // adjust if needed
+          sourceLang: "hi", // Hindi source default rakha hai
           targetScript: targetScript,
         }),
       });
@@ -38,13 +42,14 @@ const TransliterationCard = ({ editorText, onTransliterationComplete }) => {
       if (data.error) {
         setError(`❌ ${data.details || data.error}`);
       } else {
-        // ✅ send transliterated text up to Dashboard
+        // ✅ Success: Transliterated text dashboard ko bhej rahe hain
         if (onTransliterationComplete) {
           onTransliterationComplete(data.transliteratedText);
         }
       }
     } catch (err) {
       setError(`❌ Transliteration failed: ${err.message}`);
+      console.error("Transliteration API Error:", err);
     } finally {
       setIsTransliterating(false);
     }
@@ -56,13 +61,19 @@ const TransliterationCard = ({ editorText, onTransliterationComplete }) => {
         ✍️ Transliteration
       </h3>
 
+      <label className="text-[10px] text-gray-500 font-bold mb-1 block uppercase">
+        Convert Script To:
+      </label>
+
       <select
         value={targetScript}
         onChange={(e) => setTargetScript(e.target.value)}
         className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-green-500 cursor-pointer"
       >
         {scriptOptions.map((s) => (
-          <option key={s.code} value={s.code}>{s.label}</option>
+          <option key={s.code} value={s.code}>
+            {s.label}
+          </option>
         ))}
       </select>
 
@@ -77,7 +88,8 @@ const TransliterationCard = ({ editorText, onTransliterationComplete }) => {
             : "bg-green-600 text-white hover:bg-green-700"
         }`}
       >
-        {isTransliterating ? "⏳ Transliterating..." : "🔄 Transliterate Script"}
+        <span>{isTransliterating ? "⏳" : "🔄"}</span>
+        {isTransliterating ? "Transliterating..." : "Transliterate Script"}
       </button>
     </div>
   );
