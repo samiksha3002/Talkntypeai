@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+// ✅ Base URL ko alag rakhein taaki debug karna aasaan ho
+const BASE_URL = "https://tnt-gi49.onrender.com"; 
+
 const languageOptions = [
   { code: 'en-IN', label: 'English (India)' },
   { code: 'hi', label: 'Hindi (हिंदी)' },
@@ -7,7 +10,7 @@ const languageOptions = [
   { code: 'gu-IN', label: 'Gujarati (ગુજરાતી)' },
   { code: 'ta-IN', label: 'Tamil (தமிழ்)' },
   { code: 'te-IN', label: 'Telugu (తెలుగు)' },
-  { code: 'kn-IN', label: 'Kannada (ಕನ್ನಡ)' },
+  { code: 'kn-IN', label: 'Kannada (कನ್ನಡ)' },
   { code: 'ml-IN', label: 'Malayalam (മലയാളം)' },
   { code: 'pa-IN', label: 'Punjabi (ਪੰਜਾਬੀ)' },
   { code: 'bn-IN', label: 'Bengali (বাংলা)' },
@@ -34,9 +37,14 @@ const TranslationCard = ({ editorText, onTranslationComplete }) => {
     const cleanLangCode = getCleanLangCode(targetLang);
 
     try {
-      const response = await fetch("http://localhost:5000/api/chattranslate", {
+      // ✅ Explicitly using the full path
+      const response = await fetch(`${BASE_URL}/api/chattranslate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        mode: 'cors', // ✅ CORS mode enable karein
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           text: editorText,
           targetLang: cleanLangCode,
@@ -44,21 +52,25 @@ const TranslationCard = ({ editorText, onTranslationComplete }) => {
       });
 
       if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Server error ${response.status}: ${text}`);
+        // Render par kai baar 502/503 error aata hai agar server 'sleep' mode mein ho
+        if(response.status === 502) throw new Error("Server is waking up. Please try again in 30 seconds.");
+        const errorText = await response.text();
+        throw new Error(`Server Error (${response.status})`);
       }
 
       const data = await response.json();
+      
       if (data.error) {
         setError(`❌ ${data.details || data.error}`);
       } else {
-        // ✅ send translated text up to Dashboard
         if (onTranslationComplete) {
           onTranslationComplete(data.translatedText);
         }
       }
     } catch (err) {
-      setError(`❌ Translation failed: ${err.message}`);
+      // ✅ Agar Render server slow hai toh ye message dikhayega
+      setError(`❌ Connection failed. Check if backend is live at Render.`);
+      console.error("Fetch Error Details:", err);
     } finally {
       setIsTranslating(false);
     }
@@ -70,10 +82,7 @@ const TranslationCard = ({ editorText, onTranslationComplete }) => {
         <span className="bg-white p-1 rounded shadow-sm text-lg">🈯</span> Translation
       </h3>
 
-      <label
-        htmlFor="translation-language"
-        className="text-[10px] text-gray-500 font-bold mb-1 block"
-      >
+      <label htmlFor="translation-language" className="text-[10px] text-gray-500 font-bold mb-1 block">
         CONVERT EDITOR TEXT TO:
       </label>
 
@@ -84,25 +93,25 @@ const TranslationCard = ({ editorText, onTranslationComplete }) => {
         className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-indigo-500 cursor-pointer"
       >
         {languageOptions.map((lang) => (
-          <option key={lang.code} value={lang.code}>
-            {lang.label}
-          </option>
+          <option key={lang.code} value={lang.code}>{lang.label}</option>
         ))}
       </select>
 
-      {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
+      {error && (
+        <div className="bg-red-50 p-2 rounded mb-2">
+           <p className="text-red-500 text-[10px]">{error}</p>
+        </div>
+      )}
 
       <button
         onClick={handleTranslateClick}
         disabled={isTranslating}
         className={`w-full py-2 rounded text-sm font-medium transition shadow-sm flex items-center justify-center gap-2 ${
-          isTranslating
-            ? 'bg-indigo-300 text-indigo-700 cursor-not-allowed'
-            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+          isTranslating ? 'bg-indigo-300 text-indigo-700 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'
         }`}
       >
         <span>{isTranslating ? '⏳' : '🔄'}</span>
-        {isTranslating ? 'Translating...' : 'Translate Document'}
+        {isTranslating ? 'Processing...' : 'Translate Document'}
       </button>
     </div>
   );

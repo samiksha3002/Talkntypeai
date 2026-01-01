@@ -1,11 +1,14 @@
-import React from "react";
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import standard theme styles
+import React, { useRef } from "react";
+// Using react-quill-new to fix the findDOMNode warning
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css'; 
 import AiChat from "../components/AiChat";
 
 const EditorTextarea = ({ manualText, setManualText, showChat }) => {
-  
-  // Custom Toolbar configuration to match your screenshots
+  // Using a ref directly on the element as recommended by the error message
+  const quillRef = useRef(null);
+
+  // Custom Toolbar configuration
   const modules = {
     toolbar: [
       [{ 'font': [] }, { 'size': [] }],
@@ -25,9 +28,10 @@ const EditorTextarea = ({ manualText, setManualText, showChat }) => {
       {/* RICH TEXT EDITOR SECTION */}
       <div className={`flex flex-col flex-1 min-w-0 ${showChat ? "w-2/3" : "w-full"}`}>
         <ReactQuill 
+          ref={quillRef}
           theme="snow"
           value={manualText}
-          onChange={setManualText} // ReactQuill returns HTML string
+          onChange={setManualText} 
           modules={modules}
           placeholder="Start typing or speaking..."
           className="h-full flex flex-col"
@@ -58,14 +62,13 @@ const EditorTextarea = ({ manualText, setManualText, showChat }) => {
         .ql-container {
           flex: 1;
           overflow-y: auto;
-          font-size: 1.125rem; /* Matches your text-lg class */
+          font-size: 1.125rem; 
           border: none !important;
         }
         .ql-editor {
           min-height: 100%;
-          padding: 2rem; /* Matches your p-8 class */
+          padding: 2rem; 
         }
-        /* Ensures the editor doesn't hide behind status bar */
         .ql-editor.ql-blank::before {
           left: 2rem;
           color: #9ca3af;
