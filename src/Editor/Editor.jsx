@@ -3,6 +3,7 @@ import EditorActions from "./EditorActions";
 import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
+import FontConvertCard from "../components/Sidebar/FontConvertCard";
 import { mangalToKruti } from "../../utils/mangalToKruti";
 
 const Editor = ({
@@ -130,34 +131,45 @@ const Editor = ({
 
   // 🔠 Font Conversion Effect
   useEffect(() => {
-    const runFontConversion = () => {
-      if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-      
-      try {
-        setIsConverting(true); // Triggers Global Loading
-        
-        // Small timeout to ensure the loading screen appears for fast operations
-        setTimeout(() => {
-            const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
+  const runFontConversion = async () => {
+    if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
 
-            if (fontConvertCommand.font === "krutidev") {
-              const convertedText = mangalToKruti(plainText);
-              setManualText(`<p>${convertedText}</p>`);
-            } else if (fontConvertCommand.font === "unicode") {
-              setManualText(`<p>${plainText}</p>`);
-            }
-            
-            setIsConverting(false); // Hides Global Loading
-            setFontConvertCommand(null);
-        }, 500);
-      } catch (err) {
-        console.error("Font conversion error:", err);
-        setIsConverting(false);
-      }
-    };
+    try {
+      setIsConverting(true); // show global loading
 
-    runFontConversion();
-  }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
+      // Small timeout so loading spinner is visible even for fast operations
+      setTimeout(async () => {
+        const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
+        let convertedText = plainText;
+
+        if (fontConvertCommand.font === "krutidev") {
+          // Call backend API for KrutiDev → Unicode
+        const res = await fetch(`${API_BASE_URL}/api/font-convert/krutidev-to-unicode`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: plainText })
+});
+
+
+          const data = await res.json();
+          convertedText = data.convertedText || plainText;
+        } else if (fontConvertCommand.font === "unicode") {
+          // Just keep plain text for Unicode
+          convertedText = plainText;
+        }
+
+        setManualText(`<p>${convertedText}</p>`);
+        setIsConverting(false); // hide loading
+        setFontConvertCommand(null);
+      }, 500);
+    } catch (err) {
+      console.error("Font conversion error:", err);
+      setIsConverting(false);
+    }
+  };
+
+  runFontConversion();
+}, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
 
   // Helper to clear storage (Triggered from Toolbar)
   const clearAutoSave = () => {

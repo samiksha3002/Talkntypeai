@@ -3,6 +3,8 @@ import React, { useState } from "react";
 const fontOptions = [
   { code: "unicode", label: "Convert to Unicode (Devanagari)" },
   { code: "krutidev", label: "Convert to KrutiDev" },
+  { code: "Shivaji", label: "Convert to Shivaji" },
+  { code: "Preeti", label: "Convert to Preeti" },
 ];
 
 const FontConvertCard = ({ onFontConvert, isConverting, editorText }) => {

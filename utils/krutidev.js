@@ -16,7 +16,7 @@ export function convertToKrutiDev(text = "") {
     "ढ": "<",
     "ण": ".",
     "त": "r",
-    "थ": "F",
+    "थ": "r",   // corrected here
     "द": "n",
     "ध": "/",
     "न": "u",
@@ -33,6 +33,7 @@ export function convertToKrutiDev(text = "") {
     "ष": "Z",
     "स": "l",
     "ह": "g",
+
     "ा": "k",
     "ि": "f",
     "ी": "h",
@@ -43,7 +44,6 @@ export function convertToKrutiDev(text = "") {
     "ो": "ks",
     "ौ": "kS",
     "्": "~"
-    // add more mappings as needed
   };
 
   Object.keys(map).forEach((key) => {
