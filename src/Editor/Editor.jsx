@@ -48,16 +48,88 @@ const Editor = ({
   }, []);
 
   // 🎤 Speech Append Logic
-  useEffect(() => {
+ useEffect(() => {
     if (!speechText) return;
     if (speechText === lastProcessedSpeechRef.current) return;
-    
-    setManualText((prev) => 
-      prev ? prev + " " + speechText : `<p>${speechText}</p>`
-    );
+
+    // 1. commands list defined here
+    const processSpeechText = (text) => {
+      let processed = text;
+      
+      // --- PUNCTUATION MAPPING (From your Image) ---
+      const commands = [
+        { phrases: ["comma", "alpviram", "swalpviram"], symbol: "," },
+        { phrases: ["full stop", "purna viram", "purnaviram"], symbol: "." },
+        { phrases: ["question mark", "prashnchin", "prashna chinha", "prashnvachak"], symbol: "?" },
+        { phrases: ["exclamation", "vismayadibodhak", "aashcharyavachak"], symbol: "!" },
+        { phrases: ["colon", "apurna viram", "apurnaviram"], symbol: ":" },
+        { phrases: ["semi colon", "ardhviram"], symbol: ";" },
+        { phrases: ["hyphen", "yojak chinh", "sanyog chinh"], symbol: "-" },
+        { phrases: ["slash", "tirchi rekha", "tirki regh"], symbol: "/" },
+        { phrases: ["open bracket", "koshak shuru", "kans suru"], symbol: "(" },
+        { phrases: ["close bracket", "koshak band", "kans band"], symbol: ")" },
+        { phrases: ["double quote", "dohra uddharan", "duheri avtaran"], symbol: '"' },
+        { phrases: ["single quote", "ekal uddharan", "ekeri avtaran"], symbol: "'" },
+        { phrases: ["at the rate", "et da ret"], symbol: "@" },
+        { phrases: ["plus sign", "jama chinh", "berij chinh"], symbol: "+" },
+      ];
+
+      // Replace phrases with symbols (Case Insensitive)
+      commands.forEach(({ phrases, symbol }) => {
+        phrases.forEach(phrase => {
+          const regex = new RegExp(`\\b${phrase}\\b`, 'gi');
+          processed = processed.replace(regex, symbol);
+        });
+      });
+      
+      return processed;
+    };
+
+    setManualText((prev) => {
+      // Step 1: Process Punctuation first
+      let cleanSpeech = processSpeechText(speechText);
+      const lowerSpeech = speechText.toLowerCase();
+
+      // --- FORMATTING COMMANDS ---
+
+      // A. NEW PARAGRAPH (Naya Paragraph / Naveen Parichhed)
+      const paraCommands = ["new paragraph", "naya paragraph", "naya pairagraph", "naveen parichhed", "navin parichhed"];
+      if (paraCommands.some(cmd => lowerSpeech.includes(cmd))) {
+         // Remove the command word from text
+         paraCommands.forEach(cmd => {
+            cleanSpeech = cleanSpeech.replace(new RegExp(`\\b${cmd}\\b`, 'gi'), "");
+         });
+         // Create New Paragraph
+         return (prev || "") + `<p>${cleanSpeech}</p>`;
+      }
+
+      // B. NEW LINE (Nai Line / Naveen Aol)
+      const lineCommands = ["new line", "nai line", "naveen aol", "navin aol"];
+      if (lineCommands.some(cmd => lowerSpeech.includes(cmd))) {
+         // Remove the command word
+         lineCommands.forEach(cmd => {
+            cleanSpeech = cleanSpeech.replace(new RegExp(`\\b${cmd}\\b`, 'gi'), "");
+         });
+         // Insert Break (<br>) inside the last paragraph
+         if (prev && prev.trim().endsWith("</p>")) {
+            return prev.replace(/<\/p>$/, `<br>${cleanSpeech}</p>`);
+         }
+         return (prev || "") + `<p>${cleanSpeech}</p>`;
+      }
+
+      // C. NORMAL TEXT (Append to existing paragraph)
+      if (!prev) return `<p>${cleanSpeech}</p>`;
+      
+      if (prev.trim().endsWith("</p>")) {
+        // Remove closing tag, add space + text, add closing tag back
+        return prev.replace(/<\/p>$/, ` ${cleanSpeech}</p>`);
+      }
+
+      return prev + " " + cleanSpeech;
+    });
+
     lastProcessedSpeechRef.current = speechText;
   }, [speechText, setManualText]);
-
   // 🌐 Translation Effect
   useEffect(() => {
     const runTranslation = async () => {

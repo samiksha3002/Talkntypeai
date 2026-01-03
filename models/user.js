@@ -43,6 +43,7 @@ const UserSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+
 // Prevent "Model Overwrite" errors in development
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 

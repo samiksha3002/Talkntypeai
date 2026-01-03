@@ -18,7 +18,7 @@ export function convertToKrutiDev(text) {
         modifiedText = modifiedText.replace(new RegExp(key, "g"), preMap[key]);
     }
 
-    // MAIN UNICODE → KRUTIDEV MAPPING
+    // MAIN UNICODE → KRUTIDEV MAPPINGpm
     const unicodeMap = {
         "क": "d", "ख": "[", "ग": "x", "घ": "X", "ङ": "¢",
         "च": "p", "छ": "P", "ज": "h", "झ": "H", "ञ": "=",

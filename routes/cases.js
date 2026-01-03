@@ -76,6 +76,23 @@ router.put('/:caseId', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
+// ✅ 6. GET SINGLE CASE (ADD THIS ROUTE)
+router.get('/:caseId', async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const singleCase = await Case.findById(caseId);
+
+    if (!singleCase) {
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    }
+
+    // Frontend expects "case" key
+    res.status(200).json({ success: true, case: singleCase }); 
+  } catch (error) {
+    console.error("Error fetching single case:", error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
 
 // ✅ 5. IMPORT CASES FROM ECOURT TEXT DATA
 router.post('/import', async (req, res) => {

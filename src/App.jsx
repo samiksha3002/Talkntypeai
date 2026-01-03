@@ -33,6 +33,7 @@ import ImportECourtPage from "./pages/ImportECourtPage";
 import ManageTeamPage from "./pages/ManageTeamPage"; 
 import WebsiteShowcase from "./components/WebsiteShowcase";
 import ManageClientsPage from "./pages/ManageClientsPage";
+import EditCasePage from "./pages/EditCasePage";
 
 // Landing Page
 const LandingPage = () => {
@@ -115,7 +116,7 @@ function App() {
               <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
               {/* ADMIN ROUTE */}
               <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
-              
+              <Route path="/case/edit/:id" element={<EditCasePage />} />
 
               {/* 404 */}
               <Route path="*" element={<div>404 Page Not Found</div>} />
