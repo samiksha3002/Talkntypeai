@@ -41,12 +41,15 @@ const Diary = () => {
         path: "/manage-cases",
       },
       {
-        id: 3,
-        title: "Import Cases from eCourt",
-        desc: "Only eCourt text file allows to import.",
-        icon: <RefreshCw className="w-6 h-6 text-purple-400" />,
-        path: "/import-ecourt",
-      },
+  id: 3,
+  title: "Import Cases from eCourt",
+  desc: "Redirect to eCourt website.",
+  icon: <RefreshCw className="w-6 h-6 text-purple-400" />, 
+  
+  // Yahan change karein:
+  path: "https://ecourts.gov.in/ecourts_home/", 
+  isExternal: true // Ye line add karein
+},
     ],
     clientManagement: [
       {
