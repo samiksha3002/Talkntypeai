@@ -39,7 +39,7 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     // A. STATIC ADMIN LOGIN
-    if (email === 'admin@talkntype.com' && password === 'admin123') {
+    if (email === 'admin@talkntype.com' && password === 'Dhiraj2010') {
         const oneYearFromNow = new Date();
         oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1); 
         
