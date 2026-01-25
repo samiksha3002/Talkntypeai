@@ -16,7 +16,7 @@ const PaymentBookPage = () => {
     date: new Date().toISOString().split("T")[0],
     caseId: "",
   });
-const API_URL = "https://tnt-gi49.onrender.com";
+const API_URL = "https://talkntypeai.onrender.com";
 
   useEffect(() => {
     fetchPayments();

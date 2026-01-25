@@ -23,7 +23,7 @@ const Login = () => {
     setStatus({ type: 'loading', message: 'Verifying credentials...' });
 
     try {
-      const response = await fetch('https://tnt-gi49.onrender.com/api/login', {
+      const response = await fetch('https://talkntypeai.onrender.com/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

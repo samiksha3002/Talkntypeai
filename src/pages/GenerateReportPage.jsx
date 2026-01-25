@@ -34,7 +34,7 @@ const GenerateReportPage = () => {
 
     try {
       setLoading(true);
-      const API_URL = "https://tnt-gi49.onrender.com"; // ✅ Direct URL for stability
+      const API_URL = "https://talkntypeai.onrender.com"; // ✅ Direct URL for stability
 
       // ✅ Added userId to query parameters
       const res = await fetch(

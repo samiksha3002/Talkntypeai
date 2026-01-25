@@ -35,7 +35,7 @@ const AddCasePage = () => {
     }
 
     try {
-      const response = await fetch('https://tnt-gi49.onrender.com/api/cases/add', {
+      const response = await fetch('https://talkntypeai.onrender.com/api/cases/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

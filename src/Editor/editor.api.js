@@ -5,7 +5,7 @@ import axios from "axios";
 const API =
   window.location.hostname === "localhost"
     ? "http://localhost:5000"
-    : "https://tnt-gi49.onrender.com";
+    : "https://talkntypeai.onrender.com";
 
 // 🔒 Safe call for setLoading
 const safeSetLoading = (fn, val) => {

@@ -1,3 +1,5 @@
+ // Ye line sabse upar honi chahiye
+console.log("Current DB URI:", process.env.MONGO_URI);
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
@@ -49,8 +51,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // CORS SETUP
 // ----------------------
 const allowedOrigins = [
-  "https://www.talkntype.com",
-  "https://talkntype.com",
+  "https://www.talkntype.pro",
+  "https://talkntype.pro",
   "http://localhost:3000",
   "http://localhost:5173",
 ];

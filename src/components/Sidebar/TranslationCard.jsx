@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 // ✅ Base URL ko alag rakhein taaki debug karna aasaan ho
-const BASE_URL = "https://tnt-gi49.onrender.com"; 
+const BASE_URL = "https://talkntypeai.onrender.com"; 
 
 const languageOptions = [
   { code: 'en-IN', label: 'English (India)' },

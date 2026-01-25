@@ -14,7 +14,7 @@ const ManageClientsPage = () => {
       if (!userId) return navigate('/login');
 
       try {
-        const res = await fetch(`https://tnt-gi49.onrender.com/api/clients/user/${userId}`);
+        const res = await fetch(`https://talkntypeai.onrender.com/api/clients/user/${userId}`);
         const data = await res.json();
         if (data.success) setClients(data.clients);
       } catch (err) {
@@ -29,7 +29,7 @@ const ManageClientsPage = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this client?")) return;
     try {
-      const res = await fetch(`https://tnt-gi49.onrender.com/api/clients/${id}`, { method: 'DELETE' });
+      const res = await fetch(`https://talkntypeai.onrender.com/api/clients/${id}`, { method: 'DELETE' });
       if (res.ok) setClients(clients.filter(c => c._id !== id));
     } catch (err) {
       alert("Delete failed");

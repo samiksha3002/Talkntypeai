@@ -27,7 +27,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.554.0",
-    "mongoose": "^8.20.3",
+    "mongoose": "^8.21.0",
     "multer": "^2.0.2",
     "openai": "^6.10.0",
     "pdf-parse": "^2.4.5",

@@ -29,7 +29,7 @@ const AddTeamMemberPage = () => {
     setLoading(true);
 
     try {
-      const API_URL = "https://tnt-gi49.onrender.com";
+      const API_URL = "https://talkntypeai.onrender.com";
 
       console.log("Submitting team member:", memberDetails); // 👀 debug
 

@@ -21,7 +21,7 @@ const EditCasePage = () => {
     const fetchCaseDetails = async () => {
       try {
         // Backend API call to get single case
-        const res = await fetch(`https://tnt-gi49.onrender.com/api/cases/${id}`);
+        const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${id}`);
         const data = await res.json();
         
         if (data.success && data.case) {
@@ -69,7 +69,7 @@ const EditCasePage = () => {
     }
 
     try {
-      const res = await fetch(`https://tnt-gi49.onrender.com/api/cases/${id}`, {
+      const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

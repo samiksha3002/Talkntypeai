@@ -30,7 +30,7 @@ const Diary = () => {
     const fetchUniversalData = async () => {
       setLoading(true);
       try {
-        const API_URL = import.meta.env.VITE_API_URL || "https://tnt-gi49.onrender.com";
+        const API_URL = import.meta.env.VITE_API_URL || "https://talkntypeai.onrender.com";
         const token = localStorage.getItem("token");
         const userId = localStorage.getItem("userId");
 

@@ -19,7 +19,7 @@ const ManageCasesPage = () => {
     const fetchCases = async () => {
       try {
         // Corrected URL: Backend automatically adds /api/cases from server.js
-        const res = await fetch(`https://tnt-gi49.onrender.com/api/cases/user/${userId}`);
+        const res = await fetch(`https://talkntypeai.onrender.com/api/cases/user/${userId}`);
         
         // Safety check if response is not JSON
         const contentType = res.headers.get("content-type");
@@ -46,7 +46,7 @@ const ManageCasesPage = () => {
     if (!window.confirm("Are you sure you want to delete this case?")) return;
 
     try {
-      const res = await fetch(`https://tnt-gi49.onrender.com/api/cases/${caseId}`, {
+      const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${caseId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'

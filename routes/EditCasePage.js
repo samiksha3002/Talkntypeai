@@ -10,7 +10,7 @@ const EditCasePage = () => {
     // Yaha us ID ka use karke backend se data fetch karein
     const fetchCaseDetails = async () => {
       try {
-        const res = await fetch(`https://tnt-gi49.onrender.com/api/cases/${id}`); // Single case fetch API
+        const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${id}`); // Single case fetch API
         const data = await res.json();
         if (data.success) {
           setCaseData(data.case);

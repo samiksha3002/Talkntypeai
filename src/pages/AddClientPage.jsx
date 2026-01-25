@@ -35,7 +35,7 @@ const AddClientPage = () => {
     }
 
     try {
-      const response = await fetch('https://tnt-gi49.onrender.com/api/clients/add', {
+      const response = await fetch('https://talkntypeai.onrender.com/api/clients/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...clientDetails, userId }),

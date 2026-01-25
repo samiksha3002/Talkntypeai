@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 // ✅ Target Production API URL
-const API_URL = "https://tnt-gi49.onrender.com/api/transliterate";
+const API_URL = "https://talkntypeai.onrender.com/api/transliterate";
 
 const scriptOptions = [
   { code: "en", label: "Roman Script (English letters)" },
