@@ -42,6 +42,17 @@ const EditorActions = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+
+  // EditorActions.jsx ke andar ek function
+const handlePageBreak = () => {
+  const range = quillRef.current.getEditor().getSelection();
+  if (range) {
+    // Ye line ek invisible separator add karegi jo print me naya page degi
+    quillRef.current.getEditor().insertEmbed(range.index, 'break', true);
+  }
+}; 
+
+
   // --- 📄 Save as PDF ---
   const handleDownloadPDF = () => {
     const doc = new jsPDF();

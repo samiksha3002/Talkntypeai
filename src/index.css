@@ -7,3 +7,9 @@
   font-family: "KrutiDev";
   src: url("./fonts/KrutiDev010.ttf") format("truetype");
 }
+
+.page-break {
+  border-top: 2px dashed #ccc;
+  margin: 20px 0;
+  page-break-after: always;
+}
