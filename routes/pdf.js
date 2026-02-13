@@ -1,37 +1,19 @@
 import express from "express";
 import multer from "multer";
-import PDFParser from "pdf2json"; // New library
+
+// 👇 FIX: Import 'createRequire' to load CommonJS modules like pdf-parse
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const router = express.Router();
 
+// 20MB Limit
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
 });
-
-// Helper function to wrap pdf2json in a Promise (makes it async/await compatible)
-const parsePDFBuffer = (buffer) => {
-  return new Promise((resolve, reject) => {
-    const pdfParser = new PDFParser(this, 1); // 1 = Text content only
-
-    pdfParser.on("pdfParser_dataError", (errData) => {
-      reject(new Error(errData.parserError));
-    });
-
-    pdfParser.on("pdfParser_dataReady", (pdfData) => {
-      // The raw data is complex, we need to extract the text lines safely
-      try {
-        const rawText = pdfParser.getRawTextContent();
-        resolve(rawText);
-      } catch (err) {
-        reject(err);
-      }
-    });
-
-    pdfParser.parseBuffer(buffer);
-  });
-};
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
@@ -39,27 +21,32 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    console.log(`Processing with pdf2json: ${req.file.originalname}`);
+    console.log(`📄 Processing PDF: ${req.file.originalname}`);
 
-    // --- EXECUTE NEW PARSER ---
-    const extractedText = await parsePDFBuffer(req.file.buffer);
+    // ✅ pdf-parse use (No changes needed in logic here)
+    const data = await pdfParse(req.file.buffer);
+
+    const extractedText = data.text;
+    const totalPages = data.numpages;
 
     if (!extractedText || extractedText.trim().length === 0) {
       return res.status(400).json({ 
-        error: "No text found. PDF might be a scanned image." 
+        error: "No text found. This might be a scanned PDF (Image). Please use OCR for this file." 
       });
     }
 
-    console.log("✅ Success! Text length:", extractedText.length);
+    console.log(`✅ Success! Extracted ${totalPages} pages. Text length: ${extractedText.length}`);
 
     res.json({
+      success: true,
       filename: req.file.originalname,
+      totalPages: totalPages,
       text: extractedText,
     });
 
   } catch (error) {
-    console.error("❌ PDF ERROR:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ PDF Parsing Error:", error);
+    res.status(500).json({ error: "Failed to parse PDF. File might be corrupted or encrypted." });
   }
 });
 

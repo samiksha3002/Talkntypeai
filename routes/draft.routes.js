@@ -3,68 +3,98 @@ import OpenAI from "openai";
 
 const router = express.Router();
 
-// Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY, // Ensure this is set in your .env
 });
 
 router.post("/generate-draft", async (req, res) => {
   try {
-    const { prompt, language = "English", draftType = "General" } = req.body;
+    const { prompt, language = "English", draftType = "Legal Petition" } = req.body;
 
-    // Validate prompt
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    // Call OpenAI Chat Completion
+    // SYSTEM PROMPT: Updated for Extra Spacing & Strict Formatting
+    const systemInstruction = `
+      You are an expert Legal Drafter for Indian Courts.
+      
+      **GOAL:** Create a spacious, well-formatted legal document ready for printing.
+      
+      **STRICT VISUAL RULES:**
+      1. **NO MARKDOWN:** Do NOT put the output inside \`\`\`html or \`\`\`. Just return the raw code.
+      2. **SPACING:**
+         - Use **<br><br>** (Double Line Break) between EVERY paragraph to create space.
+         - Use **<br><br><br><br>** (4 Line Breaks) before "Signatures" and "Verification" so there is space to sign.
+      3. **FORMATTING:**
+         - Court Name: <div style="text-align:center; font-weight:bold; font-size:1.2em;"> [COURT NAME] </div>
+         - Case No: <div style="text-align:center;"> [CASE DETAILS] </div>
+         - Parties: Align Left. Use "Vs." or "AND".
+         - Body: Start every point with "<strong>That</strong>". Use <ol> for numbering.
+      
+      **STRUCTURE TEMPLATE:**
+      [COURT NAME CENTERED]
+      <br>
+      [CASE NO CENTERED]
+      <br><br>
+      IN THE MATTER OF:
+      [Petitioner Details]
+      <br>
+      VERSUS
+      <br>
+      [Respondent Details]
+      <br><br>
+      [TITLE CENTERED & BOLD]
+      <br><br>
+      MOST RESPECTFULLY SHOWETH:
+      <ol>
+        <li><strong>MARRIAGE:</strong> That the marriage was solemnized...</li>
+        <br>
+        <li><strong>STATUS:</strong> That the parties...</li>
+        <br>
+        <li><strong>JURISDICTION:</strong> That this Hon'ble Court...</li>
+      </ol>
+      <br><br>
+      PRAYER:
+      <br>
+      It is therefore prayed...
+      <br><br><br><br>
+      PETITIONER 1 (SIGNATURE)
+      <br><br><br><br>
+      PETITIONER 2 (SIGNATURE)
+      <br><br><br><br>
+      ADVOCATE
+    `;
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Ya gpt-3.5-turbo agar budget kam rakhna hai
+      model: "gpt-4o-mini",
+      temperature: 0.3,
       messages: [
-        {
-          role: "system",
-          // 👇 YAHAN CHANGE KIYA HAI 👇
-          // Humne AI ko instruct kiya hai ki HTML tags use kare (Markdown nahi)
-          content: `You are a professional legal document drafting assistant.
-          Draft Type: ${draftType}
-          Language: ${language}
-          
-          CRITICAL INSTRUCTION: 
-          - Provide the output in clean **HTML format** only.
-          - Use <h3> for headings, <p> for paragraphs, <ul>/<li> for lists, and <strong> for bold text.
-          - Do NOT use Markdown (like **text** or # Header).
-          - Use <br> for line breaks where necessary.
-          - Do not include \`\`\`html code blocks, just return the raw HTML string.`,
-        },
-        {
-          role: "user",
-          content: prompt,
+        { role: "system", content: systemInstruction },
+        { 
+          role: "user", 
+          content: `Draft a legal document for: "${prompt}". Fill all missing details with placeholders like [_____].` 
         },
       ],
     });
 
-    // Extract draft text safely
-    const draftText = completion?.choices?.[0]?.message?.content?.trim() || null;
+    let draftText = completion?.choices?.[0]?.message?.content?.trim() || null;
 
     if (!draftText) {
-      return res.status(500).json({
-        error: "Draft generation failed",
-        details: "Empty response from AI model",
-      });
+      return res.status(500).json({ error: "No response from AI" });
     }
 
-    // Success response
-    // Frontend par ye data.text ke roop mein milega
-    return res.status(200).json({ text: draftText });
-    
-  } catch (err) {
-    console.error("🔥 Draft generation error:", err);
+    // --- MAGICAL FIX ---
+    // Ye code `html` text aur backticks (```) ko jabardasti hata dega
+    draftText = draftText.replace(/```html/g, "").replace(/```/g, "");
+    // -------------------
 
-    return res.status(500).json({
-      error: "Draft generation failed",
-      details: err?.message || "Unknown error",
-    });
+    return res.status(200).json({ text: draftText });
+
+  } catch (err) {
+    console.error("Error:", err);
+    return res.status(500).json({ error: "Server Error", details: err.message });
   }
 });
 
-export default router;
+export default router;  

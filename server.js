@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from "cors";
 
+
 // ----------------------
 // ROUTE IMPORTS
 // ----------------------
@@ -26,7 +27,7 @@ import inquiriesRouter from "./routes/inquiries.js";
 import teamRoute from "./routes/team.js";
 import reportsRoute from "./routes/reports.js";
 import paymentsRoute from "./routes/payments.js";
-
+import csvUploadRoute from "./routes/csvUploadRoute.js";
 // --- THE CRITICAL ROUTES ---
 import pdfRoutes from "./routes/pdf.js";
 import audioRoutes from "./routes/audio.js";
@@ -51,6 +52,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // CORS SETUP
 // ----------------------
 const allowedOrigins = [
+ "https://talkntypeai.vercel.app",
   "https://www.talkntype.pro",
   "https://talkntype.pro",
   "http://localhost:3000",
@@ -99,6 +101,7 @@ app.use("/api/reports", reportsRoute);
 app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
+app.use("/api/csv-manager", csvUploadRoute);
 
 // --- PDF & AUDIO ---
 // These are mounted at /api, so the full paths will be:

@@ -54,30 +54,41 @@ export const expandText = async (text, setText, setLoading) => {
 // ------------------------------------------------------
 // ✔ IMAGE → TEXT (OCR)
 // ------------------------------------------------------
-export const uploadOCR = async (e, setText, setLoading) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+// editor.api.js
 
-  const fd = new FormData();
-  fd.append("image", file);
-
-  safeSetLoading(setLoading, true);
+export const uploadOCR = async (e, setManualText, setLoading, API) => {
+  setLoading(true);
+  const file = e.target.files[0];
+  
+  const formData = new FormData();
+  formData.append("image", file);
 
   try {
-    const { data } = await axios.post(`${API}/api/ocr/image-to-text`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
+    const res = await fetch(`${API}/api/ocr/image-to-text`, {
+      method: "POST",
+      body: formData,
     });
 
-    if (data.success && data.text) {
-      setText((prev) => (prev + "\n" + data.text).trim());
-    } else {
-      alert(data.error || "No text found in the image.");
+    const data = await res.json();
+    
+    if (data.success) {
+      // 🔥 FIX: New lines (\n) को HTML Line breaks (<br>) में बदलें
+      // ताकि Quill Editor उन्हें अलग लाइन में दिखाए
+      const formattedText = data.text.replace(/\n/g, "<br />");
+      
+      // अगर आप चाहते हैं कि पुराना टेक्स्ट रहे और नया जुड़ जाए:
+      setManualText(prev => prev + (prev ? "<br /><br />" : "") + formattedText);
+      
+      // या अगर सिर्फ नया टेक्स्ट चाहिए:
+      // setManualText(formattedText);
     }
+
   } catch (err) {
-    console.error("OCR API error:", err.response?.data || err.message);
-    alert("Failed to extract text from image.");
+    console.error(err);
+    alert("Failed to extract text");
   } finally {
-    safeSetLoading(setLoading, false);
+    setLoading(false);
+    e.target.value = null; // Reset input
   }
 };
 
@@ -111,7 +122,9 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 // ------------------------------------------------------
 // ✔ PDF → TEXT
 // ------------------------------------------------------
-export const uploadPDF = async (e, setText, setLoading) => {
+
+
+export const uploadPDF = async (e, setText, setLoading, API) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
@@ -121,20 +134,29 @@ export const uploadPDF = async (e, setText, setLoading) => {
   safeSetLoading(setLoading, true);
 
   try {
+    // Note: Make sure your backend route matches this URL exactly.
+    // If you mounted the router at '/api/pdf', change this to `${API}/api/pdf/upload-pdf`
     const { data } = await axios.post(`${API}/api/upload-pdf`, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    if (data.text) {
-      setText(data.text);
+    if (data.success || data.text) {
+      // 🔥 CRITICAL FIX FOR EDITOR:
+      // Convert standard New Lines (\n) to HTML Line Breaks (<br>)
+      // This ensures ReactQuill displays paragraphs correctly instead of one long line.
+      const formattedText = data.text.replace(/\n/g, "<br />");
+
+      setText(formattedText);
     } else {
       alert(data.error || "Failed to extract text from PDF.");
     }
   } catch (err) {
     console.error("PDF API error:", err.response?.data || err.message);
-    alert("Error processing PDF.");
+    alert("Error processing PDF. Ensure the backend is running.");
   } finally {
     safeSetLoading(setLoading, false);
+    // ✅ Reset input so the user can upload the same file again if they want
+    if (e.target) e.target.value = ""; 
   }
 };
 

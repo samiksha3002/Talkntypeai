@@ -1,5 +1,3 @@
-// src/App.jsx
-
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
@@ -7,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { CaseProvider } from "./context/CaseContext";
 
 // Components
+import CsvCaseManager from "./pages/CsvCaseManager"; // ✅ Your new component
 import Preloader from "./components/Preloader";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
@@ -23,7 +22,7 @@ import JudgementsPage from "./components/JudgementsPage";
 import AddClientPage from "./pages/AddClientPage";
 import GenerateReportPage from "./pages/GenerateReportPage";
 import AddInquiryPage from "./pages/AddInquiryPage";
-import ManageInquiries from "./pages/ManageInquiries";   // ✅ NEW IMPORT
+import ManageInquiries from "./pages/ManageInquiries";
 import AddTeamMemberPage from "./pages/AddTeamMemberPage";
 import PaymentBookPage from "./pages/PaymentBookPage";
 import AddCasePage from "./pages/AddCasePage";
@@ -36,7 +35,7 @@ import ManageClientsPage from "./pages/ManageClientsPage";
 import EditCasePage from "./pages/EditCasePage";
 import EditInquiryPage from "./pages/EditInquiryPage";
 
-// Landing Page
+// Landing Page Wrapper
 const LandingPage = () => {
   return (
     <>
@@ -50,7 +49,7 @@ const LandingPage = () => {
   );
 };
 
-// Protect Admin
+// Protect Admin Route
 const AdminRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   if (!user.role || user.role !== "admin") {
@@ -59,7 +58,7 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
-// Protect User
+// Protect User Route
 const UserRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   if (!user.role) {
@@ -74,6 +73,14 @@ const UserRoute = ({ children }) => {
 function App() {
   const [loading, setLoading] = useState(true);
 
+  // ✅ FIX 1: Define API URL and userId here so they are available for routes
+  // This uses Vite env variable if available, otherwise defaults to localhost
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  
+  // Safely get user ID from localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const userId = user._id || user.id; // Handles different ID formats
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
@@ -86,7 +93,6 @@ function App() {
       {loading ? (
         <Preloader />
       ) : (
-        // ✅ GLOBAL CONTEXT WRAPPED HERE
         <CaseProvider>
           <Router>
             <Routes>
@@ -98,25 +104,38 @@ function App() {
               {/* USER ROUTES */}
               <Route path="/dashboard" element={<UserRoute><Dashboard /></UserRoute>} />
 
+              {/* ✅ FIX 2: Added the CSV Case Manager Route with props */}
+              <Route 
+                path="/case-manager" 
+                element={
+                  <UserRoute>
+                    <CsvCaseManager userId={userId} API={API_URL} />
+                  </UserRoute>
+                } 
+              />
+
               <Route path="/diary" element={<UserRoute><Diary /></UserRoute>} />
               <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
               <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
 
-             <Route path="/manage-team" element={<ManageTeamPage />} />
+              <Route path="/manage-team" element={<ManageTeamPage />} />
 
               <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
               <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
               <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
               <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
               <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
-              <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} /> {/* ✅ NEW ROUTE */}
+              <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} />
               <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
               <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
               <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
               <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
               <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
+              
               {/* ADMIN ROUTE */}
               <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+              
+              {/* EDIT ROUTES */}
               <Route path="/case/edit/:id" element={<EditCasePage />} />
               <Route path="/edit-inquiry/:id" element={<EditInquiryPage />} />
 

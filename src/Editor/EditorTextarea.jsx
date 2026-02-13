@@ -1,26 +1,26 @@
 import React, { useRef } from "react";
-// Using react-quill-new to fix the findDOMNode warning
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css'; 
 import AiChat from "../components/AiChat";
 
 const EditorTextarea = ({ manualText, setManualText, showChat }) => {
-  // Using a ref directly on the element as recommended by the error message
   const quillRef = useRef(null);
 
-  // Custom Toolbar configuration
   const modules = {
     toolbar: [
-      [{ 'font': [] }, { 'size': [] }],
-      ['bold', 'italic', 'underline', 'strike'],        
-      [{ 'color': [] }, { 'background': [] }],          
-      [{ 'script': 'sub'}, { 'script': 'super' }],      
-      [{ 'header': '1' }, { 'header': '2' }, 'blockquote', 'code-block'],
+      [{ 'header': '1' }, { 'header': '2' }, { 'font': [] }],
+      [{ 'size': [] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote', 'code-block'], // 'code-block' button is key for Tables
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }, { 'align': [] }],
-      ['link', 'image', 'video'],
-      ['clean']                                         
+      [{ 'indent': '-1'}, { 'indent': '+1' }], 
+      [{ 'align': [] }],
+      [{ 'color': [] }, { 'background': [] }],          
+      ['link', 'image'],
+      ['clean']                                     
     ],
+    clipboard: {
+      matchVisual: false,
+    }
   };
 
   return (
@@ -45,7 +45,7 @@ const EditorTextarea = ({ manualText, setManualText, showChat }) => {
         </div>
       )}
 
-      {/* CUSTOM CSS to fix layout and remove sliding under buttons */}
+      {/* ✅ CUSTOM CSS (Updated for Normal Font + Gaps) */}
       <style>{`
         .quill {
           display: flex;
@@ -65,13 +65,36 @@ const EditorTextarea = ({ manualText, setManualText, showChat }) => {
           font-size: 1.125rem; 
           border: none !important;
         }
+        
+        /* 🔥 EDITOR STYLING */
         .ql-editor {
           min-height: 100%;
-          padding: 2rem; 
+          padding: 2rem;
+          
+          /* 1. GAP FIX: यह जरुरी है ताकि OCR के गैप्स न हटें */
+          white-space: pre-wrap !important; 
+
+          /* 2. FONT FIX: वापस नॉर्मल (सुंदर) फॉन्ट कर दिया है */
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          
+          line-height: 1.6;
         }
+
+        /* 3. BOX FIX: जब आप '<>' (Code Block) बटन दबाएंगे, तब यह स्टाइल लगेगा */
+        .ql-editor pre.ql-syntax {
+          background-color: #f3f4f6;
+          color: #1f2937;
+          padding: 1rem;
+          border-radius: 0.5rem;
+          font-family: 'Courier New', monospace; /* सिर्फ बॉक्स के लिए टाइपराइटर फॉन्ट */
+          white-space: pre;
+          overflow-x: auto;
+        }
+
         .ql-editor.ql-blank::before {
           left: 2rem;
           color: #9ca3af;
+          font-style: italic;
         }
       `}</style>
     </div>

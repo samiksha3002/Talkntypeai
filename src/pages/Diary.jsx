@@ -12,6 +12,7 @@ import {
   CreditCard,
   FileSearch,
   ClipboardList,
+  FileUp,
 } from "lucide-react";
 
 import CalendarHeader from "../components/Diary/CalendarHeader";
@@ -120,6 +121,14 @@ const Diary = () => {
         desc: "Enter court details, case number, hearing dates.",
         icon: <Briefcase className="w-6 h-6 text-blue-400" />,
         path: "/add-case",
+      },
+      // ✅ NEW BUTTON ADDED HERE
+      {
+        id: 8, // Unique ID
+        title: "Import CSV Cases",
+        desc: "Bulk upload multiple cases from Excel/CSV.",
+        icon: <FileUp className="w-6 h-6 text-emerald-400" />,
+        path: "/case-manager", // यह वही Route है जो हमने App.js में बनाया था
       },
       {
         id: 10,
