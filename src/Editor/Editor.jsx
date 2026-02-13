@@ -11,16 +11,12 @@ const Editor = ({
   speechText,
   manualText,
   setManualText,
-
-  // Commands from Dashboard
   translationCommand,
   setTranslationCommand,
   transliterationCommand,
   setTransliterationCommand,
   fontConvertCommand,
-  setFontConvertCommand,
-
-  // Loading States & Setters (Passed from Dashboard for Global Screen)
+  setFontConvertCommand,  
   isTranslating, setIsTranslating,
   isTransliterating, setIsTransliterating,
   isConverting, setIsConverting,
@@ -29,6 +25,7 @@ const Editor = ({
   isAIGenerating, setIsAIGenerating
 }) => {
   const lastProcessedSpeechRef = useRef("");
+  const quillRef = useRef(null);
   const [showChat, setShowChat] = useState(false);
   const [showDraftPopup, setShowDraftPopup] = useState(false);
 
@@ -49,10 +46,13 @@ const Editor = ({
 
   // 🎤 Speech Append Logic
  useEffect(() => {
-    if (!speechText) return;
-    if (speechText === lastProcessedSpeechRef.current) return;
+   
+    if (!speechText || speechText === lastProcessedSpeechRef.current || !quillRef.current) return;
 
     // 1. commands list defined here
+    const editor = quillRef.current.getEditor();
+    const range = editor.getSelection();
+
     const processSpeechText = (text) => {
       let processed = text;
       
@@ -85,51 +85,35 @@ const Editor = ({
       return processed;
     };
 
-    setManualText((prev) => {
-      // Step 1: Process Punctuation first
-      let cleanSpeech = processSpeechText(speechText);
-      const lowerSpeech = speechText.toLowerCase();
+    let CleanSpeech = processSpeechText(speechText);
+    const lowerSpeech = speechText.toLowerCase();
+    let textToInsert = " " + CleanSpeech;
 
-      // --- FORMATTING COMMANDS ---
+if (["new paragraph", "naya paragraph", "navin pariched"].some(cmd => lowerSpeech.includes(cmd))){
+  textToInsert = "\n\n";
+  }else if ([
+    "new line","nai line ", "navin line "].some(cmd => lowerSpeech.includes(cmd))){
+      textToInsert = "\n";
+    }
 
-      // A. NEW PARAGRAPH (Naya Paragraph / Naveen Parichhed)
-      const paraCommands = ["new paragraph", "naya paragraph", "naya pairagraph", "naveen parichhed", "navin parichhed"];
-      if (paraCommands.some(cmd => lowerSpeech.includes(cmd))) {
-         // Remove the command word from text
-         paraCommands.forEach(cmd => {
-            cleanSpeech = cleanSpeech.replace(new RegExp(`\\b${cmd}\\b`, 'gi'), "");
-         });
-         // Create New Paragraph
-         return (prev || "") + `<p>${cleanSpeech}</p>`;
-      }
+   //insert at cursor 
+   if (range) {
+    editor.insertText(range.index,textToInsert , 'user');
+    editor.setSelection(range.index + textToInsert.length , 0 );
+  }
+  else{
+    const length = editor.getLength();
+    editor.insertText(length - 1 ,textToInsert , 'user');
+  }
 
-      // B. NEW LINE (Nai Line / Naveen Aol)
-      const lineCommands = ["new line", "nai line", "naveen aol", "navin aol"];
-      if (lineCommands.some(cmd => lowerSpeech.includes(cmd))) {
-         // Remove the command word
-         lineCommands.forEach(cmd => {
-            cleanSpeech = cleanSpeech.replace(new RegExp(`\\b${cmd}\\b`, 'gi'), "");
-         });
-         // Insert Break (<br>) inside the last paragraph
-         if (prev && prev.trim().endsWith("</p>")) {
-            return prev.replace(/<\/p>$/, `<br>${cleanSpeech}</p>`);
-         }
-         return (prev || "") + `<p>${cleanSpeech}</p>`;
-      }
+  //sync state 
 
-      // C. NORMAL TEXT (Append to existing paragraph)
-      if (!prev) return `<p>${cleanSpeech}</p>`;
-      
-      if (prev.trim().endsWith("</p>")) {
-        // Remove closing tag, add space + text, add closing tag back
-        return prev.replace(/<\/p>$/, ` ${cleanSpeech}</p>`);
-      }
-
-      return prev + " " + cleanSpeech;
-    });
-
+    setManualText(editor.root.innerHTML);
     lastProcessedSpeechRef.current = speechText;
-  }, [speechText, setManualText]);
+     },[speechText, setManualText]);
+
+
+
   // 🌐 Translation Effect
   useEffect(() => {
     const runTranslation = async () => {
@@ -277,6 +261,7 @@ const Editor = ({
           
           API={API_BASE_URL}
           onClear={clearAutoSave}
+          quillRef = {quillRef}
         />
 
         {/* Text Area */}
@@ -285,6 +270,7 @@ const Editor = ({
             manualText={manualText}
             setManualText={setManualText}
             showChat={showChat}
+            quillRef={quillRef}
           />
         </div>
 

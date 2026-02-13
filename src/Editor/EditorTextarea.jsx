@@ -3,8 +3,8 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css'; 
 import AiChat from "../components/AiChat";
 
-const EditorTextarea = ({ manualText, setManualText, showChat }) => {
-  const quillRef = useRef(null);
+const EditorTextarea = ({ manualText, setManualText, showChat , quillRef }) => {
+  
 
   const modules = {
     toolbar: [
