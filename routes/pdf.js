@@ -1,53 +1,50 @@
 import express from "express";
 import multer from "multer";
-
-// 👇 FIX: Import 'createRequire' to load CommonJS modules like pdf-parse
+import fs from "fs"; // File delete karne ke liye
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
 const router = express.Router();
 
-// 20MB Limit
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
-});
-
-router.post("/upload-pdf", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
-    console.log(`📄 Processing PDF: ${req.file.originalname}`);
-
-    // ✅ pdf-parse use (No changes needed in logic here)
-    const data = await pdfParse(req.file.buffer);
-
-    const extractedText = data.text;
-    const totalPages = data.numpages;
-
-    if (!extractedText || extractedText.trim().length === 0) {
-      return res.status(400).json({ 
-        error: "No text found. This might be a scanned PDF (Image). Please use OCR for this file." 
-      });
-    }
-
-    console.log(`✅ Success! Extracted ${totalPages} pages. Text length: ${extractedText.length}`);
-
-    res.json({
-      success: true,
-      filename: req.file.originalname,
-      totalPages: totalPages,
-      text: extractedText,
-    });
-
-  } catch (error) {
-    console.error("❌ PDF Parsing Error:", error);
-    res.status(500).json({ error: "Failed to parse PDF. File might be corrupted or encrypted." });
+// Disk storage use karein taaki RAM crash na ho
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "/tmp"); // Render par temporary storage ke liye '/tmp' use hota hai
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
   }
 });
 
-export default router;
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB Limit
+});
+
+router.post("/upload-pdf", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const filePath = req.file.path;
+
+  try {
+    // File ko read karein
+    const dataBuffer = fs.readFileSync(filePath);
+    const data = await pdfParse(dataBuffer);
+
+    res.json({
+      success: true,
+      totalPages: data.numpages,
+      text: data.text,
+    });
+
+  } catch (error) {
+    console.error("❌ Error:", error);
+    res.status(500).json({ error: "Badi file process karne mein server fail ho gaya." });
+  } finally {
+    // ✅ Kaam hone ke baad file delete zaroor karein
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+});
+
+export default router;  

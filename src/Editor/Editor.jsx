@@ -4,7 +4,10 @@ import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
 import FontConvertCard from "../components/Sidebar/FontConvertCard";
-import { mangalToKruti } from "../../utils/mangalToKruti";
+
+import { convertToKrutiDev } from '../../utils/krutidev';
+import { convertToShivaji } from '../../utils/shivaji';
+import { convertToPreeti } from '../../utils/preeti';
 
 const Editor = ({
   user,
@@ -186,53 +189,41 @@ if (["new paragraph", "naya paragraph", "navin pariched"].some(cmd => lowerSpeec
   }, [transliterationCommand, API_BASE_URL, setManualText, setIsTransliterating, setTransliterationCommand]);
 
   // 🔠 Font Conversion Effect
-  useEffect(() => {
-  const runFontConversion = async () => {
-    if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-
-    try {
-      setIsConverting(true); // show global loading
-
-      // Small timeout so loading spinner is visible even for fast operations
-      setTimeout(async () => {
+useEffect(() => {
+    const runFontConversion = async () => {
+      if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
+      try {
+        setIsConverting(true);
         const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
         let convertedText = plainText;
-
-        if (fontConvertCommand.font === "krutidev") {
-          // Call backend API for KrutiDev → Unicode
-        const res = await fetch(`${API_BASE_URL}/api/font-convert/krutidev-to-unicode`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ text: plainText })
-});
-
-
-          const data = await res.json();
-          convertedText = data.convertedText || plainText;
-        } else if (fontConvertCommand.font === "unicode") {
-          // Just keep plain text for Unicode
-          convertedText = plainText;
-        }
-
-        setManualText(`<p>${convertedText}</p>`);
-        setIsConverting(false); // hide loading
+        setTimeout(async () => {
+          if (fontConvertCommand.font === "krutidev") convertedText = convertToKrutiDev(plainText);
+          else if (fontConvertCommand.font === "Shivaji") convertedText = convertToShivaji(plainText);
+          else if (fontConvertCommand.font === "Preeti") convertedText = convertToPreeti(plainText);
+          else if (fontConvertCommand.font === "unicode") {
+            const res = await fetch(`${API_BASE_URL}/api/font-convert/krutidev-to-unicode`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: plainText })
+            });
+            const data = await res.json();
+            convertedText = data.convertedText || plainText;
+          }
+          setManualText(`<p>${convertedText}</p>`);
+          setIsConverting(false);
+          setFontConvertCommand(null);
+        }, 500);
+      } catch (err) {
+        setIsConverting(false);
         setFontConvertCommand(null);
-      }, 500);
-    } catch (err) {
-      console.error("Font conversion error:", err);
-      setIsConverting(false);
-    }
-  };
+      }
+    };
+    runFontConversion();
+  }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
 
-  runFontConversion();
-}, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
-
-  // Helper to clear storage (Triggered from Toolbar)
   const clearAutoSave = () => {
-     if(user?._id) {
-         localStorage.removeItem(`autosave_${user._id}`);
-         setManualText(''); 
-     }
+    if (user?._id) {
+      localStorage.removeItem(`autosave_${user._id}`);
+      setManualText('');
+    }
   }
 
   return (
