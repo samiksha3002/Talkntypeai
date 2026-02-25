@@ -49,73 +49,87 @@ const Editor = ({
 
   // 🎤 Speech Append Logic
  useEffect(() => {
-   
-    if (!speechText || speechText === lastProcessedSpeechRef.current || !quillRef.current) return;
+  if (!speechText || speechText === lastProcessedSpeechRef.current || !quillRef.current) return;
 
-    // 1. commands list defined here
-    const editor = quillRef.current.getEditor();
-    const range = editor.getSelection();
+  const editor = quillRef.current.getEditor();
+  const range = editor.getSelection();
 
-    const processSpeechText = (text) => {
-      let processed = text;
-      
-      // --- PUNCTUATION MAPPING (From your Image) ---
-      const commands = [
-        { phrases: ["comma", "alpviram", "swalpviram"], symbol: "," },
-        { phrases: ["full stop", "purna viram", "purnaviram"], symbol: "." },
-        { phrases: ["question mark", "prashnchin", "prashna chinha", "prashnvachak"], symbol: "?" },
-        { phrases: ["exclamation", "vismayadibodhak", "aashcharyavachak"], symbol: "!" },
-        { phrases: ["colon", "apurna viram", "apurnaviram"], symbol: ":" },
-        { phrases: ["semi colon", "ardhviram"], symbol: ";" },
-        { phrases: ["hyphen", "yojak chinh", "sanyog chinh"], symbol: "-" },
-        { phrases: ["slash", "tirchi rekha", "tirki regh"], symbol: "/" },
-        { phrases: ["open bracket", "koshak shuru", "kans suru"], symbol: "(" },
-        { phrases: ["close bracket", "koshak band", "kans band"], symbol: ")" },
-        { phrases: ["double quote", "dohra uddharan", "duheri avtaran"], symbol: '"' },
-        { phrases: ["single quote", "ekal uddharan", "ekeri avtaran"], symbol: "'" },
-        { phrases: ["at the rate", "et da ret"], symbol: "@" },
-        { phrases: ["plus sign", "jama chinh", "berij chinh"], symbol: "+" },
-      ];
+  // --- MERGED PROCESSOR FUNCTION ---
+  const processSpeechText = (text) => {
+    let processed = text;
+    const commands = [
+      { phrases: ["comma", "alpviram", "swalpviram"], symbol: "," },
+      { phrases: ["full stop", "purna viram", "purnaviram"], symbol: "." },
+      { phrases: ["question mark", "prashnchin", "prashnvachak"], symbol: "?" },
+      { phrases: ["exclamation", "vismayadibodhak", "aashcharyavachak"], symbol: "!" },
+      { phrases: ["colon", "apurna viram", "apurnaviram"], symbol: ":" },
+      { phrases: ["at the rate", "et da ret"], symbol: "@" },
+    ];
 
-      // Replace phrases with symbols (Case Insensitive)
-      commands.forEach(({ phrases, symbol }) => {
-        phrases.forEach(phrase => {
-          const regex = new RegExp(`\\b${phrase}\\b`, 'gi');
-          processed = processed.replace(regex, symbol);
-        });
+    // 1. Replace phrases with symbols
+    commands.forEach(({ phrases, symbol }) => {
+      phrases.forEach(phrase => {
+        // \s? use karne se phrase ke aage piche ka extra space catch ho jayega
+        const regex = new RegExp(`\\s?${phrase}\\s?`, 'gi');
+        processed = processed.replace(regex, symbol);
       });
-      
-      return processed;
-    };
+    });
 
-    let CleanSpeech = processSpeechText(speechText);
-    const lowerSpeech = speechText.toLowerCase();
-    let textToInsert = " " + CleanSpeech;
+    // 2. SMART SPACING: Punctuation se pehle ka extra space hatao (e.g. "Hello ," -> "Hello,")
+    processed = processed.replace(/\s+([,.?!:;])/g, '$1');
 
-if (["new paragraph", "naya paragraph", "navin pariched"].some(cmd => lowerSpeech.includes(cmd))){
-  textToInsert = "\n\n";
-  }else if ([
-    "new line","nai line ", "navin line "].some(cmd => lowerSpeech.includes(cmd))){
-      textToInsert = "\n";
-    }
+    // 3. LEGAL FORMATTING: Talk N Type ke liye important terms capitalize karein
+    const legalTerms = ["section", "article", "court", "respondent", "petitioner", "plaintiff"];
+    legalTerms.forEach(term => {
+      const reg = new RegExp(`\\b${term}\\b`, 'gi');
+      processed = processed.replace(reg, (match) => match.charAt(0).toUpperCase() + match.slice(1));
+    });
 
-   //insert at cursor 
-   if (range) {
-    editor.insertText(range.index,textToInsert , 'user');
-    editor.setSelection(range.index + textToInsert.length , 0 );
+    return processed;
+  };
+
+  // 1. Diffing Logic: Sirf naya bola hua text nikaalein
+  let newPart = speechText;
+  if (lastProcessedSpeechRef.current && speechText.startsWith(lastProcessedSpeechRef.current)) {
+    newPart = speechText.slice(lastProcessedSpeechRef.current.length);
   }
-  else{
+
+  // Naye part ko process karein
+  let cleanText = processSpeechText(newPart);
+  
+  // 2. DUPLICATE CHECK: Agar Deepgram ne pehle hi punctuation de diya hai
+  const currentIndex = range ? range.index : editor.getLength() - 1;
+  const lastChar = editor.getText(currentIndex - 1, 1);
+
+  if ((lastChar === "," && cleanText.trim().startsWith(",")) || 
+      (lastChar === "." && cleanText.trim().startsWith("."))) {
+    cleanText = cleanText.trim().substring(1); 
+  }
+
+  let textToInsert = cleanText;
+
+  // 3. New Line / Paragraph Commands (Case Insensitive)
+  const lowerClean = cleanText.toLowerCase();
+  if (["new paragraph", "naya paragraph", "navin pariched"].some(cmd => lowerClean.includes(cmd))) {
+    textToInsert = "\n\n";
+  } else if (["new line", "nai line", "navin line"].some(cmd => lowerClean.includes(cmd))) {
+    textToInsert = "\n";
+  }
+
+  // 4. Final Insert into Quill
+  if (range) {
+    editor.insertText(range.index, textToInsert, 'user');
+    editor.setSelection(range.index + textToInsert.length, 0);
+  } else {
     const length = editor.getLength();
-    editor.insertText(length - 1 ,textToInsert , 'user');
+    editor.insertText(length - 1, textToInsert, 'user');
   }
 
-  //sync state 
+  // State update and Ref sync
+  setManualText(editor.root.innerHTML);
+  lastProcessedSpeechRef.current = speechText;
 
-    setManualText(editor.root.innerHTML);
-    lastProcessedSpeechRef.current = speechText;
-     },[speechText, setManualText]);
-
-
+}, [speechText, setManualText]);
 
   // 🌐 Translation Effect
   useEffect(() => {
