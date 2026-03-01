@@ -31,7 +31,9 @@ import csvUploadRoute from "./routes/csvUploadRoute.js";
 // --- THE CRITICAL ROUTES ---
 import pdfRoutes from "./routes/pdf.js";
 import audioRoutes from "./routes/audio.js";
-
+// server.js (Line 34)
+import legalRoutes from "./routes/legal.js";
+import fileUpload from 'express-fileupload';
 // ----------------------
 // CONFIGURATION
 // ----------------------
@@ -40,13 +42,20 @@ connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
 // ----------------------
 // MIDDLEWARE
 // ----------------------
 // Increase limit for large files (Audio/PDF)
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ limit: "100mb", extended: true }));
+
+//app.use(fileUpload({
+   // useTempFiles: true,
+  // tempFileDir: '/tmp/',
+ //   debug: true // इससे आपको टर्मिनल में एरर का पता चलेगा
+//}));
 
 // ----------------------
 // CORS SETUP
@@ -102,7 +111,7 @@ app.use("/api/team", teamRoute);
 app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
 app.use("/api/csv-manager", csvUploadRoute);
-
+app.use('/api', legalRoutes);
 // --- PDF & AUDIO ---
 // These are mounted at /api, so the full paths will be:
 // /api/upload-pdf
@@ -126,4 +135,5 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  
 });

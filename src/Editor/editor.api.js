@@ -121,47 +121,31 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 };
 // ------------------------------------------------------
 // ✔ PDF → TEXT
-// ------------------------------------------------------
+// editor.api.js
 
-
-export const uploadPDF = async (e, setText, setLoading, API) => {
+// Change this to match your old project's logic but new project's URL variables
+// editor.api.js
+export const uploadPDF = async (e, setText, setLoading, API_URL) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", file); // Key must be 'file'
 
-  safeSetLoading(setLoading, true);
+  if (typeof setLoading === "function") setLoading(true);
 
   try {
-    // Note: Make sure your backend route matches this URL exactly.
-    // If you mounted the router at '/api/pdf', change this to `${API}/api/pdf/upload-pdf`
-    const { data } = await axios.post(`${API}/api/upload-pdf`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    if (data.success || data.text) {
-      // 🔥 CRITICAL FIX FOR EDITOR:
-      // Convert standard New Lines (\n) to HTML Line Breaks (<br>)
-      // This ensures ReactQuill displays paragraphs correctly instead of one long line.
-      const formattedText = data.text.replace(/\n/g, "<br />");
-
-      setText(formattedText);
-    } else {
-      alert(data.error || "Failed to extract text from PDF.");
+    const { data } = await axios.post(`${API_URL}/api/upload-pdf`, fd);
+    if (data.success) {
+      // Convert new lines to HTML breaks for the TNT editor
+      setText(data.text.replace(/\n/g, "<br />"));
     }
   } catch (err) {
-    console.error("PDF API error:", err.response?.data || err.message);
-    alert("Error processing PDF. Ensure the backend is running.");
+    console.error("Upload error:", err);
   } finally {
-    safeSetLoading(setLoading, false);
-    // ✅ Reset input so the user can upload the same file again if they want
-    if (e.target) e.target.value = ""; 
+    if (typeof setLoading === "function") setLoading(false);
   }
-};
-
-
-// ------------------------------------------------------
+};// ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
 // ------------------------------------------------------
 export const generateDraftAPI = async (body) => {

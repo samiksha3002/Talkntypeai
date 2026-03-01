@@ -4,14 +4,18 @@ import { useNavigate } from 'react-router-dom';
 // ==========================================
 // Helper Component for individual buttons
 // ==========================================
-const FooterButton = ({ icon, label, color, onClick, link }) => {
+const FooterButton = ({ icon, label, color, onClick, link, isActive }) => {
   const colorClasses = {
     purple: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200",
     blue: "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200",
     orange: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200",
     slate: "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200",
     emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200",
+    indigo: "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200", // Added Indigo
   };
+
+  // Logic for Active Button highlight
+  const activeStyle = isActive ? "ring-2 ring-indigo-500 scale-105 shadow-md" : "";
 
   const handleClick = () => {
     if (link) {
@@ -24,7 +28,7 @@ const FooterButton = ({ icon, label, color, onClick, link }) => {
   return (
     <button 
       onClick={handleClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 rounded-xl border font-bold text-base transition-all active:scale-95 shadow-sm whitespace-nowrap ${colorClasses[color] || colorClasses.slate}`}
+      className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 rounded-xl border font-bold text-base transition-all active:scale-95 shadow-sm whitespace-nowrap ${colorClasses[color] || colorClasses.slate} ${activeStyle}`}
     >
       <span className="text-2xl leading-none">{icon}</span>
       <span className="hidden sm:inline">{label}</span>
@@ -35,7 +39,8 @@ const FooterButton = ({ icon, label, color, onClick, link }) => {
 // ==========================================
 // Main Footer Component
 // ==========================================
-const FooterButtons = () => {
+// Props Received from Dashboard: setActiveView and activeView
+const FooterButtons = ({ setActiveView, activeView }) => {
   const navigate = useNavigate();
 
   // 1. Navigation for Business Card
@@ -57,9 +62,9 @@ const FooterButtons = () => {
   };
 
   // 4. Navigation for Create Website
-const handleWebsiteClick = () => {
+  const handleWebsiteClick = () => {
     console.log("Navigating to /create-website");
-   navigate('/website-showcase');
+    navigate('/website-showcase');
   };
 
   return (
@@ -74,6 +79,15 @@ const handleWebsiteClick = () => {
       {/* CENTER: BUTTONS */}
       <div className="flex gap-3 w-full lg:w-auto lg:flex-1 justify-between items-center px-1">
         
+        {/* Editor Button (Added to switch back to Editor mode) */}
+        <FooterButton 
+            icon="✍️" 
+            label="Editor" 
+            color="slate" 
+            onClick={() => setActiveView("editor")} 
+            isActive={activeView === "editor"}
+        />
+
         <FooterButton 
             icon="⚖️" 
             label="Judgements" 
@@ -95,11 +109,13 @@ const handleWebsiteClick = () => {
             onClick={handleBusinessCardClick} 
         />
         
+        {/* LEGAL AI HUB BUTTON */}
         <FooterButton 
             icon="🏛️" 
-            label="eCourt" 
-            color="slate" 
-            link="https://ecourts.gov.in/ecourts_home/" 
+            label="Legal AI Hub" 
+            color="indigo" 
+            onClick={() => setActiveView("legalHub")} 
+            isActive={activeView === "legalHub"}
         />
 
         <FooterButton 

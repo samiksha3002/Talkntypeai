@@ -83,9 +83,9 @@ const Register = () => {
                 required
             >
                 <option value="">Select Executive ID</option>
-                <option value="A111">A111</option>
-                <option value="B222">B222</option>
-                <option value="C333">C333</option>
+                <option value="A111">D011</option>
+                <option value="B222">S012</option>
+                <option value="C333">A011</option>
                 <option value="D444">D444</option>
                 <option value="E555">E555</option>
             </select>

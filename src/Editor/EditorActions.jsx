@@ -42,31 +42,50 @@ const EditorActions = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-
-  // EditorActions.jsx ke andar ek function
-const handlePageBreak = () => {
-  const range = quillRef.current.getEditor().getSelection();
-  if (range) {
-    // Ye line ek invisible separator add karegi jo print me naya page degi
-    quillRef.current.getEditor().insertEmbed(range.index, 'break', true);
-  }
-}; 
-
-
-  // --- 📄 Save as PDF ---
+  const handlePageBreak = () => {
+    const range = quillRef.current.getEditor().getSelection();
+    if (range) {
+      quillRef.current.getEditor().insertEmbed(range.index, 'break', true);
+    }
+  }; 
+// --- 📄 Save as PDF (Final Fix: Clean Text + Auto Wrapping) ---
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-    const splitText = doc.splitTextToSize(manualText, 180);
+    
+    // 1. Remove HTML tags and convert entities like &nbsp; to actual spaces
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = manualText;
+    const cleanText = tempDiv.textContent || tempDiv.innerText || "";
+
+    // 2. Set PDF styles
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
+
+    // 3. Auto-wrap the text based on page width (180mm is standard for A4)
+    const splitText = doc.splitTextToSize(cleanText, 180);
+
+    // 4. Add the wrapped text to the document at coordinates x:15, y:20
     doc.text(splitText, 15, 20);
+
+    // 5. Save the file
     doc.save("document.pdf");
     setShowSaveOptions(false);
   };
-
   // --- 📝 Save as Word ---
   const handleDownloadWord = () => {
-    const blob = new Blob([manualText], { type: "text/plain;charset=utf-8" });
+    const header = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+            xmlns:w='urn:schemas-microsoft-com:office:word' 
+            xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'></head><body>`;
+    const footer = "</body></html>";
+    
+    const sourceHTML = header + manualText + footer;
+
+    const blob = new Blob(['\ufeff', sourceHTML], {
+      type: 'application/msword'
+    });
+
     saveAs(blob, "document.doc");
     setShowSaveOptions(false);
   };
@@ -93,10 +112,8 @@ const handlePageBreak = () => {
     `);
     printWindow.document.close();
     printWindow.print();
-    // printWindow.close(); // अगर आप प्रिंट के तुरंत बाद विंडो बंद करना चाहते हैं तो इसे uncomment करें
   };
 
-  // ... (Dictionary logic remains same)
   const handleDictionarySearch = async (e) => {
     if (e) e.preventDefault();
     if (!searchTerm.trim()) return;
@@ -113,17 +130,21 @@ const handlePageBreak = () => {
     }
   };
 
-  const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
+
+const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
     if (e.target.files && e.target.files[0]) {
       try {
+        // Hum koi language pass nahi kar rahe, backend handle karega
         await uploadFunction(e, setManualText, setLoadingState, API);
       } catch (err) {
+        console.error("Upload error:", err);
         alert("Failed to process file");
       } finally {
         e.target.value = null;
       }
     }
   };
+
 
   const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
@@ -147,8 +168,6 @@ const handlePageBreak = () => {
       </div>
 
       <div className="flex items-center gap-1 ml-auto border-l pl-2 border-indigo-200 relative">
-        
-        {/* SAVE BUTTON & MENU */}
         <div className="relative" ref={saveMenuRef}>
             <button onClick={() => setShowSaveOptions(!showSaveOptions)} className={`p-2 rounded-full transition-all ${showSaveOptions ? "bg-indigo-100 text-indigo-600" : "text-gray-500 hover:bg-gray-100 hover:text-indigo-600"}`} title="Save Options">
                 <Save size={18} strokeWidth={2} />
@@ -162,18 +181,16 @@ const handlePageBreak = () => {
             )}
         </div>
 
-        {/* PRINT BUTTON */}
         <button onClick={handlePrint} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Print">
             <Printer size={18} strokeWidth={2} />
         </button>
 
         <button onClick={() => setShowCommands(true)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Voice Commands"><Mic size={20} strokeWidth={2.5} /></button>
         <button onClick={() => setManualText("")} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all" title="Clear All"><Trash2 size={18} strokeWidth={2} /></button>
-        <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
+         <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
         <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => handleFileSelect(e, uploadPDF, setIsTranslating)} />
       </div>
 
-      {/* Modals for Dictionary and Commands... (same as before) */}
       {showDictionary && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm">
           <div className="bg-white w-[450px] rounded-xl shadow-2xl p-6 border border-indigo-100">
@@ -203,7 +220,6 @@ const handlePageBreak = () => {
 
       {showCommands && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-            {/* ... Commands Modal Content ... */}
              <div className="bg-white w-[500px] rounded-xl shadow-xl p-6">
             <h2 className="text-xl font-semibold mb-4 text-indigo-800">🎙️ Voice Commands</h2>
             <div className="max-h-[400px] overflow-y-auto">
