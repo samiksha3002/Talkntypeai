@@ -6,13 +6,14 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const router = express.Router();
 
-// Multer Memory Storage is best for Render
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Setup Multer
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
@@ -20,46 +21,35 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
       return res.status(400).json({ success: false, error: "No file uploaded" });
     }
 
-    // --- DYNAMIC MODULE LOADING ---
+    // --- CRITICAL FIX: Direct Loading ---
     let parsePdf;
     try {
-      // We try the standard require first
+      // Direct path to the library file is the most stable way in ES Modules
+      parsePdf = require("pdf-parse/lib/pdf-parse.js");
+    } catch (e) {
+      console.error("PDF-PARSE LOAD ERROR:", e.message);
+      // Fallback to standard require if path fails
       const mod = require("pdf-parse");
       parsePdf = typeof mod === 'function' ? mod : mod.default;
-      
-      // If still not a function, try the direct path (Common in ES Modules)
-      if (typeof parsePdf !== 'function') {
-        parsePdf = require("pdf-parse/lib/pdf-parse.js");
-      }
-    } catch (e) {
-      console.error("Module Load Error:", e);
-      return res.status(500).json({ 
-        success: false, 
-        error: "Library 'pdf-parse' not found on server. Run 'npm install pdf-parse'." 
-      });
+    }
+
+    if (typeof parsePdf !== 'function') {
+      throw new Error("The pdf-parse library could not be loaded as a function. Please ensure 'npm install pdf-parse' was run.");
     }
 
     console.log("Processing PDF:", req.file.originalname);
 
-    // 1. Parse PDF to Raw Text
+    // 1. Parse the buffer
     const data = await parsePdf(req.file.buffer);
     const extractedText = data.text;
 
     if (!extractedText || extractedText.trim().length === 0) {
-       throw new Error("This PDF seems to be an image/scan. Please use 'Image to Text' instead.");
+       throw new Error("This PDF contains no selectable text (it might be a scan). Please use Image to Text.");
     }
 
-    // 2. Use Gemini to structure the messy raw text
+    // 2. Format with Gemini
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `
-      Extract and structure the following text from a PDF. 
-      Make it clean, professional, and maintain the original legal/document context.
-      Use Markdown (headers, bolding, lists) for better readability.
-      
-      TEXT:
-      ${extractedText}
-    `;
+    const prompt = `Format this legal/text content professionally with Markdown:\n\n${extractedText}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -71,10 +61,10 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
     });
 
   } catch (error) {
-    console.error("PDF Route Error:", error);
+    console.error("FULL SERVER ERROR:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "An error occurred during PDF processing"
+      error: error.message || "Internal Server Error during PDF processing"
     });
   }
 });

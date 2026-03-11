@@ -160,8 +160,8 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
       alert("Backend Error: " + data.error);
     }
   } catch (error) {
-    console.error("PDF upload error:", error.message);
-    alert("Server is having trouble processing this PDF. Check if 'pdf-parse' is installed on backend.");
+    console.error("Detailed Error:", error);
+    alert(`PDF Error: ${error.message}`); // This will now show the REAL error from the server
   } finally {
     setLoading(false);
   }
