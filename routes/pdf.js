@@ -1,3 +1,4 @@
+
 import express from "express";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -10,20 +11,21 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No file uploaded" });
+    }
 
-    // 1. Initialize the model (Gemini 1.5 Flash is fast and cheap/free)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // ✅ Use a valid model name
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    // 2. Prepare the PDF data for Gemini
+    // ✅ Correct field name is inline_data
     const pdfData = {
-      inlineData: {
+      inline_data: {
         data: req.file.buffer.toString("base64"),
-        mimeType: "application/pdf",
+        mime_type: "application/pdf",
       },
     };
 
-    // 3. Ask Gemini to extract the text
     const prompt = "Extract all the text from this PDF. Maintain the layout as much as possible.";
     const result = await model.generateContent([prompt, pdfData]);
     const response = await result.response;
@@ -35,8 +37,9 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
 
   } catch (error) {
     console.error("Gemini PDF Error:", error);
-    res.status(500).json({ success: false, error: "AI processing failed" });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 export default router;
+  

@@ -131,21 +131,26 @@ const EditorActions = ({
   };
 
 
-const handleFileSelect = async (e, uploadFunction, setLoadingState) => {
-    if (e.target.files && e.target.files[0]) {
-      try {
-        // Hum koi language pass nahi kar rahe, backend handle karega
-        await uploadFunction(e, setManualText, setLoadingState, API);
-      } catch (err) {
-        console.error("Upload error:", err);
-        alert("Failed to process file");
-      } finally {
-        e.target.value = null;
-      }
+const handleFileSelect = async (e) => {
+  if (!e.target.files[0]) return;
+
+  const file = e.target.files[0];
+
+  try {
+    const response = await uploadPDF(file, setIsTranslating);
+
+    // 👇 IMPORTANT: Extracted text ko editor me insert karo
+    if (response?.text) {
+      setManualText((prev) => prev + "\n\n" + response.text);
     }
-  };
 
+  } catch (err) {
+    console.error("Upload error:", err);
+    alert("Failed to process file");
+  }
 
+  e.target.value = null;
+};
   const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
     { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },

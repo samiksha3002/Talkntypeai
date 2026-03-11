@@ -125,25 +125,36 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
-export const uploadPDF = async (e, setText, setLoading, API_URL) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  const fd = new FormData();
-  fd.append("file", file); // Key must be 'file'
-
-  if (typeof setLoading === "function") setLoading(true);
-
+export const uploadPDF = async (file, setLoadingState) => {
   try {
-    const { data } = await axios.post(`${API_URL}/api/upload-pdf`, fd);
-    if (data.success) {
-      // Convert new lines to HTML breaks for the TNT editor
-      setText(data.text.replace(/\n/g, "<br />"));
-    }
-  } catch (err) {
-    console.error("Upload error:", err);
+    setLoadingState(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API = import.meta.env.VITE_API_URL;
+
+    const response = await axios.post(
+      `${API}/api/upload-pdf`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log("Upload success:", response.data);
+
+    return response.data;
+
+  } catch (error) {
+
+    console.error("Upload error:", error);
+    throw error;
+
   } finally {
-    if (typeof setLoading === "function") setLoading(false);
+    setLoadingState(false);
   }
 };// ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
