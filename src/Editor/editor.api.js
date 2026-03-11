@@ -126,46 +126,44 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
 export const uploadPDF = async (file, setManualText, setLoading) => {
-
   if (!file) {
     console.error("No PDF selected");
     return;
   }
 
-  const formData = new FormData();
-  formData.append("file", file);
-
   setLoading(true);
+  const formData = new FormData();
+  formData.append("file", file); // Ensure your backend looks for 'file'
 
   try {
-
     const response = await fetch(`${API}/api/upload-pdf`, {
       method: "POST",
-      body: formData
+      body: formData,
     });
+
+    // Check if response is actually JSON before parsing
+    const contentType = response.headers.get("content-type");
+    if (!response.ok || !contentType || !contentType.includes("application/json")) {
+      const errorText = await response.text();
+      throw new Error(`Server Error: ${response.status} - ${errorText}`);
+    }
 
     const data = await response.json();
 
     if (data.success) {
-
       const formattedText = data.text.replace(/\n/g, "<br />");
-
-      setManualText(prev =>
+      setManualText((prev) =>
         prev ? prev + "<br /><br />" + formattedText : formattedText
       );
-
     } else {
-      console.error("PDF failed:", data.error);
+      console.error("PDF Processing Error:", data.error);
+      alert("Backend Error: " + data.error);
     }
-
   } catch (error) {
-
-    console.error("PDF upload error:", error);
-
+    console.error("PDF upload error:", error.message);
+    alert("Server is having trouble processing this PDF. Check if 'pdf-parse' is installed on backend.");
   } finally {
-
     setLoading(false);
-
   }
 };// ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
