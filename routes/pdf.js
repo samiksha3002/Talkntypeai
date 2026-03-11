@@ -1,7 +1,10 @@
 import express from "express";
 import multer from "multer";
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const router = express.Router();
 
@@ -15,14 +18,14 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
 
-    console.log("PDF route hit");
-
     if (!req.file) {
       return res.status(400).json({
         success: false,
         error: "No file uploaded"
       });
     }
+
+    console.log("PDF received:", req.file.originalname);
 
     const data = await pdfParse(req.file.buffer);
 
@@ -33,24 +36,26 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
     });
 
     const result = await model.generateContent(
-      `Convert this PDF text into readable format:\n\n${extractedText}`
+      `Convert this PDF text into structured readable format:\n\n${extractedText}`
     );
 
     const response = await result.response;
 
     res.json({
       success: true,
-      text: response.text()
+      text: response.text(),
+      pages: data.numpages
     });
 
   } catch (error) {
 
-    console.error("PDF ERROR:", error);
+    console.error("PDF Processing Error:", error);
 
     res.status(500).json({
       success: false,
       error: error.message
     });
+
   }
 });
 
