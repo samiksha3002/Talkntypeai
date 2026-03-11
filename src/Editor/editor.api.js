@@ -134,37 +134,47 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
-// Example fix for your frontend upload function
-const uploadPDF = async (file) => {
+export const uploadPDF = async (file, setManualText, setLoading) => {
+
+  if (!file) {
+    console.error("No PDF selected");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  setLoading(true);
+
   try {
-    // 1. Validation: Ensure it's actually a PDF
-    if (file.type !== "application/pdf") {
-      console.error("Selected file is not a PDF");
-      return;
-    }
 
-    // 2. Prepare the data
-    const formData = new FormData();
-    // IMPORTANT: The key "file" must match upload.single("file") in your Express route
-    formData.append("file", file); 
-
-    // 3. Make the Request
-    const response = await fetch("https://talkntypeai.onrender.com/api/upload-pdf", {
+    const response = await fetch(`${API}/api/upload-pdf`, {
       method: "POST",
-      body: formData, // Do NOT set Content-Type header; fetch does it for FormData
+      body: formData
     });
 
-    const result = await response.json();
+    const data = await response.json();
 
-    if (result.success) {
-      console.log("PDF Text:", result.text);
-      // Update your editor state here
-      // setEditorContent(result.text); 
+    if (data.success) {
+
+      const formattedText = data.text.replace(/\n/g, "<br />");
+
+      setManualText(prev =>
+        prev ? prev + "<br /><br />" + formattedText : formattedText
+      );
+
     } else {
-      console.error("Upload failed:", result.error);
+      console.error("PDF failed:", data.error);
     }
+
   } catch (error) {
-    console.error("Network Error:", error);
+
+    console.error("PDF upload error:", error);
+
+  } finally {
+
+    setLoading(false);
+
   }
 };// ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
