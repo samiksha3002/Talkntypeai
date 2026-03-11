@@ -56,7 +56,7 @@ export const expandText = async (text, setText, setLoading) => {
 // ------------------------------------------------------
 // editor.api.js
 
-export const uploadOCR = async (e, setManualText, setLoading, API) => {
+export const uploadOCR = async (e, setManualText, setLoading) => {
 
   const file = e?.target?.files?.[0];
   if (!file) {
@@ -80,7 +80,6 @@ export const uploadOCR = async (e, setManualText, setLoading, API) => {
 
     if (data.success) {
 
-      // convert \n to <br> for Quill editor
       const formattedText = data.text.replace(/\n/g, "<br />");
 
       setManualText(prev =>
@@ -89,23 +88,19 @@ export const uploadOCR = async (e, setManualText, setLoading, API) => {
 
     } else {
       console.error("OCR failed:", data.error);
-      alert("OCR processing failed");
     }
 
   } catch (err) {
 
     console.error("OCR error:", err);
-    alert("Failed to extract text");
 
   } finally {
 
     setLoading(false);
-
     if (e.target) e.target.value = null;
 
   }
 };
-
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 
@@ -139,9 +134,12 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
-export const uploadPDF = async (file, setManualText, setLoading, API_URL) => {
+export const uploadPDF = async (file, setManualText, setLoading) => {
 
-  if (!file) return;
+  if (!file) {
+    console.error("No PDF selected");
+    return;
+  }
 
   const formData = new FormData();
   formData.append("file", file);
@@ -158,7 +156,15 @@ export const uploadPDF = async (file, setManualText, setLoading, API_URL) => {
     const data = await response.json();
 
     if (data.success) {
-      setManualText(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+
+      const formattedText = data.text.replace(/\n/g, "<br />");
+
+      setManualText(prev =>
+        prev ? prev + "<br /><br />" + formattedText : formattedText
+      );
+
+    } else {
+      console.error("PDF failed:", data.error);
     }
 
   } catch (error) {
