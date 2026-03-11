@@ -57,38 +57,52 @@ export const expandText = async (text, setText, setLoading) => {
 // editor.api.js
 
 export const uploadOCR = async (e, setManualText, setLoading, API) => {
+
+  const file = e?.target?.files?.[0];
+  if (!file) {
+    console.error("No image selected");
+    return;
+  }
+
   setLoading(true);
-  const file = e.target.files[0];
-  
+
   const formData = new FormData();
   formData.append("image", file);
 
   try {
+
     const res = await fetch(`${API}/api/ocr/image-to-text`, {
       method: "POST",
-      body: formData,
+      body: formData
     });
 
     const data = await res.json();
-    
+
     if (data.success) {
-      // 🔥 FIX: New lines (\n) को HTML Line breaks (<br>) में बदलें
-      // ताकि Quill Editor उन्हें अलग लाइन में दिखाए
+
+      // convert \n to <br> for Quill editor
       const formattedText = data.text.replace(/\n/g, "<br />");
-      
-      // अगर आप चाहते हैं कि पुराना टेक्स्ट रहे और नया जुड़ जाए:
-      setManualText(prev => prev + (prev ? "<br /><br />" : "") + formattedText);
-      
-      // या अगर सिर्फ नया टेक्स्ट चाहिए:
-      // setManualText(formattedText);
+
+      setManualText(prev =>
+        prev ? prev + "<br /><br />" + formattedText : formattedText
+      );
+
+    } else {
+      console.error("OCR failed:", data.error);
+      alert("OCR processing failed");
     }
 
   } catch (err) {
-    console.error(err);
+
+    console.error("OCR error:", err);
     alert("Failed to extract text");
+
   } finally {
+
     setLoading(false);
-    e.target.value = null; // Reset input
+
+    if (e.target) e.target.value = null;
+
   }
 };
 
@@ -105,7 +119,7 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
   setIsAudioLoading(true);
   try {
-    const response = await fetch(`${API_URL}/api/audio/transcribe`, {
+    const response = await fetch(`${API}/api/audio/transcribe`, {
       method: "POST",
       body: formData,
     });
@@ -136,7 +150,7 @@ export const uploadPDF = async (file, setManualText, setLoading, API_URL) => {
 
   try {
 
-    const response = await fetch(`${API_URL}/api/upload-pdf`, {
+    const response = await fetch(`${API}/api/upload-pdf`, {
       method: "POST",
       body: formData
     });

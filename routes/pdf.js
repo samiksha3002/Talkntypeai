@@ -1,45 +1,57 @@
-
 import express from "express";
 import multer from "multer";
+import pdfParse from "pdf-parse";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// Initialize Gemini with your API Key
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
+
+    console.log("PDF route hit");
+
     if (!req.file) {
-      return res.status(400).json({ success: false, error: "No file uploaded" });
+      return res.status(400).json({
+        success: false,
+        error: "No file uploaded"
+      });
     }
 
-    // ✅ Use a valid model name
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const data = await pdfParse(req.file.buffer);
 
-    // ✅ Correct field name is inline_data
-    const pdfData = {
-      inline_data: {
-        data: req.file.buffer.toString("base64"),
-        mime_type: "application/pdf",
-      },
-    };
+    const extractedText = data.text;
 
-    const prompt = "Extract all the text from this PDF. Maintain the layout as much as possible.";
-    const result = await model.generateContent([prompt, pdfData]);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-pro"
+    });
+
+    const result = await model.generateContent(
+      `Convert this PDF text into readable format:\n\n${extractedText}`
+    );
+
     const response = await result.response;
 
     res.json({
       success: true,
-      text: response.text(),
+      text: response.text()
     });
 
   } catch (error) {
-    console.error("Gemini PDF Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+
+    console.error("PDF ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
 export default router;
-  
