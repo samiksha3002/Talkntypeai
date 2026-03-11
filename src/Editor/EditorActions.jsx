@@ -131,35 +131,24 @@ const EditorActions = ({
   };
 
 
+// EditorActions.jsx - Change these two functions
 const handleFileSelect = (e, uploadFn, setLoading) => {
+  const file = e?.target?.files?.[0]; 
+  if (!file) return;
 
-  const file = e?.target?.files?.[0];   // safe access
-
-  if (!file) {
-    console.error("No file selected");
-    return;
-  }
-
-  uploadFn(file, setManualText, setLoading, API);
-
+  // FIX: Pass 'e' (the event) or rewrite the API to take 'file'
+  uploadFn(e, setManualText, setLoading); // Pass 'e' instead of 'file'
   if (e.target) e.target.value = null;
 };
-
 
 const handlePDFSelect = (e) => {
-
   const file = e?.target?.files?.[0];
+  if (!file) return;
 
-  if (!file) {
-    console.error("No PDF selected");
-    return;
-  }
-
-  uploadPDF(file, setManualText, setIsTranslating, API);
-
+  // FIX: Match the uploadPDF signature (file, setText, setLoading)
+  uploadPDF(file, setManualText, setIsOCRLoading); // Ensure parameters match
   if (e.target) e.target.value = null;
-};
-  const COMMANDS = [
+};  const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
     { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
     { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },

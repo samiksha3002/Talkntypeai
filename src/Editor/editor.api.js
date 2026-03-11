@@ -56,49 +56,40 @@ export const expandText = async (text, setText, setLoading) => {
 // ------------------------------------------------------
 // editor.api.js
 
-export const uploadOCR = async (e, setManualText, setLoading) => {
+// editor.api.js
 
-  const file = e?.target?.files?.[0];
+export const uploadOCR = async (fileOrEvent, setManualText, setLoading) => {
+  // SMART CHECK: Determine if we received an event or a direct file
+  const file = fileOrEvent?.target?.files ? fileOrEvent.target.files[0] : fileOrEvent;
+
   if (!file) {
     console.error("No image selected");
     return;
   }
 
   setLoading(true);
-
   const formData = new FormData();
   formData.append("image", file);
 
   try {
-
     const res = await fetch(`${API}/api/ocr/image-to-text`, {
       method: "POST",
       body: formData
     });
 
     const data = await res.json();
-
     if (data.success) {
-
       const formattedText = data.text.replace(/\n/g, "<br />");
-
       setManualText(prev =>
         prev ? prev + "<br /><br />" + formattedText : formattedText
       );
-
     } else {
       console.error("OCR failed:", data.error);
     }
-
   } catch (err) {
-
     console.error("OCR error:", err);
-
   } finally {
-
     setLoading(false);
-    if (e.target) e.target.value = null;
-
   }
 };
 // ------------------------------------------------------
