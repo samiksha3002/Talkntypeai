@@ -201,13 +201,12 @@ const handlePDFSelect = (e) => {
         <button onClick={() => setShowCommands(true)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Voice Commands"><Mic size={20} strokeWidth={2.5} /></button>
         <button onClick={() => setManualText("")} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all" title="Clear All"><Trash2 size={18} strokeWidth={2} /></button>
          <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
-       <input
-  ref={pdfRef}
+      <input
   type="file"
   accept="application/pdf"
-  hidden
-  onChange={handlePDFSelect}
+  onChange={(e) => uploadPDF(e.target.files[0], setManualText, setLoading)}
 />
+
       </div>
 
       {showDictionary && (
