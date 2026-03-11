@@ -131,25 +131,8 @@ const EditorActions = ({
   };
 
 
-const handleFileSelect = async (e) => {
-  if (!e.target.files[0]) return;
-
-  const file = e.target.files[0];
-
-  try {
-    const response = await uploadPDF(file, setIsTranslating);
-
-    // 👇 IMPORTANT: Extracted text ko editor me insert karo
-    if (response?.text) {
-      setManualText((prev) => prev + "\n\n" + response.text);
-    }
-
-  } catch (err) {
-    console.error("Upload error:", err);
-    alert("Failed to process file");
-  }
-
-  e.target.value = null;
+const handlePDFSelect = (e) => {
+  uploadPDF(e, setManualText, setIsTranslating, API);
 };
   const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
@@ -193,7 +176,13 @@ const handleFileSelect = async (e) => {
         <button onClick={() => setShowCommands(true)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Voice Commands"><Mic size={20} strokeWidth={2.5} /></button>
         <button onClick={() => setManualText("")} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all" title="Clear All"><Trash2 size={18} strokeWidth={2} /></button>
          <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
-        <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => handleFileSelect(e, uploadPDF, setIsTranslating)} />
+       <input
+  ref={pdfRef}
+  type="file"
+  accept="application/pdf"
+  hidden
+  onChange={handlePDFSelect}
+/>
       </div>
 
       {showDictionary && (

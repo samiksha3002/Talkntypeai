@@ -125,36 +125,42 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
-export const uploadPDF = async (file, setLoadingState) => {
+export const uploadPDF = async (e, setManualText, setIsLoading, API_URL) => {
+
+  // Fix same as audio function
+  const file = (e && e.target && e.target.files) ? e.target.files[0] : e;
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  setIsLoading(true);
+
   try {
-    setLoadingState(true);
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const response = await fetch(`${API_URL}/api/upload-pdf`, {
+      method: "POST",
+      body: formData
+    });
 
-    const API = import.meta.env.VITE_API_URL;
+    const data = await response.json();
 
-    const response = await axios.post(
-      `${API}/api/upload-pdf`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
+    if (data.success) {
 
-    console.log("Upload success:", response.data);
+      setManualText(prev =>
+        prev ? `${prev}\n\n${data.text}` : data.text
+      );
 
-    return response.data;
+    }
 
   } catch (error) {
 
-    console.error("Upload error:", error);
-    throw error;
+    console.error("PDF upload error:", error);
 
   } finally {
-    setLoadingState(false);
+
+    setIsLoading(false);
+
   }
 };// ------------------------------------------------------
 // ✔ AI DRAFT GENERATION
