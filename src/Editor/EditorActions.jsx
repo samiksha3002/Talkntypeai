@@ -131,8 +131,21 @@ const EditorActions = ({
   };
 
 
+const handleFileSelect = (e, uploadFn, setLoading) => {
+  const file = e?.target?.files?.[0];
+  if (!file) return;
+
+  uploadFn(file, setManualText, setLoading, API);
+
+  e.target.value = null;
+};
 const handlePDFSelect = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
   uploadPDF(e, setManualText, setIsTranslating, API);
+
+  e.target.value = null;   // reset input
 };
   const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
