@@ -132,20 +132,32 @@ const EditorActions = ({
 
 
 const handleFileSelect = (e, uploadFn, setLoading) => {
-  const file = e?.target?.files?.[0];
-  if (!file) return;
+
+  const file = e?.target?.files?.[0];   // safe access
+
+  if (!file) {
+    console.error("No file selected");
+    return;
+  }
 
   uploadFn(file, setManualText, setLoading, API);
 
-  e.target.value = null;
+  if (e.target) e.target.value = null;
 };
+
+
 const handlePDFSelect = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
 
-  uploadPDF(e, setManualText, setIsTranslating, API);
+  const file = e?.target?.files?.[0];
 
-  e.target.value = null;   // reset input
+  if (!file) {
+    console.error("No PDF selected");
+    return;
+  }
+
+  uploadPDF(file, setManualText, setIsTranslating, API);
+
+  if (e.target) e.target.value = null;
 };
   const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },

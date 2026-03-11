@@ -125,16 +125,14 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) 
 
 // Change this to match your old project's logic but new project's URL variables
 // editor.api.js
-export const uploadPDF = async (e, setManualText, setIsLoading, API_URL) => {
+export const uploadPDF = async (file, setManualText, setLoading, API_URL) => {
 
-  // Fix same as audio function
-  const file = (e && e.target && e.target.files) ? e.target.files[0] : e;
   if (!file) return;
 
   const formData = new FormData();
   formData.append("file", file);
 
-  setIsLoading(true);
+  setLoading(true);
 
   try {
 
@@ -146,11 +144,7 @@ export const uploadPDF = async (e, setManualText, setIsLoading, API_URL) => {
     const data = await response.json();
 
     if (data.success) {
-
-      setManualText(prev =>
-        prev ? `${prev}\n\n${data.text}` : data.text
-      );
-
+      setManualText(prev => prev ? `${prev}\n\n${data.text}` : data.text);
     }
 
   } catch (error) {
@@ -159,7 +153,7 @@ export const uploadPDF = async (e, setManualText, setIsLoading, API_URL) => {
 
   } finally {
 
-    setIsLoading(false);
+    setLoading(false);
 
   }
 };// ------------------------------------------------------
