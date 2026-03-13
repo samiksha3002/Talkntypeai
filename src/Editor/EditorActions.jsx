@@ -141,14 +141,16 @@ const handleFileSelect = (e, uploadFn, setLoading) => {
   if (e.target) e.target.value = null;
 };
 
-const handlePDFSelect = (e) => {c
+const handlePDFSelect = (e) => {
   const file = e?.target?.files?.[0];
   if (!file) return;
 
   // FIX: Match the uploadPDF signature (file, setText, setLoading)
   uploadPDF(file, setManualText, setIsOCRLoading); // Ensure parameters match
   if (e.target) e.target.value = null;
-};  const COMMANDS = [
+};  
+
+const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
     { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
     { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },

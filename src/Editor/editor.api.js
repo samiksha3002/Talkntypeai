@@ -133,35 +133,38 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
 
   setLoading(true);
   const formData = new FormData();
-  formData.append("file", file); // Ensure your backend looks for 'file'
+  formData.append("file", file);
 
   try {
-    const response = await fetch(`${API}/api/upload-pdf`, {
+    // Ensure API is defined! If it's an env var, use import.meta.env.VITE_API_URL
+    const baseUrl = typeof API !== 'undefined' ? API : ""; 
+    
+    const response = await fetch(`${baseUrl}/api/upload-pdf`, {
       method: "POST",
       body: formData,
     });
 
-    // Check if response is actually JSON before parsing
-    const contentType = response.headers.get("content-type");
-    if (!response.ok || !contentType || !contentType.includes("application/json")) {
-      const errorText = await response.text();
-      throw new Error(`Server Error: ${response.status} - ${errorText}`);
+    // Check if the response is actually OK before trying to parse JSON
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Server Error" }));
+      throw new Error(errorData.error || `Error ${response.status}`);
     }
 
     const data = await response.json();
 
-    if (data.success) {
+    if (data.success && data.text) {
+      // Use a safer way to format text
       const formattedText = data.text.replace(/\n/g, "<br />");
       setManualText((prev) =>
-        prev ? prev + "<br /><br />" + formattedText : formattedText
+        prev ? `${prev}<br /><br />${formattedText}` : formattedText
       );
     } else {
-      console.error("PDF Processing Error:", data.error);
-      alert("Backend Error: " + data.error);
+      throw new Error(data.error || "Processing failed");
     }
   } catch (error) {
-    console.error("Detailed Error:", error);
-    alert(`PDF Error: ${error.message}`); // This will now show the REAL error from the server
+    console.error("PDF Upload Error:", error);
+    // This alert will now show the actual error instead of crashing
+    alert(`PDF Error: ${error.message}`); 
   } finally {
     setLoading(false);
   }
