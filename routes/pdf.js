@@ -1,19 +1,13 @@
+
 import express from "express";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createRequire } from "module";
 
-const require = createRequire(import.meta.url);
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Initialize Gemini
+// Initialize Gemini with your API Key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Setup Multer
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
-});
 
 router.post("/upload-pdf", upload.single("file"), async (req, res) => {
   try {
@@ -21,52 +15,31 @@ router.post("/upload-pdf", upload.single("file"), async (req, res) => {
       return res.status(400).json({ success: false, error: "No file uploaded" });
     }
 
-    // --- CRITICAL FIX: Direct Loading ---
-    let parsePdf;
-    try {
-      // Direct path to the library file is the most stable way in ES Modules
-      parsePdf = require("pdf-parse/lib/pdf-parse.js");
-    } catch (e) {
-      console.error("PDF-PARSE LOAD ERROR:", e.message);
-      // Fallback to standard require if path fails
-      const mod = require("pdf-parse");
-      parsePdf = typeof mod === 'function' ? mod : mod.default;
-    }
+    // ✅ Use a valid model name
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
 
-    if (typeof parsePdf !== 'function') {
-      throw new Error("The pdf-parse library could not be loaded as a function. Please ensure 'npm install pdf-parse' was run.");
-    }
+    // ✅ Correct field name is inline_data
+    const pdfData = {
+      inline_data: {
+        data: req.file.buffer.toString("base64"),
+        mime_type: "application/pdf",
+      },
+    };
 
-    console.log("Processing PDF:", req.file.originalname);
-
-    // 1. Parse the buffer
-    const data = await parsePdf(req.file.buffer);
-    const extractedText = data.text;
-
-    if (!extractedText || extractedText.trim().length === 0) {
-       throw new Error("This PDF contains no selectable text (it might be a scan). Please use Image to Text.");
-    }
-
-    // 2. Format with Gemini
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `Format this legal/text content professionally with Markdown:\n\n${extractedText}`;
-
-    const result = await model.generateContent(prompt);
+    const prompt = "Extract all the text from this PDF. Maintain the layout as much as possible.";
+    const result = await model.generateContent([prompt, pdfData]);
     const response = await result.response;
 
     res.json({
       success: true,
       text: response.text(),
-      pages: data.numpages
     });
 
   } catch (error) {
-    console.error("FULL SERVER ERROR:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Internal Server Error during PDF processing"
-    });
+    console.error("Gemini PDF Error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 export default router;
+  

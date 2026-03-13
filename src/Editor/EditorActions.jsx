@@ -141,7 +141,7 @@ const handleFileSelect = (e, uploadFn, setLoading) => {
   if (e.target) e.target.value = null;
 };
 
-const handlePDFSelect = (e) => {
+const handlePDFSelect = (e) => {c
   const file = e?.target?.files?.[0];
   if (!file) return;
 
