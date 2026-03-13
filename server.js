@@ -71,7 +71,7 @@ app.use(
 );
 
 // Pre-flight requests handle karne ke liye
-app.options('*', cors());
+app.use(cors()); // Ye automatically saare routes aur methods (OPTIONS include) handle kar lega agar aapne config sahi di hai.
 
 // ----------------------
 // MIDDLEWARE (CORS ke niche)
