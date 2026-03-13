@@ -1,10 +1,13 @@
- // Ye line sabse upar honi chahiye
-console.log("Current DB URI:", process.env.MONGO_URI);
-import express from "express";
+// 1. dotenv.config() ko SABSE UPAR rakhein, imports se bhi pehle!
 import dotenv from "dotenv";
+dotenv.config(); 
+
+import express from "express";
 import connectDB from "./config/db.js";
 import cors from "cors";
 
+// 2. Ab print karein (Yahan MONGODB_URI likha hai kyunki Render par wahi naam hai)
+console.log("Current DB URI:", process.env.MONGODB_URI ? "LOADED" : "NOT FOUND");
 
 // ----------------------
 // ROUTE IMPORTS
@@ -28,40 +31,24 @@ import teamRoute from "./routes/team.js";
 import reportsRoute from "./routes/reports.js";
 import paymentsRoute from "./routes/payments.js";
 import csvUploadRoute from "./routes/csvUploadRoute.js";
-// --- THE CRITICAL ROUTES ---
 import pdfRoutes from "./routes/pdf.js";
 import audioRoutes from "./routes/audio.js";
-// server.js (Line 34)
 import legalRoutes from "./routes/legal.js";
 import fileUpload from 'express-fileupload';
+
 // ----------------------
-// CONFIGURATION
+// CONFIGURATION & DB
 // ----------------------
-dotenv.config();
-connectDB();
+connectDB(); // Ye config load hone ke baad call ho raha hai, ab sahi hai.
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-// ----------------------
-// MIDDLEWARE
-// ----------------------
-// Increase limit for large files (Audio/PDF)
-app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ extended: true, limit: "100mb" }));
-app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ limit: "100mb", extended: true }));
-
-//app.use(fileUpload({
-   // useTempFiles: true,
-  // tempFileDir: '/tmp/',
- //   debug: true // इससे आपको टर्मिनल में एरर का पता चलेगा
-//}));
 
 // ----------------------
-// CORS SETUP
+// 3. CORS SETUP (Body parsers se upar hona chahiye!)
 // ----------------------
 const allowedOrigins = [
- "https://talkntypeai.vercel.app",
+  "https://talkntypeai.vercel.app",
   "https://www.talkntype.pro",
   "https://talkntype.pro",
   "http://localhost:3000",
@@ -71,9 +58,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       console.warn("❌ CORS Blocked:", origin);
@@ -84,6 +69,15 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Pre-flight requests handle karne ke liye
+app.options('*', cors());
+
+// ----------------------
+// MIDDLEWARE (CORS ke niche)
+// ----------------------
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
 // ----------------------
 // ROUTE MOUNTING
@@ -112,10 +106,6 @@ app.use("/api/payments", paymentsRoute);
 app.use("/api/dictionary", dictionaryRoutes);
 app.use("/api/csv-manager", csvUploadRoute);
 app.use('/api', legalRoutes);
-// --- PDF & AUDIO ---
-// These are mounted at /api, so the full paths will be:
-// /api/upload-pdf
-// /api/audio-to-text
 app.use("/api", pdfRoutes);
 app.use("/api/audio", audioRoutes);
 
@@ -135,5 +125,4 @@ app.use((err, req, res, next) => {
 // ----------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  
 });
