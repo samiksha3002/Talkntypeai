@@ -139,7 +139,7 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
     // Ensure API is defined! If it's an env var, use import.meta.env.VITE_API_URL
     const baseUrl = typeof API !== 'undefined' ? API : ""; 
     
-    const response = await fetch(`${baseUrl}/api/upload-pdf`, {
+    const response = await fetch(`${API}/api/upload-pdf`, {
       method: "POST",
       body: formData,
     });
