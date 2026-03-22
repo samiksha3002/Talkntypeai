@@ -12,6 +12,11 @@ from services.research_service import ResearchService
 from services.document_service import DocumentService
 from langchain_openai import ChatOpenAI
 
+class DraftRequest(BaseModel):
+    facts: str
+    language: str = "English"
+    documentType: str = "Bail Application"
+
 load_dotenv()
 
 app = FastAPI()
@@ -112,38 +117,32 @@ async def chat_with_pdf(request: ChatRequest):
 # ==========================================
 # 3. DRAFT GENERATION (Updated for 6-Variable Output)
 # ==========================================
+# Pehle ek naya Data Model banaiye (Imports ke paas)
+class DraftRequest(BaseModel):
+    facts: str
+    language: Optional[str] = "English"
+    documentType: Optional[str] = "Bail Application"
+
+# Ab function ko aise update kijiye:
 @app.post("/api/generate-legal-draft")
-async def generate_draft(
-    facts: str = Form(...), 
-    language: str = Form("English"), 
-    documentType: str = Form("Bail Application"), 
-    referenceFile: Optional[UploadFile] = File(None)
-):
+async def generate_draft(request: DraftRequest): # Form(...) hata kar ye likhein
     try:
-        # UPDATED: Now capturing all 6 return values from drafting_service
+        # data model se facts nikalna
         draft, judgments, arguments, timeline, affidavit, strategy = research_and_draft(
-            facts, documentType, language
+            request.facts, request.documentType, request.language
         )
-        
         return {
             "success": True, 
             "draft": draft, 
             "judgments": judgments, 
             "arguments": arguments, 
             "timeline": timeline,
-            "affidavit": affidavit,  # Naya Variable (Feature 1)
-            "strategy": strategy     # Naya Variable (Feature 2 & 4)
+            "affidavit": affidavit,
+            "strategy": strategy
         }
-        
     except Exception as e:
-        # Error handling for variable mismatch or AI failure
-        print(f"Drafting Error: {e}")
-        return {
-            "success": False, 
-            "error": str(e),
-            "message": "Variable mismatch? Check if research_and_draft returns 6 values."
-        }
-# ==========================================
+        print(f"Error: {e}")
+        return {"success": False, "error": str(e)}# ==========================================
 # 4. AI COMMANDS (Expand / Legalize Logic)
 # ==========================================
 @app.post("/api/ai-command")
@@ -201,7 +200,9 @@ async def translate_research(request: MarathiRequest):
 # EXECUTION
 # ==========================================
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Render hamesha apna port khud decide karta hai, isliye ye zaruri hai
+    port = int(os.environ.get("PORT", 10000)) 
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
     # Ye code check karega ki legal_db folder mil raha hai ya nahi

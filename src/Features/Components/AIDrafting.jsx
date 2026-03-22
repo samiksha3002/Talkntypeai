@@ -165,24 +165,29 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     if (!caseFacts.trim()) return alert("Please enter facts.");
     setLocalIsGenerating(true);
     try {
-      const formData = new FormData();
-      formData.append("facts", caseFacts);
-      formData.append("language", language);
-      formData.append("documentType", "Bail Application");
-
+      // SMART FIX: FormData ki jagah JSON use karein for better stability on Render
       const response = await fetch(`${API_BASE_URL}/api/generate-legal-draft`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          facts: caseFacts,
+          language: language,
+          documentType: "Bail Application"
+        }),
       });
 
       const data = await response.json();
+      
       if (data.success) {
         setRawDraft(data.draft); 
         
         // Parse Strategy for Meter (Feature 2 & 4)
         const strategyText = data.strategy || "";
-        const winMatch = strategyText.match(/WIN_PROBABILITY:\s*(\d+)/);
-        const winProb = winMatch ? parseInt(winMatch[1]) : 75;
+        // Flexible Regex: Find any number between 30-98
+        const winMatch = strategyText.match(/(\d+)/); 
+        const winProb = winMatch ? Math.min(Math.max(parseInt(winMatch[0]), 30), 98) : 75;
 
         setIntelligence({
           judgments: data.judgments || "No judgments found.",
@@ -190,13 +195,16 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
           timeline: data.timeline || "Timeline not available.",
           strategy: {
             win_probability: winProb,
-            opponent_args: strategyText.split("OPPONENT_ATTACK:")[1]?.split("REBUTTAL:")[0]?.trim() || strategyText
+            opponent_args: strategyText.split(/OPPONENT_ATTACK:|OPPONENT_ARGUMENTS:/i)[1]?.split(/REBUTTAL:|---/i)[0]?.trim() || strategyText
           }
         });
         setStep(3); 
+      } else {
+        alert("Drafting failed: " + (data.error || "Unknown Error"));
       }
     } catch (error) {
-      alert("Backend offline!");
+      console.error("Fetch Error:", error);
+      alert("Backend offline or connection timeout!");
     } finally {
       setLocalIsGenerating(false);
     }
