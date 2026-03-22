@@ -1,9 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert, Download } from "lucide-react";
 
-const API_BASE_URL = window.location.hostname === "localhost" 
-  ? "http://localhost:8000" 
-  : "https://talkntypeai.onrender.com";
+// ==========================================
+// URL CONFIGURATION (NODE vs PYTHON)
+// ==========================================
+const NODE_API_URL = "https://talkntypeai.onrender.com"; 
+const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
+
+const getApiUrl = (endpoint) => {
+  const isLocal = window.location.hostname === "localhost";
+  const pythonEndpoints = [
+    "/api/generate-legal-draft",
+    "/api/ai-command",
+    "/api/chat-with-pdf",
+    "/api/analyze-document"
+  ];
+
+  if (pythonEndpoints.includes(endpoint)) {
+    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
+  }
+  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
+};
 
 // ==========================================
 // FEATURE 4: BEAUTIFIED EMERALD CASE METER
@@ -78,7 +95,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   }, [chatHistory]);
 
   // ==========================================
-  // 1. SMART SYNC & BOLD RENDERING (With Feature 5: Live Links)
+  // 1. SMART SYNC & BOLD RENDERING
   // ==========================================
   useEffect(() => {
     if (!rawDraft) return;
@@ -105,7 +122,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     return parts.map((part, i) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         const cleanText = part.replace(/\*\*/g, "");
-        // Feature 5: Live Link logic for Judgments
         const isJudgment = cleanText.toLowerCase().includes("vs") || cleanText.toLowerCase().includes(" v ");
         return (
           <b 
@@ -141,7 +157,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     if (!selectedText) return;
     setLocalIsGenerating(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai-command`, {
+      const response = await fetch(getApiUrl("/api/ai-command"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command, text: selectedText, context: caseFacts }),
@@ -165,8 +181,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     if (!caseFacts.trim()) return alert("Please enter facts.");
     setLocalIsGenerating(true);
     try {
-      // SMART FIX: FormData ki jagah JSON use karein for better stability on Render
-      const response = await fetch(`${API_BASE_URL}/api/generate-legal-draft`, {
+      const response = await fetch(getApiUrl("/api/generate-legal-draft"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,10 +197,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       
       if (data.success) {
         setRawDraft(data.draft); 
-        
-        // Parse Strategy for Meter (Feature 2 & 4)
         const strategyText = data.strategy || "";
-        // Flexible Regex: Find any number between 30-98
         const winMatch = strategyText.match(/(\d+)/); 
         const winProb = winMatch ? Math.min(Math.max(parseInt(winMatch[0]), 30), 98) : 75;
 
@@ -203,7 +215,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         alert("Drafting failed: " + (data.error || "Unknown Error"));
       }
     } catch (error) {
-      console.error("Fetch Error:", error);
       alert("Backend offline or connection timeout!");
     } finally {
       setLocalIsGenerating(false);
@@ -218,7 +229,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     setChatInput("");
     setIsChatLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat-with-pdf`, {
+      const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMsg, context: caseFacts, history: chatHistory }),
@@ -370,31 +381,28 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             {rightPanelWidth === 350 ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
 
-          {/* GREEN CASE METER */}
           <CaseMeter score={intelligence.strategy?.win_probability} />
 
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 border-b pb-4 flex items-center gap-2">
             <Sparkles size={14} /> Legal Intelligence
           </h3>
           
+          <div className="p-6 rounded-3xl border border-emerald-100 bg-emerald-50/30 mb-4">
+            <h4 className="font-black text-emerald-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Gavel size={14}/> Landmark Judgments</h4>
+            <div className="text-slate-700 text-[12px] leading-relaxed italic">{renderFormattedDraft(intelligence.judgments)}</div>
+          </div>
           
+          <div className="p-6 rounded-3xl border border-indigo-100 bg-indigo-50/30 mb-4">
+            <h4 className="font-black text-indigo-800 text-[10px] mb-4 uppercase flex items-center gap-2"><ListChecks size={14}/> Winning Arguments</h4>
+            <div className="text-slate-700 text-[12px] leading-relaxed italic">{renderFormattedDraft(intelligence.arguments)}</div>
+          </div>
 
-            <div className="p-6 rounded-3xl border border-emerald-100 bg-emerald-50/30">
-              <h4 className="font-black text-emerald-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Gavel size={14}/> Landmark Judgments</h4>
-              <div className="text-slate-700 text-[12px] leading-relaxed italic">{renderFormattedDraft(intelligence.judgments)}</div>
-            </div>
-            
-            <div className="p-6 rounded-3xl border border-indigo-100 bg-indigo-50/30">
-              <h4 className="font-black text-indigo-800 text-[10px] mb-4 uppercase flex items-center gap-2"><ListChecks size={14}/> Winning Arguments</h4>
-              <div className="text-slate-700 text-[12px] leading-relaxed italic">{renderFormattedDraft(intelligence.arguments)}</div>
-            </div>
-
-            <div className="p-6 rounded-3xl border border-blue-100 bg-blue-50/30">
-              <h4 className="font-black text-blue-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Calendar size={14}/> Case Timeline</h4>
-              <div className="text-slate-700 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">{renderFormattedDraft(intelligence.timeline)}</div>
-            </div>
-             <div className="space-y-6">
-            {/* OPPONENT STRATEGY (Rose Red Design) */}
+          <div className="p-6 rounded-3xl border border-blue-100 bg-blue-50/30 mb-4">
+            <h4 className="font-black text-blue-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Calendar size={14}/> Case Timeline</h4>
+            <div className="text-slate-700 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">{renderFormattedDraft(intelligence.timeline)}</div>
+          </div>
+          
+          <div className="space-y-6">
             <div className="p-6 rounded-[32px] border border-rose-100 bg-rose-50/30 hover:bg-rose-50/50 transition-all shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-200">
@@ -421,7 +429,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
               </div>
             </div>
 
-            {/* CASE CHATBOT */}
             <div className="mt-8 border border-slate-100 rounded-[32px] overflow-hidden bg-white shadow-xl flex flex-col h-[350px]">
               <div className="bg-slate-900 p-5 text-white text-[11px] font-black uppercase flex items-center gap-2">
                 <Sparkles size={14} /> Case Analysis Bot
@@ -449,17 +456,15 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
 
 export default AIDrafting;
 
-
-<style>
-{`
+const styles = `
   @media print {
-    /* Hide everything except the main draft canvas */
-    nav, .h-16, .w-72, .bg-white.border-l, button, .fixed {
+    nav, .h-16, .w-72, .bg-white.border-l, button, .fixed, .z-20 {
       display: none !important;
     }
     .flex-1 {
       padding: 0 !important;
       background: white !important;
+      overflow: visible !important;
     }
     .max-w-[850px] {
       box-shadow: none !important;
@@ -471,5 +476,6 @@ export default AIDrafting;
       background: white !important;
     }
   }
-`}
-</style>
+`;
+
+const StyleTag = () => <style>{styles}</style>;
