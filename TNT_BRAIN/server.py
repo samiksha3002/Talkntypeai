@@ -12,23 +12,23 @@ from services.research_service import ResearchService
 from services.document_service import DocumentService
 from langchain_openai import ChatOpenAI
 
-class DraftRequest(BaseModel):
-    facts: str
-    language: str = "English"
-    documentType: str = "Bail Application"
-
 load_dotenv()
 
 app = FastAPI()
 
-# 1. Folder Setup
+# ==========================================
+# 1. FOLDER SETUP
+# ==========================================
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
 
-# 2. CORS Middleware
+# ==========================================
+# 2. CORS MIDDLEWARE (FIXED FOR SECURITY)
+# ==========================================
+# Humne origins mein "*" dala hai taaki Vercel aur Render ke beech communication blocked na ho
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +39,11 @@ research_ai = ResearchService()
 doc_service = DocumentService()
 
 # --- Data Models ---
+class DraftRequest(BaseModel):
+    facts: str
+    language: Optional[str] = "English"
+    documentType: Optional[str] = "Bail Application"
+
 class ChatRequest(BaseModel):
     query: str
     context: str
@@ -112,20 +117,10 @@ async def chat_with_pdf(request: ChatRequest):
         return {"answer": f"System Error: {str(e)}"}
 
 # ==========================================
-# 3. DRAFT GENERATION
+# 3. DRAFT GENERATION (JSON Input Mode)
 # ==========================================
-# ==========================================
-# 3. DRAFT GENERATION (Updated for 6-Variable Output)
-# ==========================================
-# Pehle ek naya Data Model banaiye (Imports ke paas)
-class DraftRequest(BaseModel):
-    facts: str
-    language: Optional[str] = "English"
-    documentType: Optional[str] = "Bail Application"
-
-# Ab function ko aise update kijiye:
 @app.post("/api/generate-legal-draft")
-async def generate_draft(request: DraftRequest): # Form(...) hata kar ye likhein
+async def generate_draft(request: DraftRequest):
     try:
         # data model se facts nikalna
         draft, judgments, arguments, timeline, affidavit, strategy = research_and_draft(
@@ -142,7 +137,9 @@ async def generate_draft(request: DraftRequest): # Form(...) hata kar ye likhein
         }
     except Exception as e:
         print(f"Error: {e}")
-        return {"success": False, "error": str(e)}# ==========================================
+        return {"success": False, "error": str(e)}
+
+# ==========================================
 # 4. AI COMMANDS (Expand / Legalize Logic)
 # ==========================================
 @app.post("/api/ai-command")
@@ -197,14 +194,13 @@ async def translate_research(request: MarathiRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
-# EXECUTION
+# EXECUTION & PATHING
 # ==========================================
-if __name__ == "__main__":
-    # Render hamesha apna port khud decide karta hai, isliye ye zaruri hai
-    port = int(os.environ.get("PORT", 10000)) 
-    uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-    # Ye code check karega ki legal_db folder mil raha hai ya nahi
+# Ye code check karega ki legal_db folder mil raha hai ya nahi
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CHROMA_PATH = os.path.join(BASE_DIR, "legal_db")
+
+if __name__ == "__main__":
+    # Render hamesha apna port khud decide karta hai
+    port = int(os.environ.get("PORT", 10000)) 
+    uvicorn.run(app, host="0.0.0.0", port=port)
