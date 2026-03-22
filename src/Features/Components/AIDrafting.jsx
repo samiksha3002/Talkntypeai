@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert } from "lucide-react";
-
-
+import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert, Download } from "lucide-react";
 
 const API_BASE_URL = window.location.hostname === "localhost" 
   ? "http://localhost:8000" 
   : "https://talkntypeai.onrender.com";
+
 // ==========================================
-
-
 // FEATURE 4: BEAUTIFIED EMERALD CASE METER
 // ==========================================
 const CaseMeter = ({ score }) => {
@@ -144,7 +141,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     if (!selectedText) return;
     setLocalIsGenerating(true);
     try {
-      const response = await fetch("${API_BASE_URL}/api/ai-command", {
+      const response = await fetch(`${API_BASE_URL}/api/ai-command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command, text: selectedText, context: caseFacts }),
@@ -173,7 +170,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       formData.append("language", language);
       formData.append("documentType", "Bail Application");
 
-      const response = await fetch("${API_BASE_URL}/api/generate-legal-draft", {
+      const response = await fetch(`${API_BASE_URL}/api/generate-legal-draft`, {
         method: "POST",
         body: formData,
       });
@@ -213,7 +210,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     setChatInput("");
     setIsChatLoading(true);
     try {
-      const response = await fetch("${API_BASE_URL}/api/chat-with-pdf", {
+      const response = await fetch(`${API_BASE_URL}/api/chat-with-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMsg, context: caseFacts, history: chatHistory }),
@@ -294,7 +291,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         <div className="flex items-center gap-6">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[3px] bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100">LexScript 2.0 Engine</span>
             <button 
-  onClick={() => window.print()} // Quickest way for high-quality court layout
+  onClick={() => window.print()} 
   className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-black shadow-lg flex items-center gap-2 transition-all active:scale-95"
 >
   <Download size={18} /> Print Court Bundle
@@ -372,7 +369,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             <Sparkles size={14} /> Legal Intelligence
           </h3>
           
-         
+          
 
             <div className="p-6 rounded-3xl border border-emerald-100 bg-emerald-50/30">
               <h4 className="font-black text-emerald-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Gavel size={14}/> Landmark Judgments</h4>
@@ -419,7 +416,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             {/* CASE CHATBOT */}
             <div className="mt-8 border border-slate-100 rounded-[32px] overflow-hidden bg-white shadow-xl flex flex-col h-[350px]">
               <div className="bg-slate-900 p-5 text-white text-[11px] font-black uppercase flex items-center gap-2">
-                <Sparkles size={16} className="text-indigo-400" /> Case Analysis Bot
+                <Sparkles size={14} /> Case Analysis Bot
               </div>
               <div className="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-50/50 custom-scrollbar">
                 {chatHistory.map((msg, i) => (
