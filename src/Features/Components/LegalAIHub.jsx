@@ -1,23 +1,15 @@
 import React, { useState } from "react";
+import { PenTool, Search, FileText, ArrowRight, Sparkles, Scale, MessageSquare } from "lucide-react";
 
 // --- FEATURE IMPORTS ---
 import AIDrafting from "./AIDrafting";
-import ChatWithPDF from "./ChatWithPDF";
-import ReviewDraft from "./ReviewDraft";
-import UploadDraft from "./UploadDraft";
 import LegalResearch from "./LegalResearch";
-import LegalMemo from "./LegalMemo";
-// import GenerateArguments from "./GenerateArguments"; 
+import ChatWithPDF from "./ChatWithPDF";
 
-/**
- * Samiksha, ensure that setIsAIGenerating and setManualText are passed 
- * as props from your main Dashboard/App component to this Hub.
- */
 const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
   const [activeFeature, setActiveFeature] = useState("main");
 
   // --- NAVIGATION LOGIC ---
-  // Passing the required props down to each feature to avoid "is not a function" errors
   if (activeFeature === "drafting") {
     return (
       <AIDrafting 
@@ -37,24 +29,6 @@ const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
     );
   }
 
-  if (activeFeature === "review") {
-    return (
-      <ReviewDraft 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-      />
-    );
-  }
-
-  if (activeFeature === "uploadDraft") {
-    return (
-      <UploadDraft 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-      />
-    );
-  }
-
   if (activeFeature === "research") {
     return (
       <LegalResearch 
@@ -64,148 +38,105 @@ const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
     );
   }
 
-  if (activeFeature === "memo") {
-    return (
-      <LegalMemo 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-      />
-    );
-  }
-
-  const featureCards = [
-    {
-      id: "drafting",
-      category: "Draft",
-      title: "AI Legal Drafting",
-      desc: "Start by drafting and do legal research side by side.",
-      icon: "✨",
-      color: "from-indigo-500 to-blue-600",
-      lightColor: "bg-indigo-50 text-indigo-600",
-    },
-    {
-      id: "review",
-      category: "Draft",
-      title: "Review Your Draft",
-      desc: "Upload your own draft to improve grammar and check errors.",
-      icon: "🔍",
-      color: "from-blue-400 to-cyan-500",
-      lightColor: "bg-blue-50 text-blue-600",
-    },
-    {
-      id: "uploadDraft",
-      category: "Draft",
-      title: "Upload your Draft",
-      desc: "Start drafting and legal research on existing files.",
-      icon: "📤",
-      color: "from-purple-500 to-indigo-500",
-      lightColor: "bg-purple-50 text-purple-600",
-    },
-    {
-      id: "research",
-      category: "Research",
-      title: "AI Legal Research",
-      desc: "Do accurate legal research with sources and cases.",
-      icon: "⚖️",
-      color: "from-sky-400 to-blue-500",
-      lightColor: "bg-sky-50 text-sky-600",
-    },
-    {
-      id: "memo",
-      category: "Research",
-      title: "Legal Memo",
-      desc: "Prepare comprehensive Legal Memos with citations.",
-      icon: "📝",
-      color: "from-violet-400 to-purple-500",
-      lightColor: "bg-violet-50 text-violet-600",
-    },
-    {
-      id: "pdfChat",
-      category: "Research",
-      title: "Chat with PDF",
-      desc: "Upload a PDF, prepare list of dates, and ask questions.",
-      icon: "💬",
-      color: "from-fuchsia-500 to-pink-600",
-      lightColor: "bg-fuchsia-50 text-fuchsia-600",
-    },
-    {
-      id: "arguments",
-      category: "Research",
-      title: "Generate Arguments",
-      desc: "Tell AI about the case or upload PDF to generate arguments.",
-      icon: "🛡️",
-      color: "from-indigo-600 to-violet-700",
-      lightColor: "bg-indigo-50 text-indigo-700",
-    }
-  ];
-
   return (
-    <div className="flex-1 overflow-y-auto bg-[#F8FAFC] pb-24 animate-fade-in">
-      <div className="bg-white border-b border-gray-100 px-8 py-10 mb-8 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-            Hi, Samiksha! 👋
-          </h1>
-          <p className="text-gray-500 mt-2 text-lg font-medium">
-            Welcome to your premium Legal AI suite. Ready to win your next case?
-          </p>
+    <div className="flex-1 bg-white min-h-screen overflow-y-auto pb-20">
+      
+      {/* HEADER SECTION - Minimalist & Clean */}
+      <div className="max-w-7xl mx-auto px-8 pt-16 pb-12">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest mb-4">
+          <Sparkles size={14} /> TNT Legal AI Suite v2.4
         </div>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-4">
+          Core AI Workspaces
+        </h1>
+        <p className="text-slate-500 text-lg max-w-2xl font-medium">
+          Select a specialized workspace to begin your legal task. Precision-engineered for modern law practice.
+        </p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-8">
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-8">
-             <div className="h-8 w-1.5 bg-indigo-600 rounded-full"></div>
-             <h2 className="text-xl font-bold text-gray-800 uppercase tracking-widest">Drafting Suite</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featureCards.filter(c => c.category === "Draft").map((card) => (
-              <FeatureCard key={card.id} card={card} onClick={() => setActiveFeature(card.id)} />
-            ))}
-          </div>
-        </div>
+      {/* FEATURE GRID - 3 High-Impact Workspaces */}
+      <div className="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* 1. AI LEGAL DRAFTING */}
+        <WorkspaceCard 
+          icon={<PenTool size={32} />}
+          title="DraftMaster Pro"
+          desc="Generate high-quality legal petitions, bail applications, and contracts in seconds with AI precision."
+          color="bg-indigo-600"
+          lightColor="bg-indigo-50"
+          textColor="text-indigo-600"
+          onClick={() => setActiveFeature("drafting")}
+        />
 
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-8">
-             <div className="h-8 w-1.5 bg-blue-600 rounded-full"></div>
-             <h2 className="text-xl font-bold text-gray-800 uppercase tracking-widest">Research Intelligence</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-8">
-            {featureCards.filter(c => c.category === "Research").map((card) => (
-              <FeatureCard key={card.id} card={card} onClick={() => setActiveFeature(card.id)} />
-            ))}
-          </div>
+        {/* 2. AI LEGAL RESEARCH */}
+        <WorkspaceCard 
+          icon={<Scale size={32} />}
+          title="AI Legal Research"
+          desc="Search across Indian Case Laws and Statutes. Get cited judgments and research memos instantly."
+          color="bg-blue-600"
+          lightColor="bg-blue-50"
+          textColor="text-blue-600"
+          onClick={() => setActiveFeature("research")}
+        />
+
+        {/* 3. CHAT WITH PDF */}
+        <WorkspaceCard 
+          icon={<MessageSquare size={32} />}
+          title="Chat with PDF"
+          desc="Analyze 42+ page documents. Extract chronologies, important dates, and chat with scanned legal files."
+          color="bg-fuchsia-600"
+          lightColor="bg-fuchsia-50"
+          textColor="text-fuchsia-600"
+          onClick={() => setActiveFeature("pdfChat")}
+        />
+
+      </div>
+
+      {/* FOOTER NOTE */}
+      <div className="max-w-7xl mx-auto px-8 mt-20">
+        <div className="p-8 rounded-[32px] bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100 text-slate-400">
+                    <FileText size={20} />
+                </div>
+                <div>
+                    <p className="text-sm font-bold text-slate-800 uppercase tracking-tighter">Enterprise Grade Security</p>
+                    <p className="text-xs text-slate-500 font-medium italic">Your legal data is encrypted and private.</p>
+                </div>
+            </div>
+            <span className="text-[10px] font-black text-slate-300 tracking-[0.2em] uppercase italic">Talk N Type</span>
         </div>
       </div>
     </div>
   );
 };
 
-const FeatureCard = ({ card, onClick }) => (
+/* COMPONENT: WorkspaceCard */
+const WorkspaceCard = ({ icon, title, desc, color, lightColor, textColor, onClick }) => (
   <div 
     onClick={onClick}
-    className="group relative bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] transition-all duration-500 cursor-pointer overflow-hidden active:scale-95"
+    className="group relative h-[420px] bg-white rounded-[40px] border border-slate-100 p-10 flex flex-col justify-between shadow-sm hover:shadow-[0_40px_80px_rgba(0,0,0,0.06)] transition-all duration-500 cursor-pointer overflow-hidden hover:-translate-y-2 active:scale-95"
   >
-    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${card.color} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-500 -mr-10 -mt-10 rounded-full`}></div>
-
-    <div className={`w-14 h-14 ${card.lightColor} rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-      {card.icon}
+    {/* Decorative Background Blob */}
+    <div className={`absolute -right-20 -bottom-20 w-64 h-64 ${lightColor} rounded-full opacity-0 group-hover:opacity-40 transition-opacity duration-700`}></div>
+    
+    <div>
+      <div className={`w-20 h-20 ${lightColor} ${textColor} rounded-[28px] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-sm border border-white/50`}>
+        {icon}
+      </div>
+      
+      <h3 className="text-2xl font-black text-slate-800 mb-4 tracking-tight group-hover:text-indigo-600 transition-colors">
+        {title}
+      </h3>
+      
+      <p className="text-slate-500 font-medium leading-relaxed">
+        {desc}
+      </p>
     </div>
 
-    <h3 className="text-xl font-bold text-gray-800 mb-3 group-hover:text-indigo-600 transition-colors">
-      {card.title}
-    </h3>
-    <p className="text-gray-500 text-sm leading-relaxed font-medium mb-6">
-      {card.desc}
-    </p>
-
-    <div className="flex items-center text-indigo-600 font-bold text-xs uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-[-10px] group-hover:translate-x-0">
-      Open Tool 
-      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-      </svg>
+    <div className={`flex items-center justify-center w-full py-4 ${color} text-white rounded-2xl font-bold text-sm tracking-widest uppercase opacity-90 group-hover:opacity-100 transition-all shadow-lg group-hover:shadow-indigo-200`}>
+      Enter Workspace
+      <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
     </div>
   </div>
 );

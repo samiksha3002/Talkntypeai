@@ -1,100 +1,265 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { 
+  FileText, Send, Loader2, Calendar, Layout, ListChecks, 
+  Download, Maximize2, X, MessageSquare, ZoomIn, ZoomOut, RotateCw 
+} from "lucide-react";
 
-const ChatWithPDF = ({ onBack }) => {
+
+// Local aur Live dono ko ek saath handle karne ke liye
+const API_BASE_URL = window.location.hostname === "localhost" 
+  ? "http://localhost:8000" 
+  : "https://talkntypeai.onrender.com";
+
+const ChatWithPDF = () => {
   const [file, setFile] = useState(null);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [inputText, setInputText] = useState("");
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [timeline, setTimeline] = useState(null);
+  const [activeTab, setActiveTab] = useState("chat"); // 'chat' or 'timeline'
+  const [zoom, setZoom] = useState(100);
+
+  const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
       setFile(uploadedFile);
-      // Trigger AI Analysis for List of Dates or Summary here
+      setPreviewUrl(URL.createObjectURL(uploadedFile));
+      analyzeDocument(uploadedFile);
+    }
+  };
+
+  const analyzeDocument = async (uploadedFile) => {
+    setIsAnalyzing(true);
+    const formData = new FormData();
+    formData.append("file", uploadedFile);
+
+    try {
+      const response = await fetch("${API_BASE_URL}/api/analyze-document", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTimeline(data.timeline);
+        setMessages([{ role: "ai", text: "Document analyzed. I've prepared a chronology in the Timeline tab." }]);
+      }
+    } catch (err) {
+      console.error("Analysis failed", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || !file) return;
+
+    const userMsg = input;
+    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+        const response = await fetch("${API_BASE_URL}/api/chat-with-pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                query: userMsg, 
+                context: timeline || "User has uploaded a document named " + file.name, 
+                history: messages 
+            }),
+        });
+        const data = await response.json();
+        setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+    } catch (err) {
+        setMessages((prev) => [...prev, { role: "ai", text: "Error connecting to Legal Brain." }]);
+    } finally {
+        setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 bg-white h-full flex flex-col overflow-hidden">
-      {/* 1. Professional Header */}
-      <div className="h-16 border-b border-gray-100 flex items-center px-6 justify-between bg-white shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold text-gray-800">Chat with PDF</h1>
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
+      
+      {/* LEFT: PROFESSIONAL PDF VIEWPORT */}
+      <div className="w-1/2 flex flex-col bg-slate-900 border-r border-slate-700 relative">
+        <div className="h-14 bg-slate-800 flex items-center justify-between px-4 border-b border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/20 rounded-lg">
+              <FileText size={18} className="text-indigo-400" />
+            </div>
+            <span className="text-slate-200 text-sm font-semibold truncate max-w-[200px]">
+              {file ? file.name : "No Document Selected"}
+            </span>
+          </div>
+          
+          {file && (
+            <div className="flex items-center bg-slate-700 rounded-lg p-1 gap-1">
+              <button onClick={() => setZoom(z => Math.max(z-20, 50))} className="p-1.5 hover:bg-slate-600 rounded text-slate-300"><ZoomOut size={16} /></button>
+              <span className="text-[10px] text-slate-400 px-2 font-mono">{zoom}%</span>
+              <button onClick={() => setZoom(z => Math.min(z+20, 200))} className="p-1.5 hover:bg-slate-600 rounded text-slate-300"><ZoomIn size={16} /></button>
+              <div className="w-[1px] h-4 bg-slate-600 mx-1" />
+              <button className="p-1.5 hover:bg-slate-600 rounded text-slate-300"><RotateCw size={16} /></button>
+            </div>
+          )}
         </div>
-        {file && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-semibold">
-            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            {file.name}
+
+        <div className="flex-1 overflow-auto bg-slate-900 flex justify-center p-4 custom-scrollbar">
+          {!file ? (
+            <div className="flex flex-col items-center justify-center text-slate-500 max-w-sm text-center">
+              <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mb-6 border border-slate-700">
+                <FileText size={40} className="text-slate-600" />
+              </div>
+              <h3 className="text-slate-200 font-bold text-lg mb-2">Ready to Analyze</h3>
+              <p className="text-sm opacity-60 mb-8">Upload FIRs, Judgments, or Petitions for instant AI chronology & chat.</p>
+              <button 
+                onClick={() => fileInputRef.current.click()}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20"
+              >
+                Choose PDF File
+              </button>
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".pdf" />
+            </div>
+          ) : (
+            <div 
+                className="transition-all duration-200 ease-in-out shadow-2xl" 
+                style={{ width: `${zoom}%`, minWidth: '100%' }}
+            >
+              <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full min-h-[85vh] rounded-sm" title="PDF Preview" />
+            </div>
+          )}
+        </div>
+
+        {isAnalyzing && (
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50">
+            <div className="bg-white/10 p-8 rounded-[40px] border border-white/10 flex flex-col items-center">
+              <Loader2 className="w-12 h-12 text-indigo-400 animate-spin mb-4" />
+              <p className="text-white font-bold tracking-widest uppercase text-[10px]">AI Neural Scanning...</p>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="flex-1 flex overflow-hidden bg-slate-50">
-        {!file ? (
-          /* --- UPLOAD STATE --- */
-          <div className="flex-1 flex flex-col items-center justify-center p-10">
-            <div className="bg-white p-12 rounded-[40px] shadow-sm border border-dashed border-indigo-200 flex flex-col items-center max-w-xl w-full">
-              <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center text-4xl mb-6">📄</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Upload Legal Document</h2>
-              <p className="text-gray-500 text-center mb-8 leading-relaxed">
-                Upload your charge sheet, case file, or any legal PDF (up to 250+ pages). AI will prepare a list of dates and answer your questions.
-              </p>
-              <input type="file" id="pdf-upload" hidden onChange={handleFileUpload} accept=".pdf" />
-              <label 
-                htmlFor="pdf-upload" 
-                className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold cursor-pointer hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
-              >
-                Choose PDF File
-              </label>
-            </div>
-          </div>
-        ) : (
-          /* --- CHAT INTERFACE --- */
-          <div className="flex-1 flex flex-row overflow-hidden">
-            {/* Left: PDF Preview / Summary (Placeholder) */}
-            <div className="w-1/3 border-r border-gray-200 bg-white p-6 overflow-y-auto">
-              <h3 className="font-bold text-gray-800 mb-4">Quick Insights</h3>
-              <div className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <h4 className="text-xs font-bold text-indigo-500 uppercase mb-1">List of Dates</h4>
-                  <p className="text-sm text-gray-500 italic">AI is extracting timeline...</p>
+      {/* RIGHT: SMART WORKSPACE */}
+      <div className="w-1/2 flex flex-col bg-white">
+        
+        {/* Modern Tabs Navigation */}
+        <div className="h-16 border-b flex items-center px-8 gap-8 shrink-0">
+          <button 
+            onClick={() => setActiveTab("chat")}
+            className={`flex items-center gap-2 text-sm font-bold h-full border-b-2 transition-all ${
+              activeTab === "chat" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <MessageSquare size={18} /> Chat Bot
+          </button>
+          <button 
+            onClick={() => setActiveTab("timeline")}
+            className={`flex items-center gap-2 text-sm font-bold h-full border-b-2 transition-all ${
+              activeTab === "timeline" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <Calendar size={18} /> Chronology
+            {timeline && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-hidden relative">
+          
+          {/* TAB 1: CHAT INTERFACE */}
+          <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ${activeTab === "chat" ? "translate-x-0" : "translate-x-full"}`}>
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] p-5 rounded-[24px] text-sm leading-relaxed shadow-sm ${
+                    msg.role === "user" 
+                    ? "bg-indigo-600 text-white rounded-tr-none" 
+                    : "bg-white text-slate-800 border border-slate-100 rounded-tl-none"
+                  }`}>
+                    {msg.text}
+                    {msg.role === "ai" && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-[10px] text-indigo-500 font-bold uppercase tracking-wider">
+                        <ListChecks size={12} /> Verified from Document
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start animate-pulse">
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
             </div>
 
-            {/* Right: AI Chat Interface */}
-            <div className="flex-1 flex flex-col">
-              <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                <div className="bg-indigo-50 p-4 rounded-2xl max-w-[80%] self-start border border-indigo-100">
-                  <p className="text-indigo-900 text-sm">
-                    Hello! I've analyzed your document. You can ask me questions like "Who are the witnesses?" or "Give me a summary of Page 165".
-                  </p>
-                </div>
-                {/* Chat messages would go here */}
-              </div>
-
-              {/* Chat Input */}
-              <div className="p-6 bg-white border-t border-gray-100">
-                <div className="flex gap-3 bg-slate-100 p-2 rounded-2xl">
-                  <input 
-                    type="text" 
-                    placeholder="Ask anything about the document..." 
-                    className="flex-1 bg-transparent border-none outline-none px-4 text-sm font-medium"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                  />
-                  <button className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-all">
-                    Send
-                  </button>
-                </div>
-              </div>
+            <div className="p-6 border-t bg-white">
+              <form onSubmit={sendMessage} className="relative group">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={file ? "Type your legal query..." : "Upload document to start"}
+                  disabled={!file || isLoading}
+                  className="w-full bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white py-4 pl-6 pr-14 rounded-2xl text-sm transition-all outline-none"
+                />
+                <button 
+                  disabled={!file || isLoading}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-md shadow-indigo-200"
+                >
+                  <Send size={18} />
+                </button>
+              </form>
             </div>
           </div>
-        )}
+
+          {/* TAB 2: PROFESSIONAL TIMELINE VIEW */}
+          <div className={`absolute inset-0 p-8 overflow-y-auto bg-white transition-transform duration-300 ${activeTab === "timeline" ? "translate-x-0" : "-translate-x-full"}`}>
+            {!timeline ? (
+              <div className="h-full flex flex-col items-center justify-center opacity-40">
+                <Calendar size={48} className="text-slate-300 mb-4" />
+                <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">Chronology not generated yet</p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-xl font-bold text-slate-800">Case Chronology</h2>
+                    <button className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100">
+                        <Download size={14} /> EXPORT TO EDITOR
+                    </button>
+                </div>
+                
+                <div className="border-l-2 border-indigo-100 ml-4 space-y-8">
+                  {/* AI Timeline content splitting logic can be added here */}
+                  <div className="relative pl-8">
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm" />
+                    <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 hover:border-indigo-200 transition-all group">
+                      <p className="whitespace-pre-wrap text-sm leading-loose text-slate-700 font-medium">
+                        {timeline}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );

@@ -34,6 +34,7 @@ import audioRoutes from "./routes/audio.js";
 // server.js (Line 34)
 import legalRoutes from "./routes/legal.js";
 import fileUpload from 'express-fileupload';
+import legalAiRoute from './routes/legalaidraft.js';
 // ----------------------
 // CONFIGURATION
 // ----------------------
@@ -118,7 +119,7 @@ app.use('/api', legalRoutes);
 // /api/audio-to-text
 app.use("/api", pdfRoutes);
 app.use("/api/audio", audioRoutes);
-
+app.use('/api/legal-ai', legalAiRoute);
 // ----------------------
 // ERROR HANDLER
 // ----------------------

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: talkntypeai
+    env: python
+    buildCommand: pip install -r TNT-brain/requirements.txt
+    startCommand: cd TNT-brain && uvicorn server:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false # Ise Render Dashboard mein manually bharna hoga safety ke liye
+      - key: TAVILY_API_KEY
+        sync: false
