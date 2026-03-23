@@ -1,10 +1,27 @@
 import React, { useState } from "react";
 import { Search, BookOpen, Globe, MessageSquare, Save, History, ExternalLink, ChevronRight, Loader2 } from "lucide-react";
 
-// Local aur Live dono ko ek saath handle karne ke liye
-const API_BASE_URL = window.location.hostname === "localhost" 
-  ? "http://localhost:8000" 
-  : "https://talkntypeai.onrender.com";
+// ==========================================
+// URL CONFIGURATION (NODE vs PYTHON)
+// ==========================================
+const NODE_API_URL = "https://talkntypeai.onrender.com"; 
+const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
+
+const getApiUrl = (endpoint) => {
+  const isLocal = window.location.hostname === "localhost";
+  const pythonEndpoints = [
+    "/api/generate-legal-draft",
+    "/api/ai-command",
+    "/api/chat-with-pdf",
+    "/api/analyze-document",
+    "/api/legal-research" // Legal research added to Python route
+  ];
+
+  if (pythonEndpoints.includes(endpoint)) {
+    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
+  }
+  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
+};
 
 const LegalResearch = () => {
   const [query, setQuery] = useState("");
@@ -23,7 +40,8 @@ const LegalResearch = () => {
     setResearchData(null); // Purana data clear karein naye search se pehle
 
     try {
-      const response = await fetch("${API_BASE_URL}/api/legal-research", {
+      // PYTHON Route for Real-time Legal Research
+      const response = await fetch(getApiUrl("/api/legal-research"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
@@ -40,7 +58,7 @@ const LegalResearch = () => {
       setHistory((prev) => [{ id: Date.now(), title: query }, ...prev]);
     } catch (error) {
       console.error("Research failed:", error);
-      alert("Search failed. Please check if backend is running on port 8000.");
+      alert("Research failed. Please ensure the Python backend is live and Tavily API is configured.");
     } finally {
       setLoading(false);
     }

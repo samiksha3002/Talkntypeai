@@ -4,11 +4,26 @@ import {
   Download, Maximize2, X, MessageSquare, ZoomIn, ZoomOut, RotateCw 
 } from "lucide-react";
 
+// ==========================================
+// URL CONFIGURATION (NODE vs PYTHON)
+// ==========================================
+const NODE_API_URL = "https://talkntypeai.onrender.com"; 
+const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
 
-// Local aur Live dono ko ek saath handle karne ke liye
-const API_BASE_URL = window.location.hostname === "localhost" 
-  ? "http://localhost:8000" 
-  : "https://talkntypeai.onrender.com";
+const getApiUrl = (endpoint) => {
+  const isLocal = window.location.hostname === "localhost";
+  const pythonEndpoints = [
+    "/api/generate-legal-draft",
+    "/api/ai-command",
+    "/api/chat-with-pdf",
+    "/api/analyze-document"
+  ];
+
+  if (pythonEndpoints.includes(endpoint)) {
+    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
+  }
+  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
+};
 
 const ChatWithPDF = () => {
   const [file, setFile] = useState(null);
@@ -43,7 +58,8 @@ const ChatWithPDF = () => {
     formData.append("file", uploadedFile);
 
     try {
-      const response = await fetch("${API_BASE_URL}/api/analyze-document", {
+      // PYTHON Route for Document Analysis
+      const response = await fetch(getApiUrl("/api/analyze-document"), {
         method: "POST",
         body: formData,
       });
@@ -69,7 +85,8 @@ const ChatWithPDF = () => {
     setIsLoading(true);
 
     try {
-        const response = await fetch("${API_BASE_URL}/api/chat-with-pdf", {
+        // PYTHON Route for Chat with PDF
+        const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
@@ -245,7 +262,6 @@ const ChatWithPDF = () => {
                 </div>
                 
                 <div className="border-l-2 border-indigo-100 ml-4 space-y-8">
-                  {/* AI Timeline content splitting logic can be added here */}
                   <div className="relative pl-8">
                     <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm" />
                     <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 hover:border-indigo-200 transition-all group">
