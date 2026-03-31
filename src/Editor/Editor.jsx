@@ -3,11 +3,9 @@ import EditorActions from "./EditorActions";
 import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
-import FontConvertCard from "../components/Sidebar/FontConvertCard";
+// Agar file ka naam fontConverter.js hai toh:
+import { convertToKrutiDev , convertToShivaji } from "../../utils/fontConverter";
 
-import { convertToKrutiDev } from '../../utils/krutidev';
-import { convertToShivaji } from '../../utils/shivaji';
-import { convertToPreeti } from '../../utils/preeti';
 
 const Editor = ({
   user,
