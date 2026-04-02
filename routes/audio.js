@@ -14,7 +14,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // --- HELPER: GEMINI TRANSCRIPTION FUNCTION ---
 async function transcribeWithGemini(fileBuffer, mimetype) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+   const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });
     
     const result = await model.generateContent([
       {
