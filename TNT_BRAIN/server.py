@@ -42,7 +42,7 @@ doc_service = DocumentService()
 class DraftRequest(BaseModel):
     facts: str
     language: Optional[str] = "English"
-    documentType: Optional[str] = "Bail Application"
+    documentType: Optional[str] = None
 
 class ChatRequest(BaseModel):
     query: str
@@ -119,25 +119,32 @@ async def chat_with_pdf(request: ChatRequest):
 # ==========================================
 # 3. DRAFT GENERATION (JSON Input Mode)
 # ==========================================
+# ==========================================
+# 3. DRAFT GENERATION (Updated for React Compatibility)
+# ==========================================
 @app.post("/api/generate-legal-draft")
 async def generate_draft(request: DraftRequest):
     try:
-        # data model se facts nikalna
+        # 1. Humne research_and_draft ko 6 variables return karne wala banaya hai
         draft, judgments, arguments, timeline, affidavit, strategy = research_and_draft(
             request.facts, request.documentType, request.language
         )
-        return {
-            "success": True, 
-            "draft": draft, 
-            "judgments": judgments, 
-            "arguments": arguments, 
-            "timeline": timeline,
-            "affidavit": affidavit,
-            "strategy": strategy
-        }
+        
+        # 2. IMPORTANT: React frontend "Array" expect kar raha hai destructuring ke liye.
+        # Hum success: True ke saath data ko ek list (array) mein bhejenge.
+        return [
+            draft, 
+            judgments, 
+            arguments, 
+            timeline, 
+            affidavit, 
+            strategy
+        ]
+        
     except Exception as e:
-        print(f"Error: {e}")
-        return {"success": False, "error": str(e)}
+        print(f"Error in Draft Generation: {e}")
+        # Agar error aaye toh empty strings bhejien taaki frontend crash na ho
+        return ["Error: " + str(e), "N/A", "N/A", "N/A", "N/A", "N/A"]
 
 # ==========================================
 # 4. AI COMMANDS (Expand / Legalize Logic)

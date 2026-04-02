@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 
 # Pydantic compatibility hack for Python 3.13+
@@ -14,42 +15,40 @@ from langchain_core.output_parsers import StrOutputParser
 load_dotenv()
 CHROMA_PATH = "legal_db"
 
-def research_and_draft(facts, doc_type="Bail Application", lang="English"):
+def research_and_draft(facts, doc_type=None, lang="English"):
     if not os.path.exists(CHROMA_PATH):
         return ("Error: 'legal_db' folder missing.", "N/A", "N/A", "N/A", "N/A", "N/A")
 
     try:
+        # 1. STEP: DYNAMIC IDENTIFICATION (Isse 'Bail' ka bias khatam hoga)
+        llm_gatekeeper = ChatOpenAI(model_name="gpt-4o", temperature=0)
+        identity_prompt = f"Analyze these facts and provide ONLY the formal title of the legal petition needed. Facts: {facts}"
+        detected_type = llm_gatekeeper.invoke(identity_prompt).content.strip()
+        
+        # Agar user ne doc_type nahi bheja, toh detected use karo
+        final_doc_type = doc_type if doc_type else detected_type
+
+        # 2. STEP: SMART VECTOR SEARCH
         embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         vector_db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
         
-        # Keep K=15 as per your original request for massive base
-        retriever = vector_db.as_retriever(search_kwargs={"k": 15}) 
-        docs = retriever.invoke(facts)
+        # Hum facts aur detected_type dono ke basis par search karenge taaki sahi law mile
+        retriever = vector_db.as_retriever(search_kwargs={"k": 10}) 
+        docs = retriever.invoke(f"{final_doc_type} grounds and precedents: {facts}")
         context_text = "\n\n".join([doc.page_content for doc in docs])
 
-        # Temperature 0.3 balance as per your logic
-        llm = ChatOpenAI(model_name="gpt-4o", temperature=0.3) 
+        # 3. STEP: MASTER DRAFTING (Strictly Instruction based)
+        llm = ChatOpenAI(model_name="gpt-4o", temperature=0.4) 
 
-        # --- THE MASTER DRAFTING COMMAND (Same logic, added new sections) ---
         system_prompt = (
-            "You are a Senior Advocate at the Supreme Court of India. Your goal is to draft an EXHAUSTIVE, "
-            "PROFESSIONAL, and HIGHLY DETAILED court bundle that spans 6 to 7 pages. "
-            f"DOCUMENT TYPE: {doc_type}. LANGUAGE: {lang}."
-            "\n\nSTRICT FORMATTING & CONTENT RULES:"
-            "1. **TITLES & HEADINGS**: Must be in ALL CAPS and **BOLD**. Center the main title."
-            "2. **SYNOPSIS**: Provide a 2-page detailed chronological narrative. A short synopsis is a failure."
-            "3. **GROUNDS**: Provide at least 15 detailed grounds. Each ground must be 200 words long. "
-            "   Start each ground with '**THAT...**'. Weave in legal logic and constitutional principles."
-            "4. **JUDGMENTS PANEL**: In the ---JUDGMENTS--- section, list 3-4 REAL Landmark cases "
-            "   (e.g., Arnesh Kumar vs State of Bihar, Rajesh Chaddha vs State of UP) with 2-line summaries."
-            "5. **ARGUMENTS PANEL**: In the ---ARGUMENTS--- section, list 5 unique winning strategies for this case."
-            "6. **STRATEGY & METER**: In the ---STRATEGY--- section, provide:"
-            "   - WIN_PROBABILITY: [A numeric score out of 100]"
-            "   - OPPONENT_ATTACK: [Predict 3 defense points from the other side]"
-            "   - REBUTTAL: [How to counter those 3 points]"
-            "7. **AFFIDAVIT**: In the ---AFFIDAVIT--- section, draft a formal 1-page Affidavit for the applicant."
-            "8. **BOLDING**: Always bold Names, Dates, Section Numbers, and Case Citations."
-            "\n\nOUTPUT MARKERS (STRICTLY USE THESE):"
+            "You are a Senior Advocate at the Supreme Court of India. Draft an EXHAUSTIVE court bundle. "
+            f"DOCUMENT TYPE: {final_doc_type}. LANGUAGE: {lang}."
+            "\n\nSTRICT INSTRUCTIONS:"
+            "1. NO BAIL CASES FOR CIVIL/DIVORCE: If this is a Divorce/Civil case, strictly avoid criminal citations like Arnesh Kumar. "
+            "2. JUDGMENTS: Provide 3-4 REAL Landmark Judgments from the Supreme Court or High Courts specific to this case type."
+            "3. SYNOPSIS: A detailed 2-page chronological narrative is mandatory."
+            "4. GROUNDS: At least 15 grounds starting with '**THAT...**'. Each ~200 words."
+            "\n\nOUTPUT MARKERS (DO NOT MISS THESE):"
             "\n---DRAFT---"
             "\n---AFFIDAVIT---"
             "\n---JUDGMENTS---"
@@ -60,35 +59,46 @@ def research_and_draft(facts, doc_type="Bail Application", lang="English"):
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
-            ("human", "FACTS: {facts}\n\nLEGAL CONTEXT: {context}"),
+            ("human", "FACTS: {facts}\n\nDATABASE CONTEXT: {context}"),
         ])
 
         chain = prompt | llm | StrOutputParser()
         full_res = chain.invoke({"facts": facts, "context": context_text})
 
-        # --- IMPROVED SPLITTING LOGIC (No logic change, just more markers) ---
-        try:
-            draft = full_res.split("---DRAFT---")[1].split("---AFFIDAVIT---")[0].strip()
-            affidavit = full_res.split("---AFFIDAVIT---")[1].split("---JUDGMENTS---")[0].strip()
-            judgments = full_res.split("---JUDGMENTS---")[1].split("---ARGUMENTS---")[0].strip()
-            arguments = full_res.split("---ARGUMENTS---")[1].split("---STRATEGY---")[0].strip()
-            strategy = full_res.split("---STRATEGY---")[1].split("---TIMELINE---")[0].strip()
-            timeline = full_res.split("---TIMELINE---")[1].strip()
-            
-            # Logic check for AI laziness (Same as your original)
-            if len(judgments) < 10: judgments = "Analyzing specific case laws for these facts..."
-            if len(arguments) < 10: arguments = "Preparing winning arguments based on grounds..."
-            
-            # Returning ALL 6 elements now
-            return draft, judgments, arguments, timeline, affidavit, strategy
-        except:
-            return full_res, "Landmark Judgments loading...", "Winning Arguments loading...", "Timeline loading...", "Affidavit loading...", "Strategy loading..."
+        # 4. STEP: PRECISION SPLITTING LOGIC (Clean layout fix)
+        def get_section(text, start_marker, end_marker):
+            try:
+                pattern = f"{start_marker}(.*?){end_marker}"
+                match = re.search(pattern, text, re.DOTALL)
+                return match.group(1).strip() if match else ""
+            except: return ""
+
+        # Last section handling
+        def get_last_section(text, start_marker):
+            try:
+                return text.split(start_marker)[-1].strip()
+            except: return ""
+
+        draft = get_section(full_res, "---DRAFT---", "---AFFIDAVIT---")
+        affidavit = get_section(full_res, "---AFFIDAVIT---", "---JUDGMENTS---")
+        judgments = get_section(full_res, "---JUDGMENTS---", "---ARGUMENTS---")
+        arguments = get_section(full_res, "---ARGUMENTS---", "---STRATEGY---")
+        strategy = get_section(full_res, "---STRATEGY---", "---TIMELINE---")
+        timeline = get_last_section(full_res, "---TIMELINE---")
+
+        # Layout Safety Check: Agar split fail hua toh full_res ko draft mein daalo
+        if not draft:
+            draft = full_res
+
+        return draft, judgments, arguments, timeline, affidavit, strategy
 
     except Exception as e:
         return f"Drafting Error: {str(e)}", "N/A", "N/A", "N/A", "N/A", "N/A"
+    # services/draft_service.py ke andar ye add karein
 
 def ask_legal_ai(query):
     try:
+        # GPT-4o use kar rahe hain legal queries ke liye
         llm = ChatOpenAI(model_name="gpt-4o", temperature=0.5)
         response = llm.invoke(query)
         return response.content

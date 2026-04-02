@@ -180,47 +180,52 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   const handleGenerateDraft = async () => {
     if (!caseFacts.trim()) return alert("Please enter facts.");
     setLocalIsGenerating(true);
+
     try {
       const response = await fetch(getApiUrl("/api/generate-legal-draft"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           facts: caseFacts,
           language: language,
-          documentType: "Bail Application"
+          documentType: null // Backend khud detect karega accuracy ke liye
         }),
       });
 
       const data = await response.json();
-      
-      if (data.success) {
-        setRawDraft(data.draft); 
-        const strategyText = data.strategy || "";
-        const winMatch = strategyText.match(/(\d+)/); 
-        const winProb = winMatch ? Math.min(Math.max(parseInt(winMatch[0]), 30), 98) : 75;
 
+      // Backend se 6 variables aayenge: [draft, judgments, arguments, timeline, affidavit, strategy]
+      if (data && Array.isArray(data)) {
+        const [draft, judgments, argumentsText, timeline, affidavit, strategy] = data;
+
+        // 1. Sirf Main Petition ko draft area mein set karein
+        setRawDraft(draft);
+
+        // 2. Right Side Panel (Intelligence) ka data set karein
         setIntelligence({
-          judgments: data.judgments || "No judgments found.",
-          arguments: data.arguments || "No arguments generated.",
-          timeline: data.timeline || "Timeline not available.",
+          judgments: judgments || "No specific cases found.",
+          arguments: argumentsText || "Preparing strategy...",
+          timeline: timeline || "Timeline not available.",
           strategy: {
-            win_probability: winProb,
-            opponent_args: strategyText.split(/OPPONENT_ATTACK:|OPPONENT_ARGUMENTS:/i)[1]?.split(/REBUTTAL:|---/i)[0]?.trim() || strategyText
+            win_probability: parseInt(strategy?.match(/\d+/)?.[0]) || 75,
+            opponent_args: strategy || "Analyzing defense..."
           }
         });
-        setStep(3); 
+
+        // 3. Affidavit ko draft ke niche append karein (Legal Bundle format)
+        setRawDraft(prev => prev + "\n\n---\n\n" + affidavit);
+
+        setStep(3);
       } else {
-        alert("Drafting failed: " + (data.error || "Unknown Error"));
+        alert("Response format error from backend.");
       }
     } catch (error) {
-      alert("Backend offline or connection timeout!");
+      console.error("Drafting Error:", error);
+      alert("Backend connection failed!");
     } finally {
       setLocalIsGenerating(false);
     }
   };
-
   const handleChatSubmit = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
