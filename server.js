@@ -33,7 +33,6 @@ import paymentsRoute from "./routes/payments.js";
 import csvUploadRoute from "./routes/csvUploadRoute.js";
 import pdfRoutes from "./routes/pdf.js";
 import audioRoutes from "./routes/audio.js";
-import legalRoutes from "./routes/legal.js";
 import legalAiRoute from './routes/legalaidraft.js';
 
 const app = express();
