@@ -1,4 +1,4 @@
- // Ye line sabse upar honi chahiye
+ji // Ye line sabse upar honi chahiye
 console.log("Current DB URI:", process.env.MONGO_URI);
 import express from "express";
 import dotenv from "dotenv";
@@ -69,18 +69,19 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
-app.use(
+// ----------------------
+// CORS SETUP
+// ----------------------
 app.use(cors({
   origin: '*',
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+// ----------------------
+// ROUTE MOUNTING
+// ----------------------
+
 
 // ----------------------
 // ROUTE MOUNTING
