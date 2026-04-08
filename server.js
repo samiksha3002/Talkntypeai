@@ -104,7 +104,7 @@ app.listen(PORT, () => {
 
 // ----------------------
 // CONFIGURATION
-// ----------------------
+// ---------------------
 dotenv.config();
 connectDB();
 
