@@ -1,4 +1,4 @@
-ji // Ye line sabse upar honi chahiye
+// Ye line sabse upar honi chahiye
 console.log("Current DB URI:", process.env.MONGO_URI);
 import express from "express";
 import dotenv from "dotenv";
