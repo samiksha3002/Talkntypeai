@@ -80,6 +80,7 @@ app.use("/api/csv-manager", csvUploadRoute);
 app.use('/api', legalRoutes);
 app.use("/api", pdfRoutes);
 app.use("/api/audio", audioRoutes);
+import legalRoutes from "./routes/legal.js";
 app.use('/api/legal-ai', legalAiRoute);
 
 // ----------------------
@@ -100,7 +101,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log("Current DB URI Status:", process.env.MONGO_URI ? "Connected" : "Missing URI");
 });
-import legalAiRoute from './routes/legalaidraft.js';
+
 // ----------------------
 // CONFIGURATION
 // ----------------------
