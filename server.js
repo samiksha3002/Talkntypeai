@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/db.js";
 
-// ROUTES
+// ROUTE IMPORTS
 import draftRouter from "./routes/draft.routes.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -34,6 +34,46 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(cors({
+  origin: '*',
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+
+app.get("/", (req, res) => res.send("TalkNType Server Running!"));
+
+app.use("/api", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/deepgram", deepgramRoutes);
+app.use("/api/cases", casesRoutes);
+app.use("/api/chattranslate", chatTranslateRoute);
+app.use("/api/chat", aiChatRoutes);
+app.use("/api/ocr", ocrRoutes);
+app.use("/api/expand", expandRoute);
+app.use("/api/fix-grammar", fixGrammarRoute);
+app.use("/api/font-convert", fontConvertRouter);
+app.use("/api/draft", draftRouter);
+app.use("/api/transliterate", transliterateFinalRoute);
+app.use("/api/clients", clientsRoutes);
+app.use("/api/inquiries", inquiriesRouter);
+app.use("/api/reports", reportsRoute);
+app.use("/api/team", teamRoute);
+app.use("/api/payments", paymentsRoute);
+app.use("/api/dictionary", dictionaryRoutes);
+app.use("/api/csv-manager", csvUploadRoute);
+app.use('/api', legalRoutes);
+app.use("/api", pdfRoutes);
+app.use("/api/audio", audioRoutes);
+app.use('/api/legal-ai', legalAiRoute);
+
+app.use((err, req, res, next) => {
+  res.status(500).json({ success: false, message: err.message });
+});
+
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
 app.use(cors({
   origin: '*',
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
