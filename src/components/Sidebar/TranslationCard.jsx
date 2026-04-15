@@ -10,10 +10,12 @@ const languageOptions = [
   { code: 'gu-IN', label: 'Gujarati (ગુજરાતી)' },
   { code: 'ta-IN', label: 'Tamil (தமிழ்)' },
   { code: 'te-IN', label: 'Telugu (తెలుగు)' },
-  { code: 'kn-IN', label: 'Kannada (कನ್ನಡ)' },
+  { code: 'kn-IN', label: 'Kannada (ಕನ್ನಡ)' },
   { code: 'ml-IN', label: 'Malayalam (മലയാളം)' },
   { code: 'pa-IN', label: 'Punjabi (ਪੰਜਾਬੀ)' },
   { code: 'bn-IN', label: 'Bengali (বাংলা)' },
+  { code: 'or-IN', label: 'Odia (ଓଡ଼ିଆ)' }, // ✅ Added Odia
+  { code: 'ur-PK', label: 'Urdu (اردو)' },    // ✅ Added Urdu
 ];
 
 const TranslationCard = ({ editorText, onTranslationComplete }) => {

@@ -3,6 +3,7 @@ import shutil
 import base64
 import fitz  # PyMuPDF
 import time
+import threading
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -17,29 +18,41 @@ class DocumentService:
         self.db_dir = "temp_db"
         self.llm_vision = ChatOpenAI(model_name="gpt-4o", temperature=0)
 
+    def _cleanup_task(self, folder_path, delay=3600):
+        """Background thread to delete the temp database after a delay"""
+        def run():
+            time.sleep(delay)
+            try:
+                if os.path.exists(folder_path):
+                    shutil.rmtree(folder_path)
+                    print(f"🧹 Cleanup Success: Deleted {folder_path}")
+            except Exception as e:
+                print(f"⚠️ Cleanup Failed: {e}")
+        
+        threading.Thread(target=run, daemon=True).start()
+
     def _perform_vision_ocr(self, file_path):
-        """Scanned PDF (Marathi/English) ko images se extract karna using GPT-4o Vision"""
+        """Scanned PDF (Marathi/English) extraction using GPT-4o Vision"""
         print(f"--- Starting High-Accuracy Vision OCR for: {file_path} ---")
         doc = fitz.open(file_path)
         ocr_docs = []
 
-        # Analyze first 10 pages for better context (Legal petitions are usually 5-10 pages)
-        for page_num in range(min(len(doc), 10)):
+        # Scanned documents ke liye first 20 pages scan karein
+        for page_num in range(min(len(doc), 20)):
             page = doc.load_page(page_num)
-            # Zoom 2.0x for clear text extraction
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) 
             img_bytes = pix.tobytes("png")
             base64_image = base64.b64encode(img_bytes).decode('utf-8')
 
-            # INSTRUCTION: Marathi context handle karne ke liye special prompt
             message = HumanMessage(
                 content=[
                     {
                         "type": "text", 
                         "text": """Extract all text from this Indian Legal Document. 
                         The document may be in Marathi or English. 
-                        Identify all dates (e.g. 14/02/2015), party names, and legal sections (e.g. 13(B)).
-                        Translate Marathi facts into English while maintaining accuracy."""
+                        Identify all dates (e.g. 14/02/2015), party names, and legal sections.
+                        Translate Marathi facts into English while maintaining accuracy, 
+                        but keep key terms like (Fariyadi, Panchnama, etc) in brackets."""
                     },
                     {
                         "type": "image_url",
@@ -61,14 +74,14 @@ class DocumentService:
         """Standard + Vision OCR Hybrid Processor"""
         current_timestamp = int(time.time())
 
-        # 1. Standard Extraction (Digital PDFs ke liye)
+        # 1. Standard Extraction
         loader = PyMuPDFLoader(file_path)
         data = loader.load()
         all_text = "".join([doc.page_content for doc in data]).strip()
         
-        # 2. Fallback to Vision OCR if scanned (Marathi Scanned Documents)
+        # 2. Fallback to Vision OCR if scanned
         if not all_text:
-            print("!!! Scanned/Handwritten Document Detected. Triggering Vision OCR !!!")
+            print("!!! Scanned Document Detected. Triggering Vision OCR !!!")
             data = self._perform_vision_ocr(file_path)
         
         if not data:
@@ -82,7 +95,7 @@ class DocumentService:
         )
         chunks = text_splitter.split_documents(data)
         
-        # 4. Save to ChromaDB (Windows WinError 32 Fix using Unique Collections)
+        # 4. Save to ChromaDB
         print(f"--- Syncing Vector Store: collection_{current_timestamp} ---")
         vector_db = Chroma.from_documents(
             documents=chunks,
@@ -90,33 +103,58 @@ class DocumentService:
             persist_directory=self.db_dir,
             collection_name=f"legal_hub_{current_timestamp}"
         )
+
+        # Cleanup trigger
+        self._cleanup_task(self.db_dir, delay=3600)
+
         return vector_db
 
     def get_timeline(self, vector_db):
-        """Timeline extractor optimized for Indian Dates (DD/MM/YYYY)"""
+        """Timeline extractor with Page References"""
         if vector_db is None:
             return "Analysis failed. Document unreadable."
 
-        # Similarity search for date-heavy segments
         docs = vector_db.similarity_search(
-            "Marriage date, separation date, filing date, court stamp date, chronology", 
-            k=12
+            "Marriage date, filing date, incidents, court orders, chronology", 
+            k=15 
         )
         
-        context = "\n\n".join([f"[Page {d.metadata.get('page')}]: {d.page_content}" for d in docs])
+        context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
         
-        llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
         prompt = f"""
-        Analyze the following legal document context (could be Marathi translated to English).
-        Prepare a precise CHRONOLOGY of events.
+        Analyze the legal context and prepare a precise CHRONOLOGY.
         
-        IMPORTANT: Look for '14/02/2015' (Marriage) and '02/01/2024' (Separation) in the text.
-        
-        FORMAT:
-        Date: [DD/MM/YYYY] | Event: [Short Description] | Ref: [Page No]
+        STRICT RULES:
+        1. Every event MUST have a Reference Page Number.
+        2. Keep legal terms like (Fariyadi, Panchnama, etc.) in brackets next to English terms.
+        3. Format: [DD/MM/YYYY] - Event Description - (Ref: Page X)
         
         CONTEXT:
         {context}
         """
+        return self.llm_vision.invoke(prompt).content
+
+    def ask_question(self, vector_db, query, history=[]):
+        """Multilingual Chat with Page Citations"""
+        if vector_db is None: return "No document loaded."
+
+        docs = vector_db.similarity_search(query, k=6)
+        context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
+
+        prompt = f"""
+        You are an expert Indian Legal Assistant. 
         
-        return llm.invoke(prompt).content
+        TASK:
+        1. Answer the question in the SAME LANGUAGE as the user's question. 
+        2. Use the provided context to answer.
+        3. Keep original legal terms in brackets.
+        4. ALWAYS mention the Page Number as 'Page X'.
+        
+        CONTEXT:
+        {context}
+        
+        USER QUESTION: {query}
+        """
+
+        response = self.llm_vision.invoke(prompt)
+        return response.content

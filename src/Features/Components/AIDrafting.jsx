@@ -296,8 +296,11 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-slate-100 px-6 py-4 rounded-2xl font-black text-sm outline-none">
               <option value="English">English</option>
               <option value="Marathi">Marathi</option>
+               <option value="Marathi">Hindi</option>
+                <option value="Marathi">Gujrati</option>
+               
             </select>
-            <button onClick={handleGenerateDraft} className="px-12 py-4 bg-indigo-600 text-white rounded-[20px] font-black shadow-xl shadow-indigo-100 transition-all transform active:scale-95">Generate 7-Page Draft</button>
+            <button onClick={handleGenerateDraft} className="px-12 py-4 bg-indigo-600 text-white rounded-[20px] font-black shadow-xl shadow-indigo-100 transition-all transform active:scale-95">Generate  Draft</button>
           </div>
         </div>
       </div>

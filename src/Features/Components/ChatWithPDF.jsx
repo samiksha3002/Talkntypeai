@@ -43,6 +43,19 @@ const ChatWithPDF = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // ==========================================
+  // CORE FUNCTIONS
+  // ==========================================
+
+  // ✅ FIX: Page Jump logic to scroll PDF iframe
+  const handlePageJump = (pageNum) => {
+    if (!previewUrl) return;
+    const baseUrl = previewUrl.split('#')[0];
+    const newUrl = `${baseUrl}#page=${pageNum}`;
+    setPreviewUrl(newUrl);
+    console.log("Navigating to page:", pageNum);
+  };
+
   const handleFileUpload = (e) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
@@ -58,7 +71,6 @@ const ChatWithPDF = () => {
     formData.append("file", uploadedFile);
 
     try {
-      // PYTHON Route for Document Analysis
       const response = await fetch(getApiUrl("/api/analyze-document"), {
         method: "POST",
         body: formData,
@@ -77,7 +89,7 @@ const ChatWithPDF = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !file) return;
+    if (!input.trim() || !file || isLoading) return;
 
     const userMsg = input;
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
@@ -85,27 +97,30 @@ const ChatWithPDF = () => {
     setIsLoading(true);
 
     try {
-        // PYTHON Route for Chat with PDF
-        const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                query: userMsg, 
-                context: timeline || "User has uploaded a document named " + file.name, 
-                history: messages 
-            }),
-        });
-        const data = await response.json();
-        setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+      const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          query: userMsg, 
+          context: timeline || "User has uploaded a document named " + file.name, 
+          history: messages.slice(-5) 
+        }),
+      });
+
+      if (!response.ok) throw new Error("Backend connection failed");
+
+      const data = await response.json();
+      setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
     } catch (err) {
-        setMessages((prev) => [...prev, { role: "ai", text: "Error connecting to Legal Brain." }]);
+      console.error("Chat error:", err);
+      setMessages((prev) => [...prev, { role: "ai", text: "Error connecting to Legal Brain. Please ensure backend is active." }]);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
       
       {/* LEFT: PROFESSIONAL PDF VIEWPORT */}
       <div className="w-1/2 flex flex-col bg-slate-900 border-r border-slate-700 relative">
@@ -186,7 +201,7 @@ const ChatWithPDF = () => {
             }`}
           >
             <Calendar size={18} /> Chronology
-            {timeline && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+            {timeline && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse ml-1" />}
           </button>
         </div>
 
@@ -194,7 +209,7 @@ const ChatWithPDF = () => {
           
           {/* TAB 1: CHAT INTERFACE */}
           <div className={`absolute inset-0 flex flex-col transition-transform duration-300 ${activeTab === "chat" ? "translate-x-0" : "translate-x-full"}`}>
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50 custom-scrollbar">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[85%] p-5 rounded-[24px] text-sm leading-relaxed shadow-sm ${
@@ -202,23 +217,41 @@ const ChatWithPDF = () => {
                     ? "bg-indigo-600 text-white rounded-tr-none" 
                     : "bg-white text-slate-800 border border-slate-100 rounded-tl-none"
                   }`}>
-                    {msg.text}
+                    <div className="whitespace-pre-wrap font-sans">{msg.text}</div>
+                    
                     {msg.role === "ai" && (
-                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-[10px] text-indigo-500 font-bold uppercase tracking-wider">
-                        <ListChecks size={12} /> Verified from Document
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <div className="flex items-center gap-2 text-[10px] text-indigo-500 font-bold uppercase tracking-wider mb-3">
+                          <ListChecks size={12} /> Verified Sources
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {(msg.text.match(/Page \d+/g) ? [...new Set(msg.text.match(/Page \d+/g))] : []).map((pageRef, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handlePageJump(pageRef.split(' ')[1])}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-[11px] font-bold transition-all border border-indigo-100 active:scale-95"
+                            >
+                              <FileText size={10} /> {pageRef.toUpperCase()}
+                            </button>
+                          ))}
+                          
+                          {!msg.text.match(/Page \d+/g) && (
+                            <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded italic">Full Document Context</span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
               ))}
+              
               {isLoading && (
                 <div className="flex justify-start animate-pulse">
-                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
-                    </div>
+                  <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]" />
                   </div>
                 </div>
               )}
@@ -227,25 +260,30 @@ const ChatWithPDF = () => {
 
             <div className="p-6 border-t bg-white">
               <form onSubmit={sendMessage} className="relative group">
+                {file && !isLoading && (
+                  <div className="absolute -top-4 left-6 px-2 py-0.5 bg-indigo-50 text-indigo-500 text-[9px] font-bold rounded border border-indigo-100 uppercase">
+                    Supports: EN • HI • MR
+                  </div>
+                )}
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={file ? "Type your legal query..." : "Upload document to start"}
+                  placeholder={!file ? "Please upload a document first..." : "Ask in English, हिंदी या मराठी..."}
                   disabled={!file || isLoading}
                   className="w-full bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white py-4 pl-6 pr-14 rounded-2xl text-sm transition-all outline-none"
                 />
                 <button 
-                  disabled={!file || isLoading}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-300 transition-all shadow-md shadow-indigo-200"
+                  disabled={!file || isLoading || !input.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-300 transition-all"
                 >
-                  <Send size={18} />
+                  {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 </button>
               </form>
             </div>
           </div>
 
-          {/* TAB 2: PROFESSIONAL TIMELINE VIEW */}
+          {/* TAB 2: CHRONOLOGY */}
           <div className={`absolute inset-0 p-8 overflow-y-auto bg-white transition-transform duration-300 ${activeTab === "timeline" ? "translate-x-0" : "-translate-x-full"}`}>
             {!timeline ? (
               <div className="h-full flex flex-col items-center justify-center opacity-40">
@@ -255,16 +293,16 @@ const ChatWithPDF = () => {
             ) : (
               <div className="space-y-8">
                 <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-xl font-bold text-slate-800">Case Chronology</h2>
-                    <button className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100">
-                        <Download size={14} /> EXPORT TO EDITOR
-                    </button>
+                  <h2 className="text-xl font-bold text-slate-800">Case Chronology</h2>
+                  <button className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all">
+                    <Download size={14} /> EXPORT TO EDITOR
+                  </button>
                 </div>
                 
                 <div className="border-l-2 border-indigo-100 ml-4 space-y-8">
                   <div className="relative pl-8">
                     <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white shadow-sm" />
-                    <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 hover:border-indigo-200 transition-all group">
+                    <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 hover:border-indigo-200 transition-all">
                       <p className="whitespace-pre-wrap text-sm leading-loose text-slate-700 font-medium">
                         {timeline}
                       </p>
