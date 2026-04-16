@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert, Download } from "lucide-react";
+import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert, Download ,FileText } from "lucide-react";
 
 // ==========================================
 // URL CONFIGURATION (NODE vs PYTHON)
@@ -63,6 +63,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [rightPanelWidth, setRightPanelWidth] = useState(350); 
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
+  const [file, setFile] = useState(null); // File ko store karne ke liye
 
   // Intelligence Panel Data (Updated for new features)
   const [intelligence, setIntelligence] = useState({
@@ -174,34 +175,64 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     }
   };
 
+  const onFileSelect = (e) => {
+    const uploadedFile = e.target.files[0];
+    if (uploadedFile) {
+      setFile(uploadedFile); // Isse state update hogi
+      setStep(2); // Isse typing area khulega
+    }
+  };
   // ==========================================
   // 3. GENERATION LOGIC
   // ==========================================
-  const handleGenerateDraft = async () => {
-    if (!caseFacts.trim()) return alert("Please enter facts.");
+ const handleGenerateDraft = async () => {
+    // Validation: Agar facts khali hain AUR koi file bhi nahi hai, toh alert dein
+    if (!caseFacts.trim() && !file) {
+      return alert("Please enter instructions or upload a PDF to proceed.");
+    }
+
     setLocalIsGenerating(true);
 
     try {
-      const response = await fetch(getApiUrl("/api/generate-legal-draft"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          facts: caseFacts,
-          language: language,
-          documentType: null // Backend khud detect karega accuracy ke liye
-        }),
-      });
+      let response;
+      
+      // CASE 1: Agar PDF upload kiya gaya hai
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file); // PDF file
+        formData.append("facts", caseFacts || "Generate draft from this document"); // User instruction
+        formData.append("language", language);
+        formData.append("documentType", null);
+
+        response = await fetch(getApiUrl("/api/generate-legal-draft"), {
+          method: "POST",
+          // Note: FormData bhejte waqt Content-Type header manually nahi dalna chahiye
+          body: formData, 
+        });
+      } 
+      // CASE 2: Agar sirf typing wala method use ho raha hai
+      else {
+        response = await fetch(getApiUrl("/api/generate-legal-draft"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            facts: caseFacts,
+            language: language,
+            documentType: null
+          }),
+        });
+      }
 
       const data = await response.json();
 
-      // Backend se 6 variables aayenge: [draft, judgments, arguments, timeline, affidavit, strategy]
+      // Backend response processing (keeping your original logic intact)
       if (data && Array.isArray(data)) {
         const [draft, judgments, argumentsText, timeline, affidavit, strategy] = data;
 
-        // 1. Sirf Main Petition ko draft area mein set karein
+        // 1. Set Main Petition
         setRawDraft(draft);
 
-        // 2. Right Side Panel (Intelligence) ka data set karein
+        // 2. Right Side Panel (Intelligence)
         setIntelligence({
           judgments: judgments || "No specific cases found.",
           arguments: argumentsText || "Preparing strategy...",
@@ -212,8 +243,8 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
           }
         });
 
-        // 3. Affidavit ko draft ke niche append karein (Legal Bundle format)
-        setRawDraft(prev => prev + "\n\n---\n\n" + affidavit);
+        // 3. Append Affidavit (Legal Bundle format)
+        setRawDraft(prev => prev + "\n\n---\n\n" + (affidavit || ""));
 
         setStep(3);
       } else {
@@ -221,11 +252,13 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       }
     } catch (error) {
       console.error("Drafting Error:", error);
-      alert("Backend connection failed!");
+      alert("Backend connection failed! Ensure your Python server is running.");
     } finally {
       setLocalIsGenerating(false);
     }
   };
+
+
   const handleChatSubmit = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -272,7 +305,14 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
           <div onClick={() => fileInputRef.current.click()} className="group border-2 border-dashed p-12 rounded-[40px] cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all duration-300">
             <div className="text-6xl mb-6 group-hover:scale-110 transition-transform">📤</div>
             <h3 className="font-black text-xl text-slate-800">Upload PDF</h3>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={() => setStep(2)} />
+           {/* Line 308 ko aise replace karein */}
+<input 
+  type="file" 
+  ref={fileInputRef} 
+  className="hidden" 
+  onChange={onFileSelect} 
+  accept=".pdf" 
+/>
           </div>
         </div>
       </div>
@@ -284,6 +324,22 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       {localIsGenerating && <SpinnerOverlay />}
       <div className="bg-white p-10 rounded-[40px] max-w-3xl w-full shadow-2xl">
         <h2 className="text-3xl font-black mb-8 flex items-center gap-3 text-slate-900"><Scale className="text-indigo-600" /> Case Facts</h2>
+        {/* Line 327 ke baad add karein */}
+{file && (
+  <div className="mb-4 flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-2xl animate-in fade-in slide-in-from-top duration-300">
+    <FileText className="text-emerald-600" size={18} />
+    <span className="text-[11px] font-bold text-emerald-700 truncate max-w-[200px]">
+      Attached: {file.name}
+    </span>
+    <button 
+      onClick={() => setFile(null)} 
+      className="ml-auto text-emerald-400 hover:text-emerald-600 p-1 transition-colors"
+      title="Remove file"
+    >
+      ✕
+    </button>
+  </div>
+)}
         <textarea 
             className="w-full h-72 p-8 bg-slate-50 border border-slate-200 rounded-[32px] outline-none focus:border-indigo-500 text-lg leading-relaxed text-slate-700" 
             value={caseFacts} 
@@ -296,8 +352,8 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-slate-100 px-6 py-4 rounded-2xl font-black text-sm outline-none">
               <option value="English">English</option>
               <option value="Marathi">Marathi</option>
-               <option value="Marathi">Hindi</option>
-                <option value="Marathi">Gujrati</option>
+              <option value="Hindi">Hindi</option>
+<option value="Gujarati">Gujarati</option>
                
             </select>
             <button onClick={handleGenerateDraft} className="px-12 py-4 bg-indigo-600 text-white rounded-[20px] font-black shadow-xl shadow-indigo-100 transition-all transform active:scale-95">Generate  Draft</button>

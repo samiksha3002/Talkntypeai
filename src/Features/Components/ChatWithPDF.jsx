@@ -145,31 +145,51 @@ const ChatWithPDF = () => {
           )}
         </div>
 
-        <div className="flex-1 overflow-auto bg-slate-900 flex justify-center p-4 custom-scrollbar">
-          {!file ? (
-            <div className="flex flex-col items-center justify-center text-slate-500 max-w-sm text-center">
-              <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mb-6 border border-slate-700">
-                <FileText size={40} className="text-slate-600" />
-              </div>
-              <h3 className="text-slate-200 font-bold text-lg mb-2">Ready to Analyze</h3>
-              <p className="text-sm opacity-60 mb-8">Upload FIRs, Judgments, or Petitions for instant AI chronology & chat.</p>
-              <button 
-                onClick={() => fileInputRef.current.click()}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20"
-              >
-                Choose PDF File
-              </button>
-              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".pdf" />
-            </div>
-          ) : (
-            <div 
-                className="transition-all duration-200 ease-in-out shadow-2xl" 
-                style={{ width: `${zoom}%`, minWidth: '100%' }}
-            >
-              <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full min-h-[85vh] rounded-sm" title="PDF Preview" />
-            </div>
-          )}
-        </div>
+       {/* PDF VIEWPORT (Safari & Mac Fixed) */}
+<div className="flex-1 overflow-auto bg-slate-900 flex justify-center p-4 custom-scrollbar">
+  {!file ? (
+    <div className="flex flex-col items-center justify-center text-slate-500 max-w-sm text-center">
+      <div className="w-20 h-20 bg-slate-800 rounded-3xl flex items-center justify-center mb-6 border border-slate-700">
+        <FileText size={40} className="text-slate-600" />
+      </div>
+      <h3 className="text-slate-200 font-bold text-lg mb-2">Ready to Analyze</h3>
+      <p className="text-sm opacity-60 mb-8">Upload FIRs, Judgments, or Petitions for instant AI chronology & chat.</p>
+      <button 
+        onClick={() => fileInputRef.current.click()}
+        className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20"
+      >
+        Choose PDF File
+      </button>
+      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".pdf" />
+    </div>
+  ) : (
+    <div 
+        className="transition-all duration-200 ease-in-out shadow-2xl bg-white" 
+        style={{ 
+          width: `${zoom}%`, 
+          minWidth: '100%',
+          height: '100%', // Safari fix
+          minHeight: '85vh', // Safari fix
+          WebkitOverflowScrolling: 'touch' // iPad scroll smooth fix
+        }}
+    >
+      {/* Object tag Safari/Mac ke liye zyada stable hai */}
+      <object
+        data={`${previewUrl}#toolbar=0&view=FitH`}
+        type="application/pdf"
+        className="w-full h-full min-h-[85vh] rounded-sm"
+      >
+        {/* Fallback agar object tag load na ho toh iframe chale */}
+        <iframe 
+          src={`${previewUrl}#toolbar=0`} 
+          className="w-full h-full min-h-[85vh]" 
+          title="PDF Preview"
+          style={{ border: 'none' }}
+        />
+      </object>
+    </div>
+  )}
+</div>
 
         {isAnalyzing && (
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50">

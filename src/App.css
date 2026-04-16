@@ -40,3 +40,15 @@
 .read-the-docs {
   color: #888;
 }
+/* Safari / Mac PDF Scroll Fix */
+object, embed, iframe {
+    display: block;
+    min-height: 85vh !important;
+    height: 100% !important;
+    width: 100% !important;
+}
+
+/* iPad touch scrolling */
+.custom-scrollbar {
+    -webkit-overflow-scrolling: touch !important;
+}
