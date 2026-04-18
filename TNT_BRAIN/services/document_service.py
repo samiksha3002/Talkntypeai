@@ -40,9 +40,12 @@ class DocumentService:
         ocr_docs = []
 
         # Scanned documents ke liye first 20 pages scan karein
+       # Scanned documents ke liye first 20 pages scan karein
         for page_num in range(min(len(doc), 20)):
             page = doc.load_page(page_num)
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) 
+            
+            # 🔥 FIX 1: Zoom level (2,2) se (1,1) kar diya taaki tokens kam use hon
+            pix = page.get_pixmap(matrix=fitz.Matrix(1, 1)) 
             img_bytes = pix.tobytes("png")
             base64_image = base64.b64encode(img_bytes).decode('utf-8')
 
@@ -70,8 +73,10 @@ class DocumentService:
             ))
             print(f"--- Page {page_num + 1} Processed ---")
             
+            # 🔥 FIX 2: API ko rate limit se bachane ke liye har page ke baad 2 second rukein
+            time.sleep(2) 
+            
         return ocr_docs
-
     def process_pdf(self, file_path):
         """Standard + Vision OCR Hybrid Processor"""
         current_timestamp = int(time.time())
