@@ -185,7 +185,10 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   // ==========================================
   // 3. GENERATION LOGIC
   // ==========================================
- const handleGenerateDraft = async () => {
+ // ==========================================
+  // 3. GENERATION LOGIC (FIXED)
+  // ==========================================
+  const handleGenerateDraft = async () => {
     // Validation: Agar facts khali hain AUR koi file bhi nahi hai, toh alert dein
     if (!caseFacts.trim() && !file) {
       return alert("Please enter instructions or upload a PDF to proceed.");
@@ -194,38 +197,28 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     setLocalIsGenerating(true);
 
     try {
-      let response;
+      // JSON ki jagah hamesha FormData banayenge kyunki backend Form() use kar raha hai
+      const formData = new FormData();
       
-      // CASE 1: Agar PDF upload kiya gaya hai
-      if (file) {
-        const formData = new FormData();
-        formData.append("file", file); // PDF file
-        formData.append("facts", caseFacts || "Generate draft from this document"); // User instruction
-        formData.append("language", language);
-        formData.append("documentType", null);
+      // Jo bhi data hai wo form mein add karo
+      formData.append("facts", caseFacts || "Generate detailed legal draft");
+      formData.append("language", language);
+      formData.append("documentType", "");
 
-        response = await fetch(getApiUrl("/api/generate-legal-draft"), {
-          method: "POST",
-          // Note: FormData bhejte waqt Content-Type header manually nahi dalna chahiye
-          body: formData, 
-        });
-      } 
-      // CASE 2: Agar sirf typing wala method use ho raha hai
-      else {
-        response = await fetch(getApiUrl("/api/generate-legal-draft"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            facts: caseFacts,
-            language: language,
-            documentType: null
-          }),
-        });
+      // Agar file hai, tabhi usko form mein add karo
+      if (file) {
+        formData.append("file", file);
       }
+
+      // Single API call for both cases (with or without file)
+      const response = await fetch(getApiUrl("/api/generate-legal-draft"), {
+        method: "POST",
+        body: formData, // Browser automatically Content-Type set kar dega
+      });
 
       const data = await response.json();
 
-      // Backend response processing (keeping your original logic intact)
+      // Backend response processing 
       if (data && Array.isArray(data)) {
         const [draft, judgments, argumentsText, timeline, affidavit, strategy] = data;
 
@@ -257,7 +250,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       setLocalIsGenerating(false);
     }
   };
-
 
   const handleChatSubmit = async (e) => {
     e.preventDefault();
