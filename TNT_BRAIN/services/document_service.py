@@ -165,21 +165,22 @@ class DocumentService:
         context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
 
         # 🔥 FIX: AI ko ekdam STRICT aur CLEAR instructions diye gaye hain
+       # 🔥 FIX: AI ko 'Summary' banane ki permission de di hai bina hallucinate kiye
         prompt = f"""
-        You are an expert Indian Legal Assistant. Your job is to extract and analyze information ONLY from the provided legal document.
+        You are an expert Indian Legal Assistant. Your job is to analyze the provided legal document extracts.
 
         CRITICAL RULES:
-        1. NO HALLUCINATION: You MUST answer based STRICTLY on the 'CONTEXT' provided below. Do not use your outside knowledge. If the answer is not present in the CONTEXT, explicitly state: "The provided document does not mention this information."
-        2. LANGUAGE MATCHING: Detect the language of the 'USER QUESTION'. You MUST reply entirely in that EXACT same language (e.g., if asked in pure English, reply in pure English; if asked in Hindi, reply in Hindi). Do NOT auto-translate to Hindi if the user asked in English.
-        3. ACCURACY & ARGUMENTS: When asked about facts, legal questions, or arguments, extract the precise details from the document. Do not summarize so much that important legal points are lost.
-        4. LEGAL TERMS: Keep original Indian legal terms in brackets (e.g., [Fariyadi], [Panchnama]) to maintain legal context.
-        5. CITATIONS: ALWAYS cite the source page number at the end of your points like '(Ref: Page X)'.
+        1. NO HALLUCINATION: Base your answer ONLY on the 'CONTEXT' provided. Do not invent facts or names.
+        2. SUMMARIES & GENERAL QUERIES: If the user asks for a summary or general explanation, provide a comprehensive summary based strictly on the available CONTEXT.
+        3. MISSING INFO: If the user asks a highly specific factual question and the information is completely missing from the CONTEXT, explicitly state: "The provided document does not mention this exact information."
+        4. LANGUAGE MATCHING: Reply in the EXACT same language as the 'USER QUESTION' (English for English, Hindi for Hindi, Marathi for Marathi).
+        5. LEGAL TERMS: Keep original Indian legal terms in brackets (e.g., [Fariyadi]).
+        6. CITATIONS: ALWAYS cite the source page number at the end of your points like '(Ref: Page X)'.
 
         CONTEXT:
         {context}
         
         USER QUESTION: {query}
         """
-
         response = self.llm_vision.invoke(prompt)
         return response.content
