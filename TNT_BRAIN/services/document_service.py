@@ -13,10 +13,12 @@ from langchain_core.documents import Document
 
 class DocumentService:
     def __init__(self):
-        # OpenAI Embeddings setup
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.db_dir = "temp_db"
-        self.llm_vision = ChatOpenAI(model_name="gpt-4o", temperature=0)
+        
+        # 🔥 FIX 1: Heavy 'gpt-4o' ko hata kar blazing fast 'gpt-4o-mini' kar diya.
+        # Note: gpt-4o-mini bhi image padhne (Vision) mein master hai, par 10x fast aur sasta hai.
+        self.llm_vision = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
     def _cleanup_task(self, folder_path, delay=3600):
         """Background thread to delete the temp database after a delay"""
@@ -32,7 +34,7 @@ class DocumentService:
         threading.Thread(target=run, daemon=True).start()
 
     def _perform_vision_ocr(self, file_path):
-        """Scanned PDF (Marathi/English) extraction using GPT-4o Vision"""
+        """Scanned PDF (Marathi/English) extraction using GPT-4o-mini Vision"""
         print(f"--- Starting High-Accuracy Vision OCR for: {file_path} ---")
         doc = fitz.open(file_path)
         ocr_docs = []
@@ -87,10 +89,10 @@ class DocumentService:
         if not data:
             return None
 
-        # 3. Smart Chunking
+        # 🔥 FIX 2: Chunk size chhota kiya taaki AI jaldi padh sake
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
-            chunk_overlap=300,
+            chunk_size=1000,   # Pehle 1500 tha
+            chunk_overlap=200, # Pehle 300 tha
             separators=["\n\n", "\n", ".", " "]
         )
         chunks = text_splitter.split_documents(data)
@@ -114,9 +116,10 @@ class DocumentService:
         if vector_db is None:
             return "Analysis failed. Document unreadable."
 
+        # 🔥 FIX 3: k=15 ki jagah k=5 kiya. Ab AI ko unnecessary text nahi padhna padega.
         docs = vector_db.similarity_search(
             "Marriage date, filing date, incidents, court orders, chronology", 
-            k=15 
+            k=5 
         )
         
         context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
@@ -138,7 +141,8 @@ class DocumentService:
         """Multilingual Chat with Page Citations"""
         if vector_db is None: return "No document loaded."
 
-        docs = vector_db.similarity_search(query, k=6)
+        # 🔥 FIX 4: k=6 ki jagah k=3 kiya. 
+        docs = vector_db.similarity_search(query, k=3)
         context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
 
         prompt = f"""
