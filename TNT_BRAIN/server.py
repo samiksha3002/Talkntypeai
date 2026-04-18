@@ -87,27 +87,24 @@ async def analyze_doc(file: UploadFile = File(...)):
 # ==========================================
 # 2. CHAT WITH PDF (RAG Logic)
 # ==========================================
+# ==========================================
+# 2. CHAT WITH PDF (RAG Logic)
+# ==========================================
 @app.post("/api/chat-with-pdf")
 async def chat_with_pdf(request: ChatRequest):
     try:
-        files = [f for f in os.listdir("uploads") if f.endswith('.pdf')]
-        if not files:
-            return {"answer": "No document found. Please upload a PDF first."}
-        
-        latest_file = os.path.join("uploads", files[-1])
-        vector_db = doc_service.process_pdf(latest_file)
-        
-        if vector_db is None:
-            return {"answer": "I'm sorry, this PDF is a scanned image and I cannot read its text yet."}
+        # 🔥 FIX 3: Baar-baar process_pdf call nahi karna hai!
+        # Hum seedha saved memory (active_db) use karenge.
+        if doc_service.active_db is None:
+            return {"answer": "Error: Document is not loaded. Please upload and analyze the PDF again."}
 
-        # Optimized search and multi-language response
-        answer = doc_service.ask_question(vector_db, request.query, request.history)
+        # Optimized search 
+        answer = doc_service.ask_question(doc_service.active_db, request.query, request.history)
         return {"answer": answer}
         
     except Exception as e:
         print(f"Chat System Error: {e}")
         return {"answer": f"System Error: {str(e)}"}
-
 # ==========================================
 # 3. DRAFT GENERATION
 # ==========================================

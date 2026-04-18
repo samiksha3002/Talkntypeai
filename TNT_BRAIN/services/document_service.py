@@ -15,11 +15,10 @@ class DocumentService:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.db_dir = "temp_db"
-        
-        # 🔥 FIX 1: Heavy 'gpt-4o' ko hata kar blazing fast 'gpt-4o-mini' kar diya.
-        # Note: gpt-4o-mini bhi image padhne (Vision) mein master hai, par 10x fast aur sasta hai.
         self.llm_vision = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
-
+        
+        # 🔥 FIX 1: Database ko yaad rakhne ke liye memory banayi
+        self.active_db = None
     def _cleanup_task(self, folder_path, delay=3600):
         """Background thread to delete the temp database after a delay"""
         def run():
@@ -103,7 +102,7 @@ class DocumentService:
         chunks = text_splitter.split_documents(data)
         
         # 4. Save to ChromaDB
-        print(f"--- Syncing Vector Store: collection_{current_timestamp} ---")
+      # 4. Save to ChromaDB
         vector_db = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
@@ -111,6 +110,13 @@ class DocumentService:
             collection_name=f"legal_hub_{current_timestamp}"
         )
 
+        # Cleanup trigger
+        self._cleanup_task(self.db_dir, delay=3600)
+
+        # 🔥 FIX 2: Naye database ko memory mein save kar liya
+        self.active_db = vector_db 
+
+        return vector_db
         # Cleanup trigger
         self._cleanup_task(self.db_dir, delay=3600)
 
