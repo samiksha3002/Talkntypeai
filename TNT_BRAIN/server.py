@@ -93,13 +93,15 @@ async def analyze_doc(file: UploadFile = File(...)):
 @app.post("/api/chat-with-pdf")
 async def chat_with_pdf(request: ChatRequest):
     try:
-        # 🔥 FIX 3: Baar-baar process_pdf call nahi karna hai!
-        # Hum seedha saved memory (active_db) use karenge.
-        if doc_service.active_db is None:
+        # 🔥 FIX: Har message par PDF dubara nahi padhna hai!
+        # Render ke multiple workers hone par hard drive/memory se seedha data load karega
+        vector_db = doc_service.get_active_db()
+        
+        if vector_db is None:
             return {"answer": "Error: Document is not loaded. Please upload and analyze the PDF again."}
 
         # Optimized search 
-        answer = doc_service.ask_question(doc_service.active_db, request.query, request.history)
+        answer = doc_service.ask_question(vector_db, request.query, request.history)
         return {"answer": answer}
         
     except Exception as e:

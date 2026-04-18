@@ -17,8 +17,9 @@ class DocumentService:
         self.db_dir = "temp_db"
         self.llm_vision = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
         
-        # 🔥 FIX 1: Database ko yaad rakhne ke liye memory banayi
+        # Memory variable
         self.active_db = None
+
     def _cleanup_task(self, folder_path, delay=3600):
         """Background thread to delete the temp database after a delay"""
         def run():
@@ -39,11 +40,10 @@ class DocumentService:
         ocr_docs = []
 
         # Scanned documents ke liye first 20 pages scan karein
-       # Scanned documents ke liye first 20 pages scan karein
         for page_num in range(min(len(doc), 20)):
             page = doc.load_page(page_num)
             
-            # 🔥 FIX 1: Zoom level (2,2) se (1,1) kar diya taaki tokens kam use hon
+            # Zoom level 1:1 taaki tokens kam use hon
             pix = page.get_pixmap(matrix=fitz.Matrix(1, 1)) 
             img_bytes = pix.tobytes("png")
             base64_image = base64.b64encode(img_bytes).decode('utf-8')
@@ -72,14 +72,13 @@ class DocumentService:
             ))
             print(f"--- Page {page_num + 1} Processed ---")
             
-            # 🔥 FIX 2: API ko rate limit se bachane ke liye har page ke baad 2 second rukein
+            # Rate limit se bachane ke liye har page ke baad 2 second rukein
             time.sleep(2) 
             
         return ocr_docs
+
     def process_pdf(self, file_path):
         """Standard + Vision OCR Hybrid Processor"""
-        current_timestamp = int(time.time())
-
         # 1. Standard Extraction
         loader = PyMuPDFLoader(file_path)
         data = loader.load()
@@ -93,41 +92,51 @@ class DocumentService:
         if not data:
             return None
 
-        # 🔥 FIX 2: Chunk size chhota kiya taaki AI jaldi padh sake
+        # 3. Smart Chunking (Optimized for speed)
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,   # Pehle 1500 tha
-            chunk_overlap=200, # Pehle 300 tha
+            chunk_size=1000,   
+            chunk_overlap=200, 
             separators=["\n\n", "\n", ".", " "]
         )
         chunks = text_splitter.split_documents(data)
         
-        # 4. Save to ChromaDB
-      # 4. Save to ChromaDB
+        # 4. Save to ChromaDB (Fixed collection name for multi-worker support)
         vector_db = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
             persist_directory=self.db_dir,
-            collection_name=f"legal_hub_{current_timestamp}"
+            collection_name="current_legal_doc" # Fixed name, NO Timestamp
         )
 
-        # Cleanup trigger
-        self._cleanup_task(self.db_dir, delay=3600)
-
-        # 🔥 FIX 2: Naye database ko memory mein save kar liya
+        # Active DB set kiya aur cleanup trigger kiya
         self.active_db = vector_db 
-
-        return vector_db
-        # Cleanup trigger
         self._cleanup_task(self.db_dir, delay=3600)
 
         return vector_db
+
+    def get_active_db(self):
+        """Agar RAM mein DB nahi hai, toh Hard Drive se load karo (Multi-Worker Fix)"""
+        # Agar current worker ki memory mein hai, toh direct bhej do
+        if self.active_db is not None:
+            return self.active_db
+        
+        # Agar doosre worker ne banaya tha, toh folder se utha lo
+        if os.path.exists(self.db_dir):
+            print("🔄 Loading DB from Disk for new Worker...")
+            self.active_db = Chroma(
+                persist_directory=self.db_dir, 
+                embedding_function=self.embeddings,
+                collection_name="current_legal_doc" # Wahi fixed name yahan use hoga
+            )
+            return self.active_db
+            
+        return None
 
     def get_timeline(self, vector_db):
         """Timeline extractor with Page References"""
         if vector_db is None:
             return "Analysis failed. Document unreadable."
 
-        # 🔥 FIX 3: k=15 ki jagah k=5 kiya. Ab AI ko unnecessary text nahi padhna padega.
         docs = vector_db.similarity_search(
             "Marriage date, filing date, incidents, court orders, chronology", 
             k=5 
@@ -152,7 +161,6 @@ class DocumentService:
         """Multilingual Chat with Page Citations"""
         if vector_db is None: return "No document loaded."
 
-        # 🔥 FIX 4: k=6 ki jagah k=3 kiya. 
         docs = vector_db.similarity_search(query, k=3)
         context = "\n\n".join([f"[PAGE {d.metadata.get('page')}]: {d.page_content}" for d in docs])
 
