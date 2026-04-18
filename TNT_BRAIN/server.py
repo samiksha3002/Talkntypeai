@@ -30,7 +30,12 @@ if not os.path.exists("uploads"):
 # ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    # "*" hata kar apne frontend ke exact URLs daalein
+    allow_origins=[
+        "https://talkntype.pro",     # Aapki live website
+        "http://localhost:3000",     # Local React server
+        "http://localhost:5173",     # Local Vite server (agar aap Vite use karte hain)
+    ], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
