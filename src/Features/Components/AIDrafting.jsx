@@ -4,6 +4,9 @@ import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRigh
 // ==========================================
 // URL CONFIGURATION (NODE vs PYTHON)
 // ==========================================
+// Server ko jagane wala code (Wake up ping)
+
+
 const NODE_API_URL = "https://talkntypeai.onrender.com"; 
 const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
 
@@ -21,20 +24,7 @@ const getApiUrl = (endpoint) => {
   }
   return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
 };
-// Server ko jagane wala code (Wake up ping)
-  useEffect(() => {
-    const wakeUpServer = async () => {
-      try {
-        // Chupchap background me ek empty request bhejo
-        await fetch("https://talkntype-ai-python.onrender.com/", { method: "HEAD" });
-        console.log("Server is awake and ready!");
-      } catch (e) {
-        console.log("Waking up server in background...");
-      }
-    };
-    
-    wakeUpServer();
-  }, []); // Ye sirf component load hone par 1 baar chalega
+
 
 // ==========================================
 // FEATURE 4: BEAUTIFIED EMERALD CASE METER
@@ -65,6 +55,20 @@ const CaseMeter = ({ score }) => {
 };
 
 const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
+   useEffect(() => {
+    const wakeUpServer = async () => {
+      try {
+        // Chupchap background me ek empty request bhejo
+        await fetch("https://talkntype-ai-python.onrender.com/", { method: "HEAD" });
+        console.log("Server is awake and ready!");
+      } catch (e) {
+        console.log("Waking up server in background...");
+      }
+    };
+    
+    wakeUpServer();
+  }, []); // Ye sirf component load hone par 1 baar chalega
+
   const [step, setStep] = useState(1);
   const [caseFacts, setCaseFacts] = useState("");
   const [language, setLanguage] = useState("English");
