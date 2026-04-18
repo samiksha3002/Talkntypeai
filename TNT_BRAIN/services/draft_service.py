@@ -40,15 +40,20 @@ def research_and_draft(facts, doc_type=None, lang="English"):
         # 3. STEP: MASTER DRAFTING (Strictly Instruction based)
         llm = ChatOpenAI(model_name="gpt-4o", temperature=0.4) 
 
+        # 🔥 FIX: Added CRITICAL FORMATTING BOUNDARIES to stop content mixing
         system_prompt = (
             "You are a Senior Advocate at the Supreme Court of India. Draft an EXHAUSTIVE court bundle. "
             f"DOCUMENT TYPE: {final_doc_type}. LANGUAGE: {lang}."
-            "\n\nSTRICT INSTRUCTIONS:"
-            "1. NO BAIL CASES FOR CIVIL/DIVORCE: If this is a Divorce/Civil case, strictly avoid criminal citations like Arnesh Kumar. "
-            "2. JUDGMENTS: Provide 3-4 REAL Landmark Judgments from the Supreme Court or High Courts specific to this case type."
-            "3. SYNOPSIS: A detailed 2-page chronological narrative is mandatory."
-            "4. GROUNDS: At least 15 grounds starting with '**THAT...**'. Each ~200 words."
-            "\n\nOUTPUT MARKERS (DO NOT MISS THESE):"
+            "\n\nCRITICAL FORMATTING BOUNDARIES (DO NOT VIOLATE):"
+            "\n1. The ---DRAFT--- section MUST ONLY contain the formal court petition (Heading, Facts, Grounds, Prayer)."
+            "\n2. DO NOT include Landmark Judgments, Case Timeline, Strategy, or Arguments INSIDE the ---DRAFT--- section."
+            "\n3. Keep Judgments, Timeline, and Strategy strictly contained within their designated output markers below."
+            "\n\nCASE INSTRUCTIONS:"
+            "\n1. NO BAIL CASES FOR CIVIL/DIVORCE: If this is a Divorce/Civil case, strictly avoid criminal citations like Arnesh Kumar. "
+            "\n2. JUDGMENTS: Provide 3-4 REAL Landmark Judgments from the Supreme Court or High Courts specific to this case type."
+            "\n3. SYNOPSIS: A detailed chronological narrative is mandatory."
+            "\n4. GROUNDS: At least 15 grounds starting with '**THAT...**'. Each ~200 words."
+            "\n\nOUTPUT MARKERS (DO NOT MISS THESE OR MIX CONTENT):"
             "\n---DRAFT---"
             "\n---AFFIDAVIT---"
             "\n---JUDGMENTS---"
@@ -94,7 +99,6 @@ def research_and_draft(facts, doc_type=None, lang="English"):
 
     except Exception as e:
         return f"Drafting Error: {str(e)}", "N/A", "N/A", "N/A", "N/A", "N/A"
-    # services/draft_service.py ke andar ye add karein
 
 def ask_legal_ai(query):
     try:

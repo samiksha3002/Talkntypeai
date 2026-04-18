@@ -21,6 +21,20 @@ const getApiUrl = (endpoint) => {
   }
   return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
 };
+// Server ko jagane wala code (Wake up ping)
+  useEffect(() => {
+    const wakeUpServer = async () => {
+      try {
+        // Chupchap background me ek empty request bhejo
+        await fetch("https://talkntype-ai-python.onrender.com/", { method: "HEAD" });
+        console.log("Server is awake and ready!");
+      } catch (e) {
+        console.log("Waking up server in background...");
+      }
+    };
+    
+    wakeUpServer();
+  }, []); // Ye sirf component load hone par 1 baar chalega
 
 // ==========================================
 // FEATURE 4: BEAUTIFIED EMERALD CASE METER
@@ -400,12 +414,12 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         <div className="flex-1 bg-slate-200/50 overflow-y-auto p-12 relative custom-scrollbar" onMouseUp={handleTextSelection}>
           {selectedText && (
             <div className="fixed bg-white shadow-2xl rounded-2xl border border-slate-100 p-1.5 flex gap-1.5 z-[200] animate-in fade-in zoom-in duration-200" style={{ left: menuPos.x, top: menuPos.top }}>
-              <button onClick={() => applyAICommand("Expand Ground")} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
-                <Maximize2 size={14} /> Expand
-              </button>
-              <button onClick={() => applyAICommand("Make Professional")} className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
-                <Scale size={14} /> Legalize
-              </button>
+              <button onMouseDown={(e) => { e.preventDefault(); applyAICommand("Expand Ground"); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+  <Maximize2 size={14} /> Expand
+</button>
+             <button onMouseDown={(e) => { e.preventDefault(); applyAICommand("Make Professional"); }} className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+  <Scale size={14} /> Legalize
+</button>
             </div>
           )}
           <div className="w-full max-w-[850px] mx-auto bg-white shadow-2xl min-h-[1200px] p-24 border border-slate-100 relative mb-20 ring-1 ring-slate-200">
@@ -453,11 +467,13 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             <div className="text-slate-700 text-[12px] leading-relaxed italic">{renderFormattedDraft(intelligence.arguments)}</div>
           </div>
 
-          <div className="p-6 rounded-3xl border border-blue-100 bg-blue-50/30 mb-4">
+        <div className="p-6 rounded-3xl border border-blue-100 bg-blue-50/30 mb-4">
             <h4 className="font-black text-blue-800 text-[10px] mb-4 uppercase flex items-center gap-2"><Calendar size={14}/> Case Timeline</h4>
-            <div className="text-slate-700 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">{renderFormattedDraft(intelligence.timeline)}</div>
+            {/* FIX: text-left aur overflow-hidden add kiya hai taaki styling na bigde */}
+            <div className="text-slate-700 text-[11px] font-mono leading-relaxed whitespace-pre-wrap text-left break-words overflow-hidden">
+                {renderFormattedDraft(intelligence.timeline)}
+            </div>
           </div>
-          
           <div className="space-y-6">
             <div className="p-6 rounded-[32px] border border-rose-100 bg-rose-50/30 hover:bg-rose-50/50 transition-all shadow-sm">
               <div className="flex items-center gap-2 mb-4">
