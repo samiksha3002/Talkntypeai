@@ -201,7 +201,7 @@ const ChatWithPDF = () => {
         )}
       </div>
 
-      {/* RIGHT: SMART WORKSPACE */}
+   
       <div className="w-1/2 flex flex-col bg-white">
         
         {/* Modern Tabs Navigation */}
