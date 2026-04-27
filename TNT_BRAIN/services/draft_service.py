@@ -1,7 +1,6 @@
 import os
 import re
 from dotenv import load_dotenv
-
 import pydantic
 if not hasattr(pydantic, 'class_validators'):
     pydantic.class_validators = {}
@@ -10,240 +9,173 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from openai import OpenAI  # ✅ Direct OpenAI for streaming
 
 load_dotenv()
 CHROMA_PATH = "legal_db"
 
-# ✅ GLOBAL LLM OBJECTS - Memory bachane ke liye ek baar hi banenge
-llm_gatekeeper = ChatOpenAI(model_name="gpt-4o", temperature=0, max_tokens=500)
-llm_drafter = ChatOpenAI(model_name="gpt-4o", temperature=0.4, max_tokens=4096)
-llm_chat = ChatOpenAI(model_name="gpt-4o", temperature=0.5, max_tokens=1000)
+# ✅ Global objects
+client = OpenAI()  # Direct client for streaming
+llm_gatekeeper = ChatOpenAI(model_name="gpt-4o", temperature=0, max_tokens=200)
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-def research_and_draft(facts, doc_type=None, lang="English"):
+
+# ==========================================
+# STREAMING VERSION - Draft Generator
+# ==========================================
+def research_and_draft_stream(facts, doc_type=None, lang="English"):
+    """
+    Ye function ek GENERATOR hai.
+    Har token aate hi yield karta hai - frontend ko instantly milta hai.
+    """
     if not os.path.exists(CHROMA_PATH):
-        return ("Error: 'legal_db' folder missing.", "N/A", "N/A", "N/A", "N/A", "N/A")
+        yield "[ERROR] legal_db folder missing."
+        return
 
     try:
-        # ==========================================
-        # STEP 1: DETECT DOCUMENT TYPE
-        # ==========================================
-        identity_prompt = f"""Analyze these facts and return ONLY the formal Indian legal petition title needed.
-Examples: 'Bail Application u/s 439 CrPC', 'Divorce Petition u/s 13 HMA', 
+        # STEP 1: Detect document type
+        identity_prompt = f"""Analyze these facts and return ONLY the formal Indian legal petition title.
+Examples: 'Bail Application u/s 439 CrPC', 'Divorce Petition u/s 13 HMA',
 'Writ Petition (Criminal)', 'Consumer Complaint u/s 35 CP Act',
 'Anticipatory Bail u/s 438 CrPC', 'Maintenance Application u/s 125 CrPC',
-'Cheque Bounce Complaint u/s 138 NI Act', 'Injunction Application Order 39 CPC',
-'FIR Quashing Petition u/s 482 CrPC', 'Custody Petition u/s 26 HMA'
-Return ONLY the title, nothing else.
+'Cheque Bounce Complaint u/s 138 NI Act', 'FIR Quashing Petition u/s 482 CrPC'
+Return ONLY the title.
 Facts: {facts}"""
-        
         detected_type = llm_gatekeeper.invoke(identity_prompt).content.strip()
         final_doc_type = doc_type if doc_type else detected_type
 
-        # ==========================================
-        # STEP 2: LANGUAGE CONFIG
-        # ==========================================
+        # STEP 2: Language config
         lang_lower = lang.lower().strip()
-        
         if "hindi" in lang_lower:
             lang_instruction = "HINDI"
-            lang_detail = (
-                "सम्पूर्ण ड्राफ्ट हिंदी में लिखें। "
-                "न्यायालय की भाषा का प्रयोग करें। "
-                "माननीय न्यायालय, याचिकाकर्ता, प्रतिवादी जैसे शब्दों का प्रयोग करें। "
-                "सभी कानूनी धाराएं जैसे धारा 302, धारा 376 आदि हिंदी में लिखें।"
-            )
+            lang_detail = "सम्पूर्ण ड्राफ्ट हिंदी में लिखें। न्यायालय की भाषा का प्रयोग करें।"
         elif "marathi" in lang_lower:
             lang_instruction = "MARATHI"
-            lang_detail = (
-                "संपूर्ण मसुदा मराठी भाषेत लिहा. "
-                "न्यायालयीन भाषेचा वापर करा. "
-                "माननीय न्यायालय, अर्जदार, प्रतिवादी असे शब्द वापरा. "
-                "सर्व कायदेशीर कलमे जसे कलम 302, कलम 376 इत्यादी मराठीत लिहा."
-            )
+            lang_detail = "संपूर्ण मसुदा मराठी भाषेत लिहा. न्यायालयीन भाषेचा वापर करा."
         else:
             lang_instruction = "ENGLISH"
-            lang_detail = (
-                "Write entire draft in formal English legal language. "
-                "Use terms like Honorable Court, Petitioner, Respondent, Applicant. "
-                "All sections, acts, and citations in English."
-            )
+            lang_detail = "Write entire draft in formal English legal language."
 
-        # ==========================================
-        # STEP 3: VECTOR DB SEARCH
-        # ==========================================
+        # STEP 3: Vector DB search
         vector_db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
         retriever = vector_db.as_retriever(search_kwargs={"k": 12})
-        docs = retriever.invoke(f"{final_doc_type} grounds precedents law sections: {facts}")
+        docs = retriever.invoke(f"{final_doc_type} grounds precedents: {facts}")
         context_text = "\n\n".join([doc.page_content for doc in docs])
 
-        # ==========================================
-        # STEP 4: MASTER SYSTEM PROMPT
-        # ==========================================
-        system_prompt = f"""You are a Senior Advocate with 30+ years of experience at the Supreme Court of India and various High Courts.
-You specialize in drafting EXHAUSTIVE, LENGTHY, and LEGALLY IMPECCABLE court documents.
+        # STEP 4: System prompt (same as before - full quality)
+        system_prompt = f"""You are a Senior Advocate with 30+ years experience at Supreme Court of India.
+Draft an EXHAUSTIVE, LENGTHY, LEGALLY IMPECCABLE court document.
 
 DOCUMENT TYPE: {final_doc_type}
 OUTPUT LANGUAGE: {lang_instruction}
 LANGUAGE INSTRUCTIONS: {lang_detail}
 
-═══════════════════════════════════════
-CRITICAL LENGTH & QUALITY REQUIREMENTS:
-═══════════════════════════════════════
+REQUIREMENTS:
+1. DRAFT (2500-3500 words): Full heading, party details, Synopsis 3-pages, 
+   20+ fact paragraphs, 15-20 GROUNDS each starting THAT... with citations,
+   detailed Prayer clause (a)(b)(c)(d)
+2. AFFIDAVIT (800-1000 words): Complete verification, first person, jurat
+3. JUDGMENTS (600-800 words): 5-6 REAL landmark cases with ratio decidendi
+4. ARGUMENTS (1000-1200 words): 8-10 argument points, counter-arguments
+5. STRATEGY (500-600 words): Steps, evidence, witnesses, timeline
+6. TIMELINE (300-400 words): Date | Event | Legal Significance table
 
-1. DRAFT SECTION (Minimum 2500-3500 words):
-   - Full Court heading with case number placeholder
-   - Complete party details (Petitioner/Respondent/Applicant)
-   - Jurisdiction clause with relevant Article/Section
-   - SYNOPSIS: Detailed 3-page chronological narrative of ALL facts
-   - FACTS IN DETAIL: Numbered paragraphs (minimum 20 paragraphs), each 100-150 words
-   - GROUNDS: Minimum 15-20 grounds, each starting with "THAT..." (150-200 words each)
-     * Legal grounds with citations
-     * Constitutional grounds if applicable
-     * Factual grounds
-     * Grounds of urgency/irreparable loss
-   - PRAYER CLAUSE: Detailed prayer with (a)(b)(c)(d) sub-prayers
-   - Advocate signature block with Bar Council details
+DOCUMENT RULES:
+- BAIL: Article 21, personal liberty, no flight risk
+- DIVORCE: Only family law citations, irretrievable breakdown
+- CONSUMER: Deficiency of service, compensation calculation
+- CHEQUE BOUNCE: Statutory presumption u/s 139
+- WRIT: Fundamental rights, constitutional provisions
+- FIR QUASHING: Abuse of process, inherent powers u/s 482
 
-2. AFFIDAVIT SECTION (Minimum 800-1000 words):
-   - Complete verification affidavit
-   - All facts in first person deponent language
-   - Proper jurat and verification clause
-   - Witness and notary section
-
-3. JUDGMENTS SECTION (Minimum 600-800 words):
-   - 5-6 REAL landmark judgments specific to {final_doc_type}
-   - Format: Case Name v. Case Name (Year) Volume SCR/SCC Page
-   - Ratio decidendi of each judgment (2-3 lines)
-   - How it applies to current case
-   - Recent judgments (post 2015) preferred
-
-4. ARGUMENTS SECTION (Minimum 1000-1200 words):
-   - Point-wise oral arguments for hearing
-   - Opening statement
-   - 8-10 argument points with legal backing
-   - Anticipated counter-arguments and replies
-   - Closing submission
-
-5. STRATEGY SECTION (Minimum 500-600 words):
-   - Immediate steps to take
-   - Evidence to collect
-   - Witnesses to prepare
-   - Timeline for filing
-   - Risk assessment
-   - Alternative legal remedies
-
-6. TIMELINE SECTION (Minimum 300-400 words):
-   - Chronological table of all events
-   - Date | Event | Legal Significance format
-   - Include court dates if mentioned
-
-═══════════════════════════════════════
-DOCUMENT-TYPE SPECIFIC RULES:
-═══════════════════════════════════════
-- BAIL/ANTICIPATORY BAIL: Include personal liberty arguments, Article 21, no flight risk, custodial torture risk
-- DIVORCE/MATRIMONIAL: Only use family law citations (NO criminal bail cases), include irretrievable breakdown
-- CONSUMER: Include deficiency of service, unfair trade practice, compensation calculation
-- CHEQUE BOUNCE: Include statutory presumption u/s 139, legally enforceable debt
-- WRIT PETITION: Include fundamental rights violation, constitutional provisions, writ jurisdiction
-- CUSTODY: Include best interest of child doctrine, welfare principle
-- FIR QUASHING: Include abuse of process, inherent powers u/s 482 CrPC
-
-═══════════════════════════════════════
-MANDATORY OUTPUT FORMAT - USE EXACTLY:
-═══════════════════════════════════════
+MANDATORY FORMAT:
 ---DRAFT---
-[Complete petition/application - 2500-3500 words minimum]
+[complete petition]
 ---AFFIDAVIT---
-[Complete supporting affidavit - 800-1000 words]
+[complete affidavit]
 ---JUDGMENTS---
-[5-6 landmark cases with ratio - 600-800 words]
+[landmark cases]
 ---ARGUMENTS---
-[Detailed oral arguments - 1000-1200 words]
+[oral arguments]
 ---STRATEGY---
-[Case strategy and next steps - 500-600 words]
+[case strategy]
 ---TIMELINE---
-[Chronological events table - 300-400 words]"""
+[chronological table]"""
 
-        # ==========================================
-        # STEP 5: HUMAN PROMPT
-        # ==========================================
-        human_prompt = """CASE FACTS PROVIDED BY CLIENT:
-{facts}
+        # ✅ STEP 5: STREAMING API CALL
+        stream = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"FACTS: {facts}\n\nLAW DATABASE: {context_text}\n\nWrite in {lang_instruction} language."}
+            ],
+            max_tokens=4096,
+            temperature=0.4,
+            stream=True  # ✅ YE KEY HAI
+        )
 
-RELEVANT LAW DATABASE CONTEXT:
-{context}
-
-IMPORTANT REMINDERS:
-- Write in {lang} language throughout
-- Minimum word counts MUST be met for each section
-- Use REAL Indian case citations only
-- Every ground must cite a specific law section or article
-- Draft must be court-ready and professionally formatted"""
-
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", human_prompt),
-        ])
-
-        chain = prompt | llm_drafter | StrOutputParser()
-        full_res = chain.invoke({
-            "facts": facts,
-            "context": context_text,
-            "lang": lang_instruction
-        })
-
-        # ==========================================
-        # STEP 6: PRECISION SECTION SPLITTING
-        # ==========================================
-        def get_section(text, start_marker, end_marker):
-            try:
-                pattern = f"{re.escape(start_marker)}(.*?){re.escape(end_marker)}"
-                match = re.search(pattern, text, re.DOTALL)
-                return match.group(1).strip() if match else ""
-            except:
-                return ""
-
-        def get_last_section(text, start_marker):
-            try:
-                return text.split(start_marker)[-1].strip()
-            except:
-                return ""
-
-        draft     = get_section(full_res, "---DRAFT---",     "---AFFIDAVIT---")
-        affidavit = get_section(full_res, "---AFFIDAVIT---", "---JUDGMENTS---")
-        judgments = get_section(full_res, "---JUDGMENTS---", "---ARGUMENTS---")
-        arguments = get_section(full_res, "---ARGUMENTS---", "---STRATEGY---")
-        strategy  = get_section(full_res, "---STRATEGY---",  "---TIMELINE---")
-        timeline  = get_last_section(full_res, "---TIMELINE---")
-
-        # Safety fallback
-        if not draft:
-            draft = full_res
-
-        return draft, judgments, arguments, timeline, affidavit, strategy
+        # ✅ STEP 6: Token by token yield karo
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta  # Har token frontend ko bhejo
 
     except Exception as e:
-        return f"Drafting Error: {str(e)}", "N/A", "N/A", "N/A", "N/A", "N/A"
+        yield f"\n[DRAFTING ERROR]: {str(e)}"
 
 
 # ==========================================
-# LEGAL AI CHAT (General Queries)
+# NON-STREAMING (backward compat) - Chat
 # ==========================================
+def research_and_draft(facts, doc_type=None, lang="English"):
+    """Old non-streaming version - PDF draft ke liye use hoti hai"""
+    full_text = ""
+    for chunk in research_and_draft_stream(facts, doc_type, lang):
+        full_text += chunk
+
+    def get_section(text, start, end):
+        try:
+            match = re.search(f"{re.escape(start)}(.*?){re.escape(end)}", text, re.DOTALL)
+            return match.group(1).strip() if match else ""
+        except:
+            return ""
+
+    def get_last(text, start):
+        try:
+            return text.split(start)[-1].strip()
+        except:
+            return ""
+
+    draft     = get_section(full_text, "---DRAFT---",     "---AFFIDAVIT---")
+    affidavit = get_section(full_text, "---AFFIDAVIT---", "---JUDGMENTS---")
+    judgments = get_section(full_text, "---JUDGMENTS---", "---ARGUMENTS---")
+    arguments = get_section(full_text, "---ARGUMENTS---", "---STRATEGY---")
+    strategy  = get_section(full_text, "---STRATEGY---",  "---TIMELINE---")
+    timeline  = get_last(full_text, "---TIMELINE---")
+
+    if not draft:
+        draft = full_text
+
+    return draft, judgments, arguments, timeline, affidavit, strategy
+
+
 def ask_legal_ai(query):
     try:
-        system = """You are a Senior Legal Advisor specializing in Indian law.
-Answer legal queries with:
-- Relevant IPC/CrPC/CPC sections
-- Applicable case laws
-- Practical advice
-- Clear step-by-step guidance
-Be detailed but easy to understand."""
-        
-        response = llm_chat.invoke([
-            ("system", system),
-            ("human", query)
-        ])
-        return response.content
+        stream = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a Senior Legal Advisor specializing in Indian law. Answer with relevant sections, case laws, and practical guidance."},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=1000,
+            temperature=0.5,
+            stream=True
+        )
+        result = ""
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                result += delta
+        return result
     except Exception as e:
         return f"Legal Brain Error: {str(e)}"
