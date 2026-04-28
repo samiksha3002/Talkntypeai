@@ -126,36 +126,36 @@ Extract every word visible on this page:"""
     # PROCESS PDF - MAIN FUNCTION
     # ==========================================
     def process_pdf(self, file_path):
-        """PDF ko read karo, chunks banao, ChromaDB mein save karo"""
         try:
-            # STEP 1: Standard text extraction
             loader = PyMuPDFLoader(file_path)
             data = loader.load()
+        
+            # ✅ Har document ka text Unicode safe banao
+            for doc in data:
+                doc.page_content = doc.page_content.encode('utf-8', errors='replace').decode('utf-8')
+            
             all_text = "".join([doc.page_content for doc in data]).strip()
 
-            # STEP 2: Agar text nahi mila = scanned PDF, Vision OCR use karo
             if len(all_text) < 100:
-                print("⚠️ Scanned PDF detected - Starting Vision OCR...")
+                print("Scanned PDF - Vision OCR starting...")
                 data = self._perform_vision_ocr(file_path)
+                # ✅ OCR result bhi safe karo
+                for doc in data:
+                    doc.page_content = doc.page_content.encode('utf-8', errors='replace').decode('utf-8')
 
             if not data:
                 return None
 
-            # STEP 3: Smart chunking
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1500,    # ✅ Larger chunks = more context per answer
-                chunk_overlap=300,  # ✅ More overlap = no info lost at boundaries
-                separators=["\n\n", "\n", "।", ".", " "]  # ✅ Marathi full stop "।" added
+                chunk_size=1500,
+                chunk_overlap=300,
+                separators=["\n\n", "\n", "।", ".", " "]
             )
             chunks = text_splitter.split_documents(data)
-            print(f"✅ Total chunks created: {len(chunks)}")
 
-            # STEP 4: Old DB clear karo, naya banao
             if os.path.exists(self.db_dir):
                 shutil.rmtree(self.db_dir)
-                print("🗑️ Old DB cleared")
 
-            # STEP 5: ChromaDB mein save karo
             vector_db = Chroma.from_documents(
                 documents=chunks,
                 embedding=self.embeddings,
@@ -164,16 +164,14 @@ Extract every word visible on this page:"""
             )
 
             self.active_db = vector_db
-            self._cleanup_task(self.db_dir, delay=7200)  # 2 hours baad delete
-
+            self._cleanup_task(self.db_dir, delay=7200)
             gc.collect()
-            print(f"✅ PDF processed successfully: {len(chunks)} chunks saved")
             return vector_db
 
         except Exception as e:
-            print(f"❌ PDF Processing Error: {e}")
+            print(f"PDF Processing Error: {e}")
             return None
-
+    
     # ==========================================
     # GET ACTIVE DB
     # ==========================================

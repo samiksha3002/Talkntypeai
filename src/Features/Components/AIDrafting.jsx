@@ -1,5 +1,15 @@
+// ==========================================
+// PASTE THIS ENTIRE FILE — COMPLETE UPDATED AIDrafting COMPONENT
+// Replace your old AIDrafting.jsx with this file
+// ==========================================
+
 import React, { useState, useEffect, useRef } from "react";
-import { Maximize2, ListChecks, Sparkles, Wand2, Scale, ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert, Download, FileText } from "lucide-react";
+import {
+  Maximize2, ListChecks, Sparkles, Wand2, Scale,
+  ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert,
+  Download, FileText, Printer, Copy, Share2, Stamp,
+  CheckCircle2, FileDown, FileType2, ClipboardCopy, X
+} from "lucide-react";
 
 // ==========================================
 // URL CONFIGURATION (NODE vs PYTHON)
@@ -20,6 +30,244 @@ const getApiUrl = (endpoint) => {
     return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
   }
   return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
+};
+
+// ==========================================
+// DOWNLOAD UTILITIES
+// ==========================================
+
+// 1. Print / Save as PDF
+const handlePrint = () => window.print();
+
+// 2. Download as plain .txt (fallback if no docx library)
+const downloadTxt = (text, filename = "LexScript_Draft.txt") => {
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// 3. Download as .doc (RTF-wrapped HTML, opens in Word)
+const downloadWord = (htmlContent, filename = "LexScript_Draft.doc") => {
+  const header = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office'
+          xmlns:w='urn:schemas-microsoft-com:office:word'
+          xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset='utf-8'><title>Legal Draft</title>
+    <style>
+      @page { margin: 2cm; }
+      body { font-family: 'Times New Roman', serif; font-size: 14pt; line-height: 2; color: #000; }
+      b { font-weight: bold; }
+      p { margin: 0 0 12pt 0; text-align: justify; }
+    </style>
+    <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>
+    <w:Zoom>90</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
+    </head><body>`;
+  const footer = `</body></html>`;
+
+  // Convert plain text with **bold** markers to HTML
+  const formatted = htmlContent
+    .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+    .replace(/\n/g, "<br/>");
+
+  const blob = new Blob([header + formatted + footer], {
+    type: "application/msword",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// 4. Copy to clipboard
+const copyToClipboard = async (text, onSuccess) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    onSuccess?.();
+  } catch {
+    // Fallback
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    onSuccess?.();
+  }
+};
+
+// 5. Share (Web Share API or copy link)
+const shareDraft = async (text) => {
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Legal Draft – LexScript AI",
+        text: text.slice(0, 200) + "...",
+        url: window.location.href,
+      });
+    } catch { /* cancelled */ }
+  } else {
+    await navigator.clipboard.writeText(window.location.href);
+    alert("Link copied to clipboard!");
+  }
+};
+
+// ==========================================
+// TOAST NOTIFICATION (small, auto-dismiss)
+// ==========================================
+const Toast = ({ message, onClose }) => (
+  <div
+    style={{
+      position: "fixed",
+      bottom: "32px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 9999,
+      background: "#0f172a",
+      color: "#fff",
+      padding: "12px 24px",
+      borderRadius: "999px",
+      fontSize: "13px",
+      fontWeight: "700",
+      letterSpacing: "0.5px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      animation: "slideUp 0.3s ease",
+    }}
+  >
+    <CheckCircle2 size={16} color="#4ade80" />
+    {message}
+  </div>
+);
+
+// ==========================================
+// DOWNLOAD DROPDOWN MENU
+// ==========================================
+const DownloadMenu = ({ onClose, rawDraft, liveDraft }) => {
+  const actions = [
+    {
+      icon: <Printer size={16} />,
+      label: "Print / Save as PDF",
+      sub: "Opens browser print dialog",
+      color: "#6366f1",
+      bg: "#eef2ff",
+      action: () => { handlePrint(); onClose(); },
+    },
+    {
+      icon: <FileType2 size={16} />,
+      label: "Download as Word (.doc)",
+      sub: "Opens in Microsoft Word",
+      color: "#2563eb",
+      bg: "#eff6ff",
+      action: () => { downloadWord(rawDraft || liveDraft); onClose(); },
+    },
+    {
+      icon: <FileDown size={16} />,
+      label: "Download as Text (.txt)",
+      sub: "Plain text file",
+      color: "#0891b2",
+      bg: "#ecfeff",
+      action: () => { downloadTxt(rawDraft || liveDraft); onClose(); },
+    },
+  ];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "calc(100% + 8px)",
+        right: 0,
+        zIndex: 999,
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: "20px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        padding: "8px",
+        minWidth: "260px",
+        animation: "dropIn 0.2s ease",
+      }}
+    >
+      {actions.map((a, i) => (
+        <button
+          key={i}
+          onClick={a.action}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px 14px",
+            borderRadius: "14px",
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = a.bg}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+        >
+          <span style={{
+            width: "32px", height: "32px", borderRadius: "10px",
+            background: a.bg, display: "flex", alignItems: "center",
+            justifyContent: "center", color: a.color, flexShrink: 0,
+          }}>
+            {a.icon}
+          </span>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "800", color: "#0f172a", letterSpacing: "0.2px" }}>
+              {a.label}
+            </div>
+            <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "600", marginTop: "1px" }}>
+              {a.sub}
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// ==========================================
+// STAMP BADGE (Draft / Final / Confidential)
+// ==========================================
+const StampBadge = ({ status }) => {
+  if (!status) return null;
+  const config = {
+    DRAFT: { color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d" },
+    FINAL: { color: "#10b981", bg: "#f0fdf4", border: "#6ee7b7" },
+    CONFIDENTIAL: { color: "#ef4444", bg: "#fef2f2", border: "#fca5a5" },
+  };
+  const c = config[status] || config.DRAFT;
+  return (
+    <div style={{
+      position: "absolute",
+      top: "32px",
+      right: "32px",
+      border: `3px solid ${c.border}`,
+      color: c.color,
+      background: c.bg,
+      padding: "6px 18px",
+      borderRadius: "8px",
+      fontSize: "20px",
+      fontWeight: "900",
+      letterSpacing: "4px",
+      opacity: 0.6,
+      transform: "rotate(-15deg)",
+      pointerEvents: "none",
+      userSelect: "none",
+      fontFamily: "serif",
+    }}>
+      {status}
+    </div>
+  );
 };
 
 // ==========================================
@@ -78,24 +326,19 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   const [caseFacts, setCaseFacts] = useState("");
   const [language, setLanguage] = useState("English");
 
-  // Streaming states
   const [streamedText, setStreamedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Draft & live display states
   const [rawDraft, setRawDraft] = useState("");
   const [liveDraft, setLiveDraft] = useState("");
 
-  // File states
   const [file, setFile] = useState(null);
 
-  // Floating Menu & UI States
   const [selectedText, setSelectedText] = useState("");
   const [menuPos, setMenuPos] = useState({ x: 0, top: 0 });
   const [rightPanelWidth, setRightPanelWidth] = useState(350);
   const [localIsGenerating, setLocalIsGenerating] = useState(false);
 
-  // Intelligence Panel Data
   const [intelligence, setIntelligence] = useState({
     judgments: "Awaiting generation...",
     arguments: "Awaiting generation...",
@@ -103,10 +346,18 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     strategy: null,
   });
 
-  // Chat States
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+
+  // ===== NEW STATES =====
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [stampStatus, setStampStatus] = useState(null); // null | 'DRAFT' | 'FINAL' | 'CONFIDENTIAL'
+  const [showStampMenu, setShowStampMenu] = useState(false);
+  const downloadBtnRef = useRef(null);
+  const stampBtnRef = useRef(null);
+  // ======================
 
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -124,6 +375,28 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Toast auto-dismiss
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (downloadBtnRef.current && !downloadBtnRef.current.contains(e.target)) {
+        setShowDownloadMenu(false);
+      }
+      if (stampBtnRef.current && !stampBtnRef.current.contains(e.target)) {
+        setShowStampMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ==========================================
   // SMART SYNC: rawDraft + variables → liveDraft
@@ -172,10 +445,9 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
                 "_blank"
               )
             }
-            className={`font-bold text-slate-900 ${
-              isJudgment
-                ? "cursor-pointer hover:text-indigo-600 hover:underline decoration-indigo-300"
-                : ""
+            className={`font-bold text-slate-900 ${isJudgment
+              ? "cursor-pointer hover:text-indigo-600 hover:underline decoration-indigo-300"
+              : ""
             }`}
           >
             {cleanText}
@@ -250,12 +522,9 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     const timeline = fullText.split("---TIMELINE---").pop()?.trim() || "";
 
     const mainDraft = draft || fullText;
-    const fullDraft = affidavit
-      ? `${mainDraft}\n\n---\n\n${affidavit}`
-      : mainDraft;
+    const fullDraft = affidavit ? `${mainDraft}\n\n---\n\n${affidavit}` : mainDraft;
 
     setRawDraft(fullDraft);
-
     setIntelligence({
       judgments: judgments || "No specific cases found.",
       arguments: argumentsText || "Preparing strategy...",
@@ -268,7 +537,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   };
 
   // ==========================================
-  // ✅ STREAMING GENERATION (Claude-style word by word)
+  // STREAMING GENERATION
   // ==========================================
   const generateDraftWithStreaming = async (facts, lang, documentType, uploadedFile) => {
     setStreamedText("");
@@ -286,7 +555,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         formData.append("facts", facts || "Generate draft from this document");
         formData.append("language", lang);
         if (documentType) formData.append("documentType", documentType);
-
         response = await fetch(getApiUrl("/api/generate-legal-draft-stream"), {
           method: "POST",
           body: formData,
@@ -312,17 +580,15 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        // Keep last incomplete line in buffer
         buffer = lines.pop() || "";
 
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data: ")) continue;
 
-          const data = trimmed.slice(6); // Remove "data: "
+          const data = trimmed.slice(6);
 
           if (data === "[DONE]") {
-            // Stream complete — parse sections
             parseDraftSections(fullText);
             setStreamedText("");
             setStep(3);
@@ -339,16 +605,12 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             return;
           }
 
-          // Convert escaped newlines back to real newlines
           const token = data.replace(/\\n/g, "\n");
           fullText += token;
-
-          // Update streaming display in real time
           setStreamedText(fullText);
         }
       }
 
-      // If stream ended without [DONE], still parse what we have
       if (fullText) {
         parseDraftSections(fullText);
         setStreamedText("");
@@ -363,9 +625,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     }
   };
 
-  // ==========================================
-  // MAIN GENERATE HANDLER (uses streaming)
-  // ==========================================
   const handleGenerateDraft = async () => {
     if (!caseFacts.trim() && !file) {
       return alert("Please enter instructions or upload a PDF to proceed.");
@@ -416,7 +675,6 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
       <p className="mt-2 text-slate-500 italic tracking-wide">
         Streaming your petition word by word...
       </p>
-      {/* Live streaming preview in overlay */}
       {streamedText && (
         <div className="mt-6 max-w-2xl w-full mx-4 bg-white/80 rounded-2xl p-6 border border-indigo-100 shadow-xl max-h-48 overflow-y-auto">
           <p className="text-xs font-mono text-slate-600 whitespace-pre-wrap leading-relaxed">
@@ -542,14 +800,13 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   // ==========================================
   return (
     <>
-      {/* Blink animation style */}
       <style>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes dropIn { from { opacity: 0; transform: translateY(-8px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
         @media print {
-          nav, .h-16, .w-72, .bg-white.border-l, button, .fixed, .z-20 {
+          nav, .h-16, .w-72, .bg-white.border-l, button, .fixed, .z-20, .no-print {
             display: none !important;
           }
           .flex-1 {
@@ -568,38 +825,213 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+
+        .action-btn {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 16px;
+          border-radius: 14px;
+          border: none;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.3px;
+          cursor: pointer;
+          transition: all 0.15s;
+          white-space: nowrap;
+        }
+        .action-btn:active { transform: scale(0.96); }
+
+        .stamp-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          z-index: 999;
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+          padding: 8px;
+          min-width: 200px;
+          animation: dropIn 0.2s ease;
+        }
+        .stamp-option {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 14px;
+          border-radius: 12px;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 1px;
+          transition: background 0.15s;
+          text-align: left;
+        }
       `}</style>
 
       <div className="flex flex-col h-full bg-slate-100 overflow-hidden animate-fade-in font-sans">
         {localIsGenerating && <SpinnerOverlay />}
 
-        {/* HEADER */}
-        <div className="h-16 bg-white border-b flex items-center px-10 justify-between shrink-0 shadow-sm z-20">
+        {/* ================================================ */}
+        {/* ✅ UPDATED HEADER WITH ALL ACTION BUTTONS         */}
+        {/* ================================================ */}
+        <div className="h-16 bg-white border-b flex items-center px-6 justify-between shrink-0 shadow-sm z-20 no-print">
+          {/* LEFT: Back */}
           <button
             onClick={() => setStep(2)}
             className="flex items-center gap-2 text-slate-500 font-black text-sm hover:text-indigo-600 transition-all"
           >
             <ChevronLeft size={20} /> Back to Facts
           </button>
-          <div className="flex items-center gap-6">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[3px] bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100">
+
+          {/* CENTER: Engine Badge + Streaming Indicator */}
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[3px] bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100 hidden md:block">
               LexScript 2.0 Engine
             </span>
-            {/* Streaming indicator in header */}
             {isGenerating && (
               <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest animate-pulse flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-ping" />
                 Streaming...
               </span>
             )}
+          </div>
+
+          {/* RIGHT: Action Buttons */}
+          <div className="flex items-center gap-2">
+
+            {/* 1. COPY TEXT */}
             <button
-              onClick={() => window.print()}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-black shadow-lg flex items-center gap-2 transition-all active:scale-95"
+              className="action-btn no-print"
+              style={{ background: "#f8fafc", color: "#475569" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+              onMouseLeave={e => e.currentTarget.style.background = "#f8fafc"}
+              onClick={() =>
+                copyToClipboard(liveDraft || rawDraft, () =>
+                  setToast("Draft copied to clipboard!")
+                )
+              }
+              title="Copy draft text to clipboard"
             >
-              <Download size={18} /> Print Court Bundle
+              <ClipboardCopy size={15} />
+              <span className="hidden lg:inline">Copy Text</span>
+            </button>
+
+            {/* 2. SHARE */}
+            <button
+              className="action-btn no-print"
+              style={{ background: "#f8fafc", color: "#475569" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+              onMouseLeave={e => e.currentTarget.style.background = "#f8fafc"}
+              onClick={() => shareDraft(liveDraft || rawDraft)}
+              title="Share this draft"
+            >
+              <Share2 size={15} />
+              <span className="hidden lg:inline">Share</span>
+            </button>
+
+            {/* 3. STAMP (Draft / Final / Confidential) */}
+            <div style={{ position: "relative" }} ref={stampBtnRef}>
+              <button
+                className="action-btn no-print"
+                style={{
+                  background: stampStatus ? "#fef9c3" : "#f8fafc",
+                  color: stampStatus ? "#92400e" : "#475569",
+                  border: stampStatus ? "1.5px solid #fcd34d" : "none",
+                }}
+                onMouseEnter={e => { if (!stampStatus) e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={e => { if (!stampStatus) e.currentTarget.style.background = "#f8fafc"; }}
+                onClick={() => setShowStampMenu(v => !v)}
+                title="Stamp document status"
+              >
+                <Stamp size={15} />
+                <span className="hidden lg:inline">
+                  {stampStatus ? stampStatus : "Stamp"}
+                </span>
+              </button>
+
+              {showStampMenu && (
+                <div className="stamp-menu">
+                  {[
+                    { label: "DRAFT", color: "#b45309", bg: "#fef3c7" },
+                    { label: "FINAL", color: "#065f46", bg: "#d1fae5" },
+                    { label: "CONFIDENTIAL", color: "#991b1b", bg: "#fee2e2" },
+                    { label: "Remove Stamp", color: "#64748b", bg: "#f8fafc" },
+                  ].map(({ label, color, bg }) => (
+                    <button
+                      key={label}
+                      className="stamp-option"
+                      style={{ color }}
+                      onMouseEnter={e => e.currentTarget.style.background = bg}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      onClick={() => {
+                        setStampStatus(label === "Remove Stamp" ? null : label);
+                        setShowStampMenu(false);
+                        if (label !== "Remove Stamp") setToast(`Stamped as ${label}`);
+                      }}
+                    >
+                      <span style={{
+                        width: "10px", height: "10px", borderRadius: "2px",
+                        background: color, display: "inline-block", flexShrink: 0,
+                      }} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 4. DOWNLOAD DROPDOWN (PDF / Word / TXT) */}
+            <div style={{ position: "relative" }} ref={downloadBtnRef}>
+              <button
+                className="action-btn no-print"
+                style={{ background: "#eff6ff", color: "#1d4ed8" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#dbeafe"}
+                onMouseLeave={e => e.currentTarget.style.background = "#eff6ff"}
+                onClick={() => setShowDownloadMenu(v => !v)}
+                title="Download options"
+              >
+                <FileDown size={15} />
+                <span>Download</span>
+                <span style={{ fontSize: "10px", opacity: 0.7 }}>▾</span>
+              </button>
+
+              {showDownloadMenu && (
+                <DownloadMenu
+                  onClose={() => setShowDownloadMenu(false)}
+                  rawDraft={rawDraft}
+                  liveDraft={liveDraft}
+                />
+              )}
+            </div>
+
+            {/* 5. PRINT COURT BUNDLE (primary CTA) */}
+            <button
+              className="action-btn no-print"
+              style={{
+                background: "linear-gradient(135deg, #059669, #10b981)",
+                color: "#fff",
+                boxShadow: "0 4px 20px rgba(16,185,129,0.35)",
+                paddingLeft: "20px",
+                paddingRight: "20px",
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.92"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              onClick={handlePrint}
+              title="Print full court bundle"
+            >
+              <Printer size={15} />
+              Print Court Bundle
             </button>
           </div>
         </div>
+        {/* ================================================ */}
+        {/* END OF UPDATED HEADER                            */}
+        {/* ================================================ */}
 
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT: VARIABLES PANEL */}
@@ -652,8 +1084,11 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             )}
 
             <div className="w-full max-w-[850px] mx-auto bg-white shadow-2xl min-h-[1200px] p-24 border border-slate-100 relative mb-20 ring-1 ring-slate-200">
-              
-              {/* ✅ STREAMING VIEW: show streamed text live, word by word */}
+
+              {/* STAMP BADGE on document */}
+              <StampBadge status={stampStatus} />
+
+              {/* STREAMING VIEW */}
               {isGenerating ? (
                 <div className="outline-none whitespace-pre-wrap font-serif text-[17px] leading-[2.2] text-slate-800 text-justify">
                   {streamedText || (
@@ -667,7 +1102,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
                   {streamedText && <StreamingCursor />}
                 </div>
               ) : (
-                /* ✅ FINAL VIEW: editable contentEditable with formatting */
+                /* FINAL EDITABLE VIEW */
                 <div
                   contentEditable
                   suppressContentEditableWarning
@@ -693,22 +1128,16 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
             </div>
           </div>
 
-          {/* RIGHT: RESIZABLE INTELLIGENCE HUB */}
+          {/* RIGHT: INTELLIGENCE HUB */}
           <div
             style={{ width: `${rightPanelWidth}px` }}
             className="bg-white border-l p-8 overflow-y-auto shrink-0 flex flex-col relative transition-all duration-300 shadow-2xl z-10 custom-scrollbar"
           >
             <button
-              onClick={() =>
-                setRightPanelWidth(rightPanelWidth === 350 ? 550 : 350)
-              }
+              onClick={() => setRightPanelWidth(rightPanelWidth === 350 ? 550 : 350)}
               className="absolute left-[-15px] top-1/2 bg-white border border-slate-200 w-8 h-16 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-lg z-50"
             >
-              {rightPanelWidth === 350 ? (
-                <ChevronLeft size={20} />
-              ) : (
-                <ChevronRight size={20} />
-              )}
+              {rightPanelWidth === 350 ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
             </button>
 
             <CaseMeter score={intelligence.strategy?.win_probability} />
@@ -724,9 +1153,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
               </h4>
               <div className="text-slate-700 text-[12px] leading-relaxed italic">
                 {isGenerating ? (
-                  <span className="text-emerald-400 animate-pulse text-[11px] font-bold">
-                    Researching case law...
-                  </span>
+                  <span className="text-emerald-400 animate-pulse text-[11px] font-bold">Researching case law...</span>
                 ) : (
                   renderFormattedDraft(intelligence.judgments)
                 )}
@@ -740,9 +1167,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
               </h4>
               <div className="text-slate-700 text-[12px] leading-relaxed italic">
                 {isGenerating ? (
-                  <span className="text-indigo-400 animate-pulse text-[11px] font-bold">
-                    Building arguments...
-                  </span>
+                  <span className="text-indigo-400 animate-pulse text-[11px] font-bold">Building arguments...</span>
                 ) : (
                   renderFormattedDraft(intelligence.arguments)
                 )}
@@ -756,9 +1181,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
               </h4>
               <div className="text-slate-700 text-[11px] font-mono leading-relaxed whitespace-pre-wrap">
                 {isGenerating ? (
-                  <span className="text-blue-400 animate-pulse text-[11px] font-bold">
-                    Mapping chronology...
-                  </span>
+                  <span className="text-blue-400 animate-pulse text-[11px] font-bold">Mapping chronology...</span>
                 ) : (
                   renderFormattedDraft(intelligence.timeline)
                 )}
@@ -780,28 +1203,21 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
                   {isGenerating ? (
                     <div className="flex flex-col items-center py-4 gap-2">
                       <div className="w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-[10px] uppercase font-black text-rose-300 tracking-widest">
-                        Analyzing Defense...
-                      </p>
+                      <p className="text-[10px] uppercase font-black text-rose-300 tracking-widest">Analyzing Defense...</p>
                     </div>
                   ) : intelligence.strategy?.opponent_args ? (
                     <div className="space-y-3">
-                      {intelligence.strategy.opponent_args
-                        .split("\n")
-                        .filter(Boolean)
-                        .map((point, idx) => (
-                          <p key={idx} className="flex gap-2">
-                            <span className="text-rose-500 font-bold">•</span>
-                            {point.replace(/^- /, "")}
-                          </p>
-                        ))}
+                      {intelligence.strategy.opponent_args.split("\n").filter(Boolean).map((point, idx) => (
+                        <p key={idx} className="flex gap-2">
+                          <span className="text-rose-500 font-bold">•</span>
+                          {point.replace(/^- /, "")}
+                        </p>
+                      ))}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center py-4 gap-2">
                       <div className="w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-[10px] uppercase font-black text-rose-300 tracking-widest">
-                        Analyzing Defense...
-                      </p>
+                      <p className="text-[10px] uppercase font-black text-rose-300 tracking-widest">Analyzing Defense...</p>
                     </div>
                   )}
                 </div>
@@ -832,10 +1248,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
                   )}
                   <div ref={chatEndRef} />
                 </div>
-                <form
-                  onSubmit={handleChatSubmit}
-                  className="p-4 bg-white border-t flex gap-2"
-                >
+                <form onSubmit={handleChatSubmit} className="p-4 bg-white border-t flex gap-2">
                   <input
                     type="text"
                     value={chatInput}
@@ -855,6 +1268,9 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
           </div>
         </div>
       </div>
+
+      {/* TOAST NOTIFICATION */}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );
 };

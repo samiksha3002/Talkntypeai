@@ -133,26 +133,46 @@ async def generate_draft(
 ):
     try:
         final_facts = facts or ""
+
         if file:
-            file_path = os.path.join("uploads", file.filename)
+            # ✅ Safe filename - special chars remove karo
+            safe_filename = file.filename.encode('ascii', 'ignore').decode('ascii')
+            safe_filename = safe_filename.replace(" ", "_") or "upload.pdf"
+            file_path = os.path.join("uploads", safe_filename)
+
             with open(file_path, "wb") as f:
                 f.write(await file.read())
+
             vector_db = doc_service.process_pdf(file_path)
+
             if vector_db:
-                pdf_context = doc_service.ask_question(vector_db, "Summarize all legal facts and parties.", [])
-                final_facts = f"CONTEXT FROM PDF:\n{pdf_context}\n\nUSER INSTRUCTIONS:\n{final_facts}"
-            os.remove(file_path)
+                pdf_context = doc_service.ask_question(
+                    vector_db,
+                    "Summarize all legal facts, party names, dates, and sections from this document.",
+                    []
+                )
+                # ✅ Unicode fix - PDF text ko safely encode karo
+                pdf_context_clean = pdf_context.encode('utf-8', errors='replace').decode('utf-8')
+                final_facts = f"CONTEXT FROM PDF:\n{pdf_context_clean}\n\nUSER INSTRUCTIONS:\n{final_facts}"
+
+            if os.path.exists(file_path):
+                os.remove(file_path)
             gc.collect()
 
         if not final_facts.strip():
             return ["Please provide case facts or upload a PDF.", "N/A", "N/A", "N/A", "N/A", "N/A"]
 
-        draft, judgments, arguments, timeline, affidavit, strategy = research_and_draft(final_facts, documentType, language)
+        draft, judgments, arguments, timeline, affidavit, strategy = research_and_draft(
+            final_facts, documentType, language
+        )
         return [draft, judgments, arguments, timeline, affidavit, strategy]
+
+    except UnicodeDecodeError as e:
+        print(f"Unicode Error: {e}")
+        return [f"PDF mein special characters hain jo read nahi ho sake. Plain text facts type karke try karein.", "N/A", "N/A", "N/A", "N/A", "N/A"]
     except Exception as e:
+        print(f"Draft Error: {e}")
         return [f"Error: {str(e)}", "N/A", "N/A", "N/A", "N/A", "N/A"]
-
-
 @app.post("/api/ai-command")
 async def handle_ai_command(request: AICommandRequest):
     try:
