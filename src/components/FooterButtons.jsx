@@ -1,137 +1,199 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Feather,
+  Scale,
+  BrainCircuit,
+} from "lucide-react";
 
-// ==========================================
-// Helper Component for individual buttons
-// ==========================================
-const FooterButton = ({ icon, label, color, onClick, link, isActive }) => {
-  const colorClasses = {
-    purple: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200",
-    blue: "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200",
-    orange: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200",
-    slate: "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200",
-    emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200",
-    indigo: "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200", // Added Indigo
+/* =====================================
+   Premium Footer Button
+===================================== */
+const FooterTab = ({
+  title,
+  icon,
+  active,
+  onClick,
+  color,
+}) => {
+  const colorStyles = {
+    purple: {
+      gradient:
+        "from-violet-50 via-purple-50 to-fuchsia-100",
+      iconBg:
+        "bg-gradient-to-br from-violet-500 to-purple-600",
+      glow: "bg-violet-500/20",
+      text: "text-violet-700",
+      active:
+        "ring-2 ring-violet-400 shadow-violet-300/40",
+    },
+
+    orange: {
+      gradient:
+        "from-orange-50 via-amber-50 to-yellow-100",
+      iconBg:
+        "bg-gradient-to-br from-orange-500 to-amber-500",
+      glow: "bg-orange-500/20",
+      text: "text-orange-700",
+      active:
+        "ring-2 ring-orange-400 shadow-orange-300/40",
+    },
+
+    blue: {
+      gradient:
+        "from-blue-50 via-indigo-50 to-cyan-100",
+      iconBg:
+        "bg-gradient-to-br from-blue-500 to-indigo-600",
+      glow: "bg-blue-500/20",
+      text: "text-blue-700",
+      active:
+        "ring-2 ring-blue-400 shadow-blue-300/40",
+    },
   };
 
-  // Logic for Active Button highlight
-  const activeStyle = isActive ? "ring-2 ring-indigo-500 scale-105 shadow-md" : "";
-
-  const handleClick = () => {
-    if (link) {
-      window.open(link, '_blank');
-    } else if (onClick) {
-      onClick();
-    }
-  };
+  const style = colorStyles[color];
 
   return (
-    <button 
-      onClick={handleClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 rounded-xl border font-bold text-base transition-all active:scale-95 shadow-sm whitespace-nowrap ${colorClasses[color] || colorClasses.slate} ${activeStyle}`}
+    <button
+      onClick={onClick}
+      className={`
+        relative overflow-hidden
+        flex items-center gap-3
+        h-[68px]
+        rounded-[22px]
+        px-5
+        border border-white/60
+        bg-gradient-to-r ${style.gradient}
+        backdrop-blur-xl
+        shadow-md
+        transition-all duration-300 ease-out
+        hover:shadow-xl
+        hover:-translate-y-[2px]
+        hover:scale-[1.015]
+        active:scale-[0.98]
+        ${active ? style.active : ""}
+      `}
     >
-      <span className="text-2xl leading-none">{icon}</span>
-      <span className="hidden sm:inline">{label}</span>
+      {/* Glow effect */}
+      <div
+        className={`
+          absolute
+          -right-6
+          -top-6
+          h-20
+          w-20
+          rounded-full
+          blur-2xl
+          ${style.glow}
+        `}
+      />
+
+      {/* Glossy top overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent opacity-70" />
+
+      {/* Icon Box */}
+      <div
+        className={`
+          relative z-10
+          w-11 h-11
+          rounded-2xl
+          ${style.iconBg}
+          flex items-center justify-center
+          text-white
+          shadow-lg
+          shrink-0
+        `}
+      >
+        {icon}
+      </div>
+
+      {/* Text */}
+      <div className="relative z-10 flex flex-col items-start">
+        <span
+          className={`
+            font-bold text-[18px]
+            tracking-tight
+            ${style.text}
+          `}
+        >
+          {title}
+        </span>
+
+        <span className="text-xs text-slate-500 font-medium">
+          Open section
+        </span>
+      </div>
+
+      {/* Active Indicator */}
+      {active && (
+        <div className="absolute right-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse block" />
+        </div>
+      )}
     </button>
   );
 };
 
-// ==========================================
-// Main Footer Component
-// ==========================================
-// Props Received from Dashboard: setActiveView and activeView
-const FooterButtons = ({ setActiveView, activeView }) => {
+/* =====================================
+   Main Footer Component
+===================================== */
+const FooterButtons = ({
+  setActiveView,
+  activeView,
+}) => {
   const navigate = useNavigate();
 
-  // 1. Navigation for Business Card
-  const handleBusinessCardClick = () => {
-    console.log("Navigating to /business-card");
-    navigate('/business-card');
-  };
-
-  // 2. Navigation for Judgements
-  const handleJudgementsClick = () => {
-    console.log("Navigating to /judgements");
-    navigate('/judgements');
-  };
-
-  // 3. Navigation for Diary
-  const handleDiaryClick = () => {
-    console.log("Diary Button Clicked! Attempting to navigate to /diary");
-    navigate('/diary'); 
-  };
-
-  // 4. Navigation for Create Website
-  const handleWebsiteClick = () => {
-    console.log("Navigating to /create-website");
-    navigate('/website-showcase');
-  };
-
   return (
-    <footer className="h-20 bg-white border-t border-gray-300 fixed bottom-0 w-full z-50 flex items-center justify-between px-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      
-      {/* Left: System Status */}
-      <div className="text-sm text-gray-500 font-medium items-center gap-2 hidden lg:flex min-w-[150px]">
-         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-         System Status: <span className="text-emerald-600 font-semibold">Online</span>
+    <footer className="h-[88px] border-t border-slate-200 bg-white px-4 flex items-center">
+
+      {/* LEFT SIDE - SYSTEM STATUS */}
+      <div className="w-[230px] flex items-center gap-2 text-sm font-medium text-slate-600 border-r border-slate-200 pr-5">
+
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+
+        <span>
+          System Status:{" "}
+          <span className="text-emerald-600 font-bold">
+            Online
+          </span>
+        </span>
       </div>
 
-      {/* CENTER: BUTTONS */}
-      <div className="flex gap-3 w-full lg:w-auto lg:flex-1 justify-between items-center px-1">
-        
-        {/* Editor Button (Added to switch back to Editor mode) */}
-        <FooterButton 
-            icon="✍️" 
-            label="Editor" 
-            color="slate" 
-            onClick={() => setActiveView("editor")} 
-            isActive={activeView === "editor"}
+      {/* RIGHT SIDE BUTTONS */}
+      <div className="flex-1 grid grid-cols-3 gap-3 pl-5">
+
+        {/* EDITOR */}
+        <FooterTab
+          title="Editor"
+          color="purple"
+          active={activeView === "editor"}
+          icon={<Feather size={22} />}
+          onClick={() =>
+            setActiveView("editor")
+          }
         />
 
-        <FooterButton 
-            icon="⚖️" 
-            label="Judgements" 
-            color="purple" 
-            onClick={handleJudgementsClick}
+        {/* JUDGEMENTS */}
+        <FooterTab
+          title="Judgements"
+          color="orange"
+          icon={<Scale size={22} />}
+          onClick={() =>
+            navigate("/judgements")
+          }
         />
 
-        <FooterButton 
-            icon="🌐" 
-            label="Website" 
-            color="blue"  
-            onClick={handleWebsiteClick} 
+        {/* LEGAL AI HUB */}
+        <FooterTab
+          title="Legal AI Hub"
+          color="blue"
+          active={activeView === "legalHub"}
+          icon={<BrainCircuit size={22} />}
+          onClick={() =>
+            setActiveView("legalHub")
+          }
         />
-        
-        <FooterButton 
-            icon="🪪" 
-            label="Card" 
-            color="orange" 
-            onClick={handleBusinessCardClick} 
-        />
-        
-        {/* LEGAL AI HUB BUTTON */}
-        <FooterButton 
-            icon="🏛️" 
-            label="Legal AI Hub" 
-            color="indigo" 
-            onClick={() => setActiveView("legalHub")} 
-            isActive={activeView === "legalHub"}
-        />
-
-        <FooterButton 
-            icon="📒" 
-            label="Diary" 
-            color="emerald"
-            onClick={handleDiaryClick} 
-        />
-
       </div>
-
-      {/* Right: Version */}
-      <div className="text-xs text-gray-400 hidden lg:block min-w-[50px] text-right">
-        v2.4.0
-      </div>
-
     </footer>
   );
 };
