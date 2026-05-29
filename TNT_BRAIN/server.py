@@ -1,11 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse  # ✅ ADD THIS
+from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from pydantic import BaseModel
 import uvicorn
 import os
 import gc
+import hashlib
+import json
 from dotenv import load_dotenv
 
 from services.draft_service import research_and_draft, research_and_draft_stream, ask_legal_ai
@@ -20,6 +22,28 @@ app = FastAPI()
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
 
+# ==========================================
+# Simple file-based user store
+# (Replace with your DB logic if you have one)
+# ==========================================
+USERS_FILE = "users.json"
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_users(users):
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# ==========================================
+# CORS — must be before all routes
+# ==========================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,6 +60,10 @@ research_ai = ResearchService()
 doc_service = DocumentService()
 llm = ChatOpenAI(model_name="gpt-4o", temperature=0.3, max_tokens=1000)
 
+
+# ==========================================
+# Pydantic models
+# ==========================================
 class DraftRequest(BaseModel):
     facts: str
     language: Optional[str] = "English"
@@ -57,9 +85,85 @@ class AICommandRequest(BaseModel):
     text: str
     context: str
 
+# ✅ NEW: Auth models
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = ""
+
 
 # ==========================================
-# ✅ NEW STREAMING ENDPOINT
+# ✅ NEW: LOGIN ENDPOINT
+# ==========================================
+@app.post("/api/login")
+async def login(request: LoginRequest):
+    """
+    User login - email/password verify karo aur token return karo.
+    """
+    try:
+        users = load_users()
+        email = request.email.lower().strip()
+
+        if email not in users:
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        hashed = hash_password(request.password)
+        if users[email]["password"] != hashed:
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+        return {
+            "success": True,
+            "message": "Login successful.",
+            "user": {
+                "email": email,
+                "name": users[email].get("name", ""),
+            },
+            # Simple token: in production replace with real JWT
+            "token": hashlib.sha256(f"{email}:loggedin".encode()).hexdigest()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# ✅ NEW: REGISTER ENDPOINT
+# ==========================================
+@app.post("/api/register")
+async def register(request: RegisterRequest):
+    """
+    New user registration.
+    """
+    try:
+        users = load_users()
+        email = request.email.lower().strip()
+
+        if email in users:
+            raise HTTPException(status_code=400, detail="Email already registered.")
+
+        users[email] = {
+            "password": hash_password(request.password),
+            "name": request.name or "",
+        }
+        save_users(users)
+
+        return {
+            "success": True,
+            "message": "Registration successful. Please login.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================
+# ✅ NEW: STREAMING ENDPOINT (already in your code, kept as-is)
 # ==========================================
 @app.post("/api/generate-legal-draft-stream")
 async def generate_draft_stream(request: DraftRequest):
@@ -74,28 +178,26 @@ async def generate_draft_stream(request: DraftRequest):
                 request.documentType,
                 request.language
             ):
-                # SSE format: "data: <content>\n\n"
-                # Special chars escape karo
                 safe_token = token.replace("\n", "\\n")
                 yield f"data: {safe_token}\n\n"
         except Exception as e:
             yield f"data: [ERROR]: {str(e)}\n\n"
         finally:
-            yield "data: [DONE]\n\n"  # Frontend ko signal do ki stream khatam
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         token_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # ✅ Nginx buffering disable
+            "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         }
     )
 
 
 # ==========================================
-# OLD ENDPOINTS (unchanged)
+# OLD ENDPOINTS (completely unchanged)
 # ==========================================
 @app.post("/api/analyze-document")
 async def analyze_doc(file: UploadFile = File(...)):
@@ -135,7 +237,6 @@ async def generate_draft(
         final_facts = facts or ""
 
         if file:
-            # ✅ Safe filename - special chars remove karo
             safe_filename = file.filename.encode('ascii', 'ignore').decode('ascii')
             safe_filename = safe_filename.replace(" ", "_") or "upload.pdf"
             file_path = os.path.join("uploads", safe_filename)
@@ -151,7 +252,6 @@ async def generate_draft(
                     "Summarize all legal facts, party names, dates, and sections from this document.",
                     []
                 )
-                # ✅ Unicode fix - PDF text ko safely encode karo
                 pdf_context_clean = pdf_context.encode('utf-8', errors='replace').decode('utf-8')
                 final_facts = f"CONTEXT FROM PDF:\n{pdf_context_clean}\n\nUSER INSTRUCTIONS:\n{final_facts}"
 
@@ -173,6 +273,8 @@ async def generate_draft(
     except Exception as e:
         print(f"Draft Error: {e}")
         return [f"Error: {str(e)}", "N/A", "N/A", "N/A", "N/A", "N/A"]
+
+
 @app.post("/api/ai-command")
 async def handle_ai_command(request: AICommandRequest):
     try:
