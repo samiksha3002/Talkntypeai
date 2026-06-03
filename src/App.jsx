@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-// GLOBAL CONTEXT PROVIDER
+// GLOBAL CONTEXT PROVIDERS
 import { CaseProvider } from "./context/CaseContext";
+import { SearchProvider } from "./context/SearchContext"; // ✅ Added SearchContext import
 
 // Components
-import CsvCaseManager from "./pages/CsvCaseManager"; // ✅ Your new component
+import CsvCaseManager from "./pages/CsvCaseManager";
 import Preloader from "./components/Preloader";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
@@ -73,7 +74,7 @@ const UserRoute = ({ children }) => {
 function App() {
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIX 1: Define API URL and userId here so they are available for routes
+  // Define API URL and userId here so they are available for routes
   // This uses Vite env variable if available, otherwise defaults to localhost
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   
@@ -94,55 +95,55 @@ function App() {
         <Preloader />
       ) : (
         <CaseProvider>
-          <Router>
-            <Routes>
-              {/* PUBLIC ROUTES */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+          <SearchProvider> {/* ✅ WRAPPED ROUTER WITH SEARCH PROVIDER */}
+            <Router>
+              <Routes>
+                {/* PUBLIC ROUTES */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
-              {/* USER ROUTES */}
-              <Route path="/dashboard" element={<UserRoute><Dashboard /></UserRoute>} />
+                {/* USER ROUTES */}
+                <Route path="/dashboard" element={<UserRoute><Dashboard /></UserRoute>} />
 
-              {/* ✅ FIX 2: Added the CSV Case Manager Route with props */}
-              <Route 
-                path="/case-manager" 
-                element={
-                  <UserRoute>
-                    <CsvCaseManager userId={userId} API={API_URL} />
-                  </UserRoute>
-                } 
-              />
+                {/* CSV Case Manager Route with props */}
+                <Route 
+                  path="/case-manager" 
+                  element={
+                    <UserRoute>
+                      <CsvCaseManager userId={userId} API={API_URL} />
+                    </UserRoute>
+                  } 
+                />
 
-              <Route path="/diary" element={<UserRoute><Diary /></UserRoute>} />
-              <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
-              <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
+                <Route path="/diary" element={<UserRoute><Diary /></UserRoute>} />
+                <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
+                <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
+                <Route path="/manage-team" element={<ManageTeamPage />} />
+                <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
+                <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
+                <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
+                <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
+                <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
+                <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} />
+                <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
+                <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
+                <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
+                <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
+                <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
+                
+                {/* ADMIN ROUTE */}
+                <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+                
+                {/* EDIT ROUTES */}
+                <Route path="/case/edit/:id" element={<EditCasePage />} />
+                <Route path="/edit-inquiry/:id" element={<EditInquiryPage />} />
 
-              <Route path="/manage-team" element={<ManageTeamPage />} />
-
-              <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
-              <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
-              <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
-              <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
-              <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
-              <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} />
-              <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
-              <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
-              <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
-              <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
-              <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
-              
-              {/* ADMIN ROUTE */}
-              <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
-              
-              {/* EDIT ROUTES */}
-              <Route path="/case/edit/:id" element={<EditCasePage />} />
-              <Route path="/edit-inquiry/:id" element={<EditInquiryPage />} />
-
-              {/* 404 */}
-              <Route path="*" element={<div>404 Page Not Found</div>} />
-            </Routes>
-          </Router>
+                {/* 404 */}
+                <Route path="*" element={<div>404 Page Not Found</div>} />
+              </Routes>
+            </Router>
+          </SearchProvider>
         </CaseProvider>
       )}
     </>
