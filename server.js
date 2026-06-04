@@ -4,29 +4,29 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 
 // ── TalkNType Route Imports ───────────────────────────────────────────────────
-import draftRouter            from "./routes/draft.routes.js";
-import authRoutes             from "./routes/auth.js";
-import adminRoutes            from "./routes/admin.js";
-import deepgramRoutes         from "./routes/deepgram.js";
-import chatTranslateRoute     from "./routes/chatTranslate.js";
-import casesRoutes            from "./routes/cases.js";
-import aiChatRoutes           from "./routes/aiChat.js";
-import ocrRoutes              from "./routes/ocr.js";
-import expandRoute            from "./routes/expand.js";
-import fixGrammarRoute        from "./routes/fixGrammar.js";
-import fontConvertRouter      from "./routes/fontConvert.js";
+import draftRouter             from "./routes/draft.routes.js";
+import authRoutes              from "./routes/auth.js";
+import adminRoutes             from "./routes/admin.js";
+import deepgramRoutes          from "./routes/deepgram.js";
+import chatTranslateRoute      from "./routes/chatTranslate.js";
+import casesRoutes             from "./routes/cases.js";
+import aiChatRoutes            from "./routes/aiChat.js";
+import ocrRoutes               from "./routes/ocr.js";
+import expandRoute             from "./routes/expand.js";
+import fixGrammarRoute         from "./routes/fixGrammar.js";
+import fontConvertRouter       from "./routes/fontConvert.js";
 import transliterateFinalRoute from "./routes/transliteratefinal.js";
-import dictionaryRoutes       from "./routes/dictionary.js";
-import clientsRoutes          from "./routes/clients.js";
-import inquiriesRouter        from "./routes/inquiries.js";
-import teamRoute              from "./routes/team.js";
-import reportsRoute           from "./routes/reports.js";
-import paymentsRoute          from "./routes/payments.js";
-import csvUploadRoute         from "./routes/csvUploadRoute.js";
-import pdfRoutes              from "./routes/pdf.js";
-import audioRoutes            from "./routes/audio.js";
-import legalRoutes            from "./routes/legal.js";
-import legalAiRoute           from "./routes/legalaidraft.js";
+import dictionaryRoutes        from "./routes/dictionary.js";
+import clientsRoutes           from "./routes/clients.js";
+import inquiriesRouter         from "./routes/inquiries.js";
+import teamRoute               from "./routes/team.js";
+import reportsRoute            from "./routes/reports.js";
+import paymentsRoute           from "./routes/payments.js";
+import csvUploadRoute          from "./routes/csvUploadRoute.js";
+import pdfRoutes               from "./routes/pdf.js";
+import audioRoutes             from "./routes/audio.js";
+import legalRoutes             from "./routes/legal.js";
+import legalAiRoute            from "./routes/legalaidraft.js";
 
 // ── LexArchive Route Imports ──────────────────────────────────────────────────
 import judgementsRouter from "./routes/judgements.js";
@@ -40,23 +40,23 @@ dotenv.config();
 connectDB();
 
 const app  = express();
-app.set("trust proxy", 1); 
 const PORT = process.env.PORT || 5000;
+
+app.set("trust proxy", 1); // Required for Render (sits behind a proxy)
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "https://talkntype.pro",        // ← correct spelling with 'y'
-  "https://www.talkntype.pro",    // ← with www
-  "https://talkntpe.pro",         // ← keep old one too just in case
+  "https://talkntype.pro",
+  "https://www.talkntype.pro",
+  "https://talkntpe.pro",
   "https://www.talkntpe.pro",
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // allow non-browser requests
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -67,11 +67,13 @@ app.use(cors({
   methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials:    true,
-}));
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 
-// ── Handle preflight for all routes ──────────────────────────────────────────
-app.options("/(.*)", cors());
+app.use(cors(corsOptions)); // handles OPTIONS preflight automatically
 
+// ── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
@@ -127,7 +129,7 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 TalkNType + LexArchive server running on http://localhost:${PORT}`);
   if (!process.env.INDIAN_KANOON_API_TOKEN) {
     console.warn("⚠️  INDIAN_KANOON_API_TOKEN not set — LexArchive calls will fail.");
   }
