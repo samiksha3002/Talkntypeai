@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 
 // GLOBAL CONTEXT PROVIDERS
 import { CaseProvider } from "./context/CaseContext";
-import { SearchProvider } from "./context/SearchContext"; // ✅ Added SearchContext import
+import { SearchProvider } from './components/Context/searchcontext.jsx'; // ✅ Added SearchContext import
 
 // Components
 import CsvCaseManager from "./pages/CsvCaseManager";
