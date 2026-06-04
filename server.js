@@ -28,17 +28,11 @@ import audioRoutes            from "./routes/audio.js";
 import legalRoutes            from "./routes/legal.js";
 import legalAiRoute           from "./routes/legalaidraft.js";
 
-// ── LexArchive Route Imports final ──────────────────────────────────────────────────
+// ── LexArchive Route Imports ──────────────────────────────────────────────────
 import judgementsRouter from "./routes/judgements.js";
 import savedRouter      from "./routes/saved.js";
 
-// ── LexArchive Middleware Imports ─────────────────────────────────────────────
-// NOTE: if rateLimiter uses CommonJS exports, rename it rateLimiter.js → rateLimiter.mjs
-// or add "type": "module" to its package.json, or use createRequire.
-// If you keep it as a .js CJS file, import it like this instead:
-//   import { createRequire } from "module";
-//   const require = createRequire(import.meta.url);
-//   const { apiLimiter } = require("./middleware/rateLimiter.js");
+// ── Middleware Imports ────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -48,23 +42,39 @@ connectDB();
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Global Middleware ─────────────────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://talkntype.pro",        // ← correct spelling with 'y'
+  "https://www.talkntype.pro",    // ← with www
+  "https://talkntpe.pro",         // ← keep old one too just in case
+  "https://www.talkntpe.pro",
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://talkntpe.pro",        // ← add this
-    "https://www.talkntpe.pro",    // ← add this too (with www)
-  ],
-  methods:      ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn("CORS blocked origin:", origin);
+      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    }
+  },
+  methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
+  credentials:    true,
 }));
+
+// ── Handle preflight for all routes ──────────────────────────────────────────
+app.options("*", cors());
+
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
-// ── Rate Limiting (LexArchive) ────────────────────────────────────────────────
-// Applied only to /api/* so it covers all API routes in one place.
+// ── Rate Limiting ─────────────────────────────────────────────────────────────
 app.use("/api", apiLimiter);
 
 // ── Health / Root ─────────────────────────────────────────────────────────────
@@ -72,29 +82,29 @@ app.get("/",       (req, res) => res.send("TalkNType Server Running!"));
 app.get("/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 
 // ── TalkNType Routes ──────────────────────────────────────────────────────────
-app.use("/api",              authRoutes);
-app.use("/api/admin",        adminRoutes);
-app.use("/api/deepgram",     deepgramRoutes);
-app.use("/api/cases",        casesRoutes);
+app.use("/api",               authRoutes);
+app.use("/api/admin",         adminRoutes);
+app.use("/api/deepgram",      deepgramRoutes);
+app.use("/api/cases",         casesRoutes);
 app.use("/api/chattranslate", chatTranslateRoute);
-app.use("/api/chat",         aiChatRoutes);
-app.use("/api/ocr",          ocrRoutes);
-app.use("/api/expand",       expandRoute);
-app.use("/api/fix-grammar",  fixGrammarRoute);
-app.use("/api/font-convert", fontConvertRouter);
-app.use("/api/draft",        draftRouter);
+app.use("/api/chat",          aiChatRoutes);
+app.use("/api/ocr",           ocrRoutes);
+app.use("/api/expand",        expandRoute);
+app.use("/api/fix-grammar",   fixGrammarRoute);
+app.use("/api/font-convert",  fontConvertRouter);
+app.use("/api/draft",         draftRouter);
 app.use("/api/transliterate", transliterateFinalRoute);
-app.use("/api/clients",      clientsRoutes);
-app.use("/api/inquiries",    inquiriesRouter);
-app.use("/api/reports",      reportsRoute);
-app.use("/api/team",         teamRoute);
-app.use("/api/payments",     paymentsRoute);
-app.use("/api/dictionary",   dictionaryRoutes);
-app.use("/api/csv-manager",  csvUploadRoute);
-app.use("/api",              legalRoutes);
-app.use("/api",              pdfRoutes);       // exposes /api/upload-pdf etc.
-app.use("/api/audio",        audioRoutes);
-app.use("/api/legal-ai",     legalAiRoute);
+app.use("/api/clients",       clientsRoutes);
+app.use("/api/inquiries",     inquiriesRouter);
+app.use("/api/reports",       reportsRoute);
+app.use("/api/team",          teamRoute);
+app.use("/api/payments",      paymentsRoute);
+app.use("/api/dictionary",    dictionaryRoutes);
+app.use("/api/csv-manager",   csvUploadRoute);
+app.use("/api",               legalRoutes);
+app.use("/api",               pdfRoutes);
+app.use("/api/audio",         audioRoutes);
+app.use("/api/legal-ai",      legalAiRoute);
 
 // ── LexArchive Routes ─────────────────────────────────────────────────────────
 app.use("/api/judgements", judgementsRouter);
@@ -116,9 +126,8 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🚀 TalkNType + LexArchive server running on http://localhost:${PORT}`);
-
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
   if (!process.env.INDIAN_KANOON_API_TOKEN) {
-    console.warn("⚠️  INDIAN_KANOON_API_TOKEN is not set — LexArchive API calls will fail.");
+    console.warn("⚠️  INDIAN_KANOON_API_TOKEN not set — LexArchive calls will fail.");
   }
 });
