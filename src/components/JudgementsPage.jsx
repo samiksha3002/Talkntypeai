@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useLatestJudgements, useSearch, useJudgement, useSaved } from '../components/Hooks/usejudgements';
-import { useSearchContext } from '../context/Searchcontext';
+import { useSearchContext } from '../components/Context/searchcontext.jsx';
 import { formatDate, getCourtInfo, getTagStyle, truncate } from '../components/utils/formatters';
 
 // ─────────────────────────────────────────────────────────────────────────────
