@@ -1,5 +1,13 @@
+// server.js
+// ─────────────────────────────────────────────────────────────────────────────
+// CRITICAL: dotenv MUST be the very first thing — before any other imports.
+// In ES Modules, all imports execute before any code in this file runs.
+// So we use a separate env.js file that loads dotenv, and import IT first.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import "./env.js";   // ← must be FIRST import — loads .env before everything else
+
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/db.js";
 
@@ -36,13 +44,12 @@ import savedRouter      from "./routes/saved.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
-dotenv.config();
 connectDB();
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
-app.set("trust proxy", 1); // Required for Render (sits behind a proxy)
+app.set("trust proxy", 1);
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -56,7 +63,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow non-browser requests
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -71,7 +78,7 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-app.use(cors(corsOptions)); // handles OPTIONS preflight automatically
+app.use(cors(corsOptions));
 
 // ── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "100mb" }));
@@ -119,7 +126,7 @@ app.use((req, res) => {
 });
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+app.use((err, req, res, next) => {
   console.error("🔥 Server Error:", err.stack || err.message);
   res.status(500).json({
     success: false,
@@ -130,7 +137,5 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 // ── Start Server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🚀 TalkNType + LexArchive server running on http://localhost:${PORT}`);
-  if (!process.env.INDIAN_KANOON_API_TOKEN) {
-    console.warn("⚠️  INDIAN_KANOON_API_TOKEN not set — LexArchive calls will fail.");
-  }
+  console.log(`✅ Indian Kanoon token: ${process.env.INDIAN_KANOON_API_TOKEN ? process.env.INDIAN_KANOON_API_TOKEN.slice(0,8) + "..." : "❌ NOT SET"}`);
 });

@@ -12,7 +12,7 @@ const searchKey = (req) => `search:${JSON.stringify(req.query)}`;
 const docKey    = (req) => `doc:${req.params.docid}`;
 const fragKey   = (req) => `frag:${req.params.docid}:${req.query.q}`;
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/judgements/latest
 router.get("/latest",
@@ -28,6 +28,7 @@ router.get("/search",
 );
 
 // GET /api/judgements/:docid/fragment?q=article+21
+// NOTE: this must come BEFORE /:docid so Express doesn't match "fragment" as a docid
 router.get("/:docid/fragment",
   cacheMiddleware(fragKey),
   ctrl.getFragment

@@ -1,40 +1,36 @@
 // routes/saved.js
-//
-// Simple in-memory saved list (replace with DB like SQLite/Postgres in prod).
-// In production: add user auth middleware and persist to database.
-//
+// Simple in-memory saved list.
+// Replace savedMap with a DB query when you add auth/users.
 
 import express from "express";
 
-const router  = express.Router();
+const router   = express.Router();
+const savedMap = new Map();  // docid → entry object
 
-// In-memory store (keyed by docid)
-const savedMap = new Map();
-
-// GET /api/saved — list all saved judgements
+// GET /api/saved
 router.get("/", (req, res) => {
   res.json({ saved: Array.from(savedMap.values()) });
 });
 
-// POST /api/saved — save a judgement
-//   Body: { docid, title, citation, court, date }
+// POST /api/saved
+// Body: { docid, title, citation, court, date }
 router.post("/", (req, res) => {
   const { docid, title, citation, court, date } = req.body;
   if (!docid) return res.status(400).json({ error: "docid is required." });
 
   const entry = {
-    docid:   String(docid),
+    docid   : String(docid),
     title,
     citation,
     court,
     date,
-    savedAt: new Date().toISOString(),
+    savedAt : new Date().toISOString(),
   };
   savedMap.set(String(docid), entry);
   res.status(201).json(entry);
 });
 
-// DELETE /api/saved/:docid — remove a saved judgement
+// DELETE /api/saved/:docid
 router.delete("/:docid", (req, res) => {
   const { docid } = req.params;
   if (!savedMap.has(docid)) {

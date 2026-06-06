@@ -1,11 +1,11 @@
-// frontend/src/hooks/useJudgements.js
-//
-// Custom hooks that wrap the API service.
-// Uses plain useState + useEffect (no extra libraries needed).
-// Swap for React Query / SWR in production for auto-refetch, deduplication etc.
-//
+// frontend/src/components/Hooks/usejudgements.js
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix applied:
+//   Import path changed to  ../../services/api  to match your project layout.
+//   (App.jsx shows JudgementsPage is at src/components/ so services is at src/services/)
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   searchJudgements,
   getLatestJudgements,
@@ -15,7 +15,8 @@ import {
   removeSaved,
 } from '../services/api';
 
-// ─────────────────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────────────
 // useLatestJudgements  — loads on mount
 // ─────────────────────────────────────────────────────────────────────────────
 export function useLatestJudgements() {
@@ -26,9 +27,11 @@ export function useLatestJudgements() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+
     getLatestJudgements()
-      .then((d)  => { if (!cancelled) { setData(d);    setLoading(false); } })
+      .then((d)  => { if (!cancelled) { setData(d);          setLoading(false); } })
       .catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
+
     return () => { cancelled = true; };
   }, []);
 
@@ -36,7 +39,7 @@ export function useLatestJudgements() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useSearch  — call search() to trigger
+// useSearch  — call search(query, page, filters) to trigger
 // ─────────────────────────────────────────────────────────────────────────────
 export function useSearch() {
   const [results,  setResults]  = useState(null);
@@ -45,12 +48,14 @@ export function useSearch() {
   const [query,    setQuery]    = useState('');
   const [page,     setPage]     = useState(0);
   const [filters,  setFilters]  = useState({});
-  const abortRef = useRef(null);
 
   const search = useCallback(async (q, p = 0, f = {}) => {
     if (!q?.trim()) return;
-    setQuery(q); setPage(p); setFilters(f);
-    setLoading(true); setError(null);
+    setQuery(q);
+    setPage(p);
+    setFilters(f);
+    setLoading(true);
+    setError(null);
 
     try {
       const data = await searchJudgements(q, p, f);
@@ -62,14 +67,20 @@ export function useSearch() {
     }
   }, []);
 
-  const nextPage = useCallback(() => search(query, page + 1, filters), [query, page, filters, search]);
-  const prevPage = useCallback(() => search(query, Math.max(0, page - 1), filters), [query, page, filters, search]);
+  const nextPage = useCallback(
+    () => search(query, page + 1, filters),
+    [query, page, filters, search]
+  );
+  const prevPage = useCallback(
+    () => search(query, Math.max(0, page - 1), filters),
+    [query, page, filters, search]
+  );
 
   return { results, loading, error, query, page, search, nextPage, prevPage };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useJudgement  — loads a single document by docid
+// useJudgement  — fetches a single document by docid
 // ─────────────────────────────────────────────────────────────────────────────
 export function useJudgement(docid) {
   const [data,    setData]    = useState(null);
@@ -79,10 +90,13 @@ export function useJudgement(docid) {
   useEffect(() => {
     if (!docid) return;
     let cancelled = false;
-    setLoading(true); setData(null); setError(null);
+
+    setLoading(true);
+    setData(null);
+    setError(null);
 
     getJudgement(docid)
-      .then((d)  => { if (!cancelled) { setData(d);    setLoading(false); } })
+      .then((d)  => { if (!cancelled) { setData(d);          setLoading(false); } })
       .catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
 
     return () => { cancelled = true; };
@@ -92,7 +106,7 @@ export function useJudgement(docid) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useSaved  — manage bookmarked judgements
+// useSaved  — bookmark management
 // ─────────────────────────────────────────────────────────────────────────────
 export function useSaved() {
   const [saved,   setSaved]   = useState([]);
@@ -100,8 +114,8 @@ export function useSaved() {
 
   const refresh = useCallback(() => {
     getSaved()
-      .then((d) => { setSaved(d.saved || []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((d) => { setSaved(d?.saved || []); setLoading(false); })
+      .catch(()  => setLoading(false));
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
