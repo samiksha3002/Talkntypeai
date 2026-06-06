@@ -36,15 +36,13 @@ const EditorTextarea = ({ manualText, setManualText, showChat, quillRef }) => {
     ],
     clipboard: { matchVisual: false },
   };
-
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike',
-    'align', 'indent', 'list', 'bullet',
-    'blockquote', 'code-block',
-    'color', 'background', 'link', 'image',
-  ];
-
+const formats = [
+  'header', 'font', 'size',
+  'bold', 'italic', 'underline', 'strike',
+  'align', 'indent', 'list',              // ✅ 'list' alone covers both bullet and ordered
+  'blockquote', 'code-block',
+  'color', 'background', 'link', 'image',
+];
   return (
     <div style={{
       display: 'flex',
