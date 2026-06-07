@@ -48,7 +48,6 @@ object, embed, iframe {
     width: 100% !important;
 }
 
-/* iPad touch scrolling */
 .custom-scrollbar {
     -webkit-overflow-scrolling: touch !important;
 }
