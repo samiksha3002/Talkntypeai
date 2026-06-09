@@ -1,82 +1,121 @@
-// frontend/src/pages/JudgementsPage.jsx
+// frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, FileText, Bookmark, Building2, Calendar,
   Users, Gavel, Printer, Copy, ExternalLink,
   Loader2, AlertCircle, ChevronLeft, ChevronRight,
-  ChevronDown, X, Sparkles, BookOpen,
+  ChevronDown, X, Sparkles,
 } from 'lucide-react';
 
 import { useLatestJudgements, useSearch, useJudgement, useSaved } from '../components/Hooks/usejudgements';
 import { useSearchContext } from '../components/Context/searchcontext.jsx';
 import { formatDate, getCourtInfo, truncate } from '../components/utils/formatters';
 
-// ── Court Badge ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Court Badge
+// ─────────────────────────────────────────────────────────────────────────────
 function CourtBadge({ courtName }) {
-  const { label, style } = getCourtInfo(courtName);
+  const name = courtName || '';
+  const isSupreme = name.toLowerCase().includes('supreme');
+  const isHC = name.toLowerCase().includes('high');
   return (
-    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${style}`}>
-      {label}
+    <span style={{
+      fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 4,
+      background: isSupreme ? '#FEE2E2' : isHC ? '#DBEAFE' : '#F3F4F6',
+      color: isSupreme ? '#991B1B' : isHC ? '#1E40AF' : '#374151',
+    }}>
+      {isSupreme ? 'SC India' : name.replace(' High Court', ' HC') || 'Unknown'}
     </span>
   );
 }
 
-// ── AI Headnote using Gemini ───────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Headnote — tries multiple response fields
+// ─────────────────────────────────────────────────────────────────────────────
 function Headnote({ doc }) {
-  const [summary, setSummary]   = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [shown,   setShown]     = useState(false);
+  const [summary, setSummary] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [shown,   setShown]   = useState(false);
+  const [error,   setError]   = useState('');
 
   const generate = async () => {
     if (summary) { setShown(s => !s); return; }
     setLoading(true);
     setShown(true);
+    setError('');
     try {
-      const text = (doc.snippet || '') + ' ' + (doc.fulltext || '').slice(0, 2000);
+      const text = ((doc.snippet || '') + ' ' + (doc.fulltext || '')).slice(0, 3000);
+      const prompt = `You are a legal expert. Summarize this Indian court judgment in exactly 3 bullet points:\n\nCase: ${doc.title}\nCourt: ${doc.court}\nDate: ${doc.date}\nContent: ${text}\n\nFormat:\n• Facts: (what happened, 1 sentence)\n• Held: (what court decided, 1-2 sentences)\n• Significance: (why this matters legally, 1 sentence)\n\nBe concise and accurate.`;
+
       const res = await fetch('https://talkntypeai.onrender.com/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `Legal case: "${doc.title}"\nCourt: ${doc.court}\nDate: ${doc.date}\n\nText: ${text}\n\nGive a headnote in exactly 3 bullet points:\n• Facts: (1 sentence)\n• Held: (1-2 sentences, key ratio decidendi)\n• Significance: (why this case matters)\n\nBe concise and legally accurate.`,
-        }),
+        body: JSON.stringify({ message: prompt }),
       });
+
+      if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
-      setSummary(data.reply || data.message || data.response || 'Summary not available.');
-    } catch {
-      setSummary('Could not generate summary. Please try again.');
+
+      // Try every possible field name
+      const result =
+        data?.reply         ||
+        data?.message       ||
+        data?.response      ||
+        data?.text          ||
+        data?.content       ||
+        data?.answer        ||
+        data?.output        ||
+        data?.result        ||
+        (Array.isArray(data?.candidates) && data.candidates[0]?.content?.parts?.[0]?.text) ||
+        (typeof data === 'string' ? data : '');
+
+      if (result) {
+        setSummary(result);
+      } else {
+        setError(`Response received but no text found. Keys: ${Object.keys(data).join(', ')}`);
+      }
+    } catch (e) {
+      setError(`Failed: ${e.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mb-4">
-      <button
-        onClick={generate}
-        className="flex items-center gap-2 h-8 px-4 rounded text-xs font-medium border border-yellow-600/40 text-yellow-500 bg-yellow-600/8 hover:bg-yellow-600/15 transition-colors"
-      >
+    <div style={{ marginBottom: 20 }}>
+      <button onClick={generate} style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        height: 32, padding: '0 14px', borderRadius: 6, cursor: 'pointer',
+        border: '1px solid #D97706', background: '#FFFBEB',
+        color: '#92400E', fontSize: 12, fontWeight: 500,
+      }}>
         <Sparkles size={13} />
         {loading ? 'Generating AI Summary…' : shown ? 'Hide AI Summary' : '✨ AI Headnote / Summary'}
       </button>
 
       {shown && (
-        <div className="mt-3 p-4 rounded-lg border border-yellow-600/20 bg-yellow-600/5">
-          <div className="text-[10px] font-semibold tracking-widest uppercase text-yellow-500/80 mb-2">
+        <div style={{
+          marginTop: 10, padding: '14px 16px', borderRadius: 8,
+          background: '#FFFBEB', border: '1px solid #FDE68A',
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#92400E', marginBottom: 8 }}>
             AI-Generated Headnote
           </div>
           {loading ? (
-            <div className="flex items-center gap-2 text-white/40 text-xs">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400E', fontSize: 13 }}>
               <Loader2 size={14} className="animate-spin" /> Analysing judgement…
             </div>
+          ) : error ? (
+            <div style={{ fontSize: 12, color: '#DC2626' }}>{error}</div>
           ) : (
-            <div className="text-sm leading-relaxed text-slate-200 whitespace-pre-line">
+            <div style={{ fontSize: 13, lineHeight: 1.8, color: '#1C1917', whiteSpace: 'pre-line' }}>
               {summary}
             </div>
           )}
-          <div className="text-[10px] text-white/25 mt-2">
-            AI-generated summary — verify with original judgement
+          <div style={{ fontSize: 10, color: '#92400E', opacity: 0.6, marginTop: 8 }}>
+            AI-generated — verify with original judgement
           </div>
         </div>
       )}
@@ -84,7 +123,9 @@ function Headnote({ doc }) {
   );
 }
 
-// ── Advanced Search Panel ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Advanced Filter Panel
+// ─────────────────────────────────────────────────────────────────────────────
 const COURTS = [
   'Supreme Court of India','Delhi High Court','Bombay High Court',
   'Madras High Court','Calcutta High Court','Allahabad High Court',
@@ -92,6 +133,7 @@ const COURTS = [
   'Rajasthan High Court','Kerala High Court','Patna High Court',
   'Orissa High Court','Gauhati High Court','Uttarakhand High Court',
   'Madhya Pradesh High Court','Andhra Pradesh High Court','Telangana High Court',
+  'Jharkhand High Court','Chhattisgarh High Court',
 ];
 const SUBJECTS = [
   'Criminal Law','Constitutional Law','Civil Law','Family Law',
@@ -101,98 +143,102 @@ const SUBJECTS = [
   'Consumer Protection','Land Acquisition',
 ];
 const YEARS = Array.from({ length: 40 }, (_, i) => String(2025 - i));
+const QUICK_TAGS = [
+  'anticipatory bail','section 498A','fundamental rights','article 21',
+  'divorce maintenance','property dispute','income tax refund','habeas corpus',
+  'writ of mandamus','contempt of court',
+];
 
 function AdvancedFilters({ onSearch, onClose }) {
-  const [q,       setQ]       = useState('');
-  const [court,   setCourt]   = useState('');
-  const [year,    setYear]    = useState('');
+  const [q, setQ]           = useState('');
+  const [court, setCourt]   = useState('');
+  const [year, setYear]     = useState('');
   const [subject, setSubject] = useState('');
-  const [bench,   setBench]   = useState('');
+  const [bench, setBench]   = useState('');
 
   const apply = () => {
-    const parts = [q, subject].filter(Boolean);
-    if (bench) parts.push(`bench:${bench}`);
+    const parts = [q.trim(), subject.trim(), bench ? `bench "${bench}"` : ''].filter(Boolean);
     const query = parts.join(' ') || 'judgment';
-    const filters = { court, year };
-    onSearch(query, 0, filters);
+    onSearch(query, { court, year });
     onClose();
   };
 
-  const inputCls = "w-full h-8 px-3 rounded bg-slate-800 border border-slate-600 text-sm text-white/80 outline-none focus:border-yellow-600/50 placeholder-white/25";
-  const selectCls = "w-full h-8 px-3 rounded bg-slate-800 border border-slate-600 text-sm text-white/70 outline-none focus:border-yellow-600/50";
+  const inp = { width: '100%', height: 32, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', background: '#F9FAFB', fontSize: 12, color: '#111827', outline: 'none' };
+  const sel = { ...inp, cursor: 'pointer' };
 
   return (
-    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-slate-900 border border-slate-600 rounded-lg shadow-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-white/60 tracking-widest uppercase">Advanced Search</span>
-        <button onClick={onClose} className="text-white/40 hover:text-white/70"><X size={14} /></button>
+    <div style={{
+      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+      marginTop: 4, background: '#FFFFFF', border: '1px solid #E5E7EB',
+      borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', padding: 16,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 1, textTransform: 'uppercase' }}>
+          Advanced Search
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+          <X size={14} />
+        </button>
       </div>
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <div className="text-[10px] text-white/40 mb-1 uppercase tracking-wider">Keywords</div>
-          <input className={inputCls} value={q} onChange={e=>setQ(e.target.value)}
-            placeholder="e.g. bail anticipatory arrest" />
-        </div>
-        <div>
-          <div className="text-[10px] text-white/40 mb-1 uppercase tracking-wider">Court</div>
-          <select className={selectCls} value={court} onChange={e=>setCourt(e.target.value)}>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+        {[
+          ['Keywords', <input style={inp} value={q} onChange={e => setQ(e.target.value)} placeholder="e.g. bail arrest section..." />],
+          ['Court', <select style={sel} value={court} onChange={e => setCourt(e.target.value)}>
             <option value="">All Courts</option>
             {COURTS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="text-[10px] text-white/40 mb-1 uppercase tracking-wider">Year</div>
-          <select className={selectCls} value={year} onChange={e=>setYear(e.target.value)}>
+          </select>],
+          ['Year', <select style={sel} value={year} onChange={e => setYear(e.target.value)}>
             <option value="">All Years</option>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="text-[10px] text-white/40 mb-1 uppercase tracking-wider">Subject</div>
-          <select className={selectCls} value={subject} onChange={e=>setSubject(e.target.value)}>
+          </select>],
+          ['Subject', <select style={sel} value={subject} onChange={e => setSubject(e.target.value)}>
             <option value="">All Subjects</option>
             {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="text-[10px] text-white/40 mb-1 uppercase tracking-wider">Bench Type</div>
-          <select className={selectCls} value={bench} onChange={e=>setBench(e.target.value)}>
+          </select>],
+          ['Bench Type', <select style={sel} value={bench} onChange={e => setBench(e.target.value)}>
             <option value="">Any Bench</option>
-            <option value="Constitution Bench">Constitution Bench</option>
-            <option value="Larger Bench">Larger Bench (5+)</option>
-            <option value="Division Bench">Division Bench</option>
-            <option value="Single Bench">Single Bench</option>
-          </select>
-        </div>
-        <div className="flex items-end">
-          <button onClick={apply}
-            className="w-full h-8 px-4 bg-yellow-700 rounded text-xs font-semibold text-slate-900 hover:bg-yellow-600 transition-colors">
-            Apply Filters
-          </button>
-        </div>
+            <option>Constitution Bench</option>
+            <option>Larger Bench</option>
+            <option>Division Bench</option>
+            <option>Single Bench</option>
+          </select>],
+          ['', <button onClick={apply} style={{
+            width: '100%', height: 32, background: '#B45309', border: 'none',
+            borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          }}>Apply Filters</button>],
+        ].map(([label, el], i) => (
+          <div key={i}>
+            {label && <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>}
+            {el}
+          </div>
+        ))}
       </div>
-      <div className="flex gap-2 flex-wrap">
-        {['landmark','anticipatory bail','section 498A','fundamental rights',
-          'article 21','divorce maintenance','property dispute','income tax'].map(tag => (
-          <button key={tag} onClick={() => { setQ(tag); }}
-            className="h-5 px-2 rounded-full text-[10px] bg-slate-800 border border-slate-700 text-white/45 hover:text-yellow-500 hover:border-yellow-600/40 transition-colors">
-            {tag}
-          </button>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {QUICK_TAGS.map(tag => (
+          <button key={tag} onClick={() => setQ(tag)} style={{
+            height: 22, padding: '0 10px', borderRadius: 100,
+            border: '1px solid #E5E7EB', background: '#F9FAFB',
+            fontSize: 11, color: '#6B7280', cursor: 'pointer',
+          }}>{tag}</button>
         ))}
       </div>
     </div>
   );
 }
 
-// ── Print / PDF ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Print / Save PDF
+// ─────────────────────────────────────────────────────────────────────────────
 function printJudgement(doc) {
   const win = window.open('', '_blank');
-  if (!win) return;
+  if (!win) { alert('Allow popups to print/save as PDF'); return; }
   win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
     <style>
       body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.9;padding:0 24px}
       h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:16px}
-      .meta{background:#f5f5f0;padding:12px 16px;border-radius:6px;font-size:13px;color:#444;margin-bottom:24px}
+      .meta{background:#f9f9f0;padding:12px 16px;border-radius:6px;font-size:13px;color:#444;margin-bottom:24px;border:1px solid #e5e5cc}
       .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#888;margin:24px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
       .content{font-size:14px;line-height:1.9;color:#222}
       @media print{body{margin:10px}}
@@ -214,68 +260,89 @@ function printJudgement(doc) {
   setTimeout(() => { win.focus(); win.print(); }, 600);
 }
 
-// ── Modules ────────────────────────────────────────────────────────────────────
-const MODULES = [
-  { id: 'latest-cases',      label: 'Latest Cases',      isLatest: true },
-  { id: 'citation-search',   label: 'Citation Search',   isCitation: true },
-  { id: 'advanced-search',   label: 'Advanced Search',   isAdvanced: true },
-  { id: 'nominal-search',    label: 'Nominal Search',    query: '' },
-  { id: 'subject-topic',     label: 'Subject / Topic',   query: 'subject matter law' },
-  { id: 'judges-search',     label: 'Judges Search',     query: '' },
-  { id: 'new-criminal-laws', label: 'New Criminal Laws', query: 'BNS BNSS BSA bharatiya nyaya sanhita 2023' },
-  { id: 'central-laws',      label: 'Central Laws',      query: 'central act parliament India' },
-  { id: 'state-laws',        label: 'State Laws',        query: 'state amendment act legislation' },
-  { id: 'overruled-cases',   label: 'Overruled Cases',   query: 'overruled reversed judgment' },
-  { id: 'law-comm-reports',  label: 'Law Comm. Reports', query: 'law commission report India' },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// Save to file (download as .txt)
+// ─────────────────────────────────────────────────────────────────────────────
+function saveToFile(doc) {
+  const content = [
+    doc.title,
+    doc.citation ? `Citation: ${doc.citation}` : '',
+    `Court: ${doc.court || 'N/A'}`,
+    `Date: ${formatDate(doc.date) || 'N/A'}`,
+    '',
+    '--- JUDGEMENT ---',
+    '',
+    doc.fulltext
+      ? doc.fulltext.replace(/<[^>]*>/g, '')
+      : doc.snippet
+        ? doc.snippet.replace(/<[^>]*>/g, '')
+        : 'Full text not available.',
+  ].filter(l => l !== undefined).join('\n');
 
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${doc.title.slice(0, 60).replace(/[^a-z0-9]/gi, '_')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Top tabs + Modules
+// ─────────────────────────────────────────────────────────────────────────────
 const TOP_TABS = [
   { id: 'judgements',  label: 'Judgements',  isLatest: true },
   { id: 'bare-acts',   label: 'Bare Acts',   query: 'bare act statute section India' },
-  { id: 'legal-news',  label: 'Legal News',  query: 'latest supreme court judgment 2025' },
-  { id: 'law-reports', label: 'Law Reports', query: 'AIR SCC law commission report' },
+  { id: 'legal-news',  label: 'Legal News',  query: 'latest supreme court order judgment 2025' },
+  { id: 'law-reports', label: 'Law Reports', query: 'AIR SCC law report commission India' },
 ];
 
-// ── Copy to clipboard helper ───────────────────────────────────────────────────
-function useCopyToast() {
-  const [copied, setCopied] = useState(false);
-  const copy = (text) => {
-    navigator.clipboard.writeText(text)
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(() => {
-        // Fallback for older browsers
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
-  };
-  return { copied, copy };
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles (light theme)
+// ─────────────────────────────────────────────────────────────────────────────
+const C = {
+  pageBg    : '#F3F4F6',
+  topbar    : '#1E293B',
+  topbarBor : '#334155',
+  white     : '#FFFFFF',
+  border    : '#E5E7EB',
+  borderMid : '#D1D5DB',
+  text1     : '#111827',
+  text2     : '#374151',
+  text3     : '#6B7280',
+  text4     : '#9CA3AF',
+  gold      : '#B45309',
+  goldLight : '#FEF3C7',
+  goldBord  : '#FDE68A',
+  accent    : '#1E40AF',
+  listBg    : '#FFFFFF',
+  listHover : '#F9FAFB',
+  listSel   : '#FFFBEB',
+  detailBg  : '#FFFFFF',
+  sectionBg : '#F9FAFB',
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 const JudgementsPage = () => {
   const navigate = useNavigate();
-  const { copied, copy } = useCopyToast();
 
   const {
     queryText, setQueryText,
     activeFilters, toggleFilter,
-    activeModule, setActiveModule,
     selectedDocid, setSelectedDocid,
   } = useSearchContext();
 
-  const [activeTab,     setActiveTab]     = useState('judgements');
-  const [inputValue,    setInputValue]    = useState('');
-  const [citationMode,  setCitationMode]  = useState(false);
-  const [showAdvanced,  setShowAdvanced]  = useState(false);
-  const [savedToast,    setSavedToast]    = useState('');
+  const [activeTab,    setActiveTab]    = useState('judgements');
+  const [inputValue,   setInputValue]   = useState('');
+  const [citationMode, setCitationMode] = useState(false);
+  const [showAdv,      setShowAdv]      = useState(false);
+  const [toast,        setToast]        = useState('');
+  const [copied,       setCopied]       = useState(false);
 
   const { data: latestData, loading: latestLoading } = useLatestJudgements();
   const {
@@ -295,219 +362,229 @@ const JudgementsPage = () => {
     if (listItems.length > 0 && !selectedDocid) setSelectedDocid(listItems[0].id);
   }, [listItems]);
 
-  const doSearch = useCallback((q, page = 0, filters = {}) => {
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+  const doSearch = useCallback((q, filters = {}) => {
     if (!q?.trim()) return;
     setQueryText(q);
-    search(q, page, filters);
+    setSelectedDocid(null);
+    // Pass court and year through filters object
+    search(q, 0, filters);
   }, [search, setQueryText]);
 
   const handleSearch = () => {
     if (!inputValue.trim()) return;
     setCitationMode(false);
-    setShowAdvanced(false);
-    setSelectedDocid(null);
-    doSearch(inputValue, 0);
+    setShowAdv(false);
+    doSearch(inputValue);
   };
 
   const handleTopTab = (tab) => {
     setActiveTab(tab.id);
     setSelectedDocid(null);
     if (tab.isLatest) { setQueryText(''); setInputValue(''); }
-    else { setInputValue(tab.query); doSearch(tab.query, 0); }
-  };
-
-  const handleModuleClick = (mod) => {
-    setActiveModule(mod.id);
-    setSelectedDocid(null);
-    setCitationMode(!!mod.isCitation);
-    setShowAdvanced(!!mod.isAdvanced);
-    if (mod.isLatest) { setQueryText(''); setInputValue(''); return; }
-    if (mod.isCitation || mod.isAdvanced) { setInputValue(''); return; }
-    if (mod.query) { setInputValue(mod.query); doSearch(mod.query, 0); }
+    else { setInputValue(tab.query); doSearch(tab.query); }
   };
 
   const handleSaveToggle = async () => {
     if (!docDetail) return;
     if (isSaved(docDetail.id)) {
       await remove(docDetail.id);
-      setSavedToast('Removed from library');
+      showToast('Removed from saved');
     } else {
       await save({ docid: docDetail.id, title: docDetail.title, citation: docDetail.citation, court: docDetail.court, date: docDetail.date });
-      setSavedToast('Saved to library ✓');
+      showToast('Saved to library ✓');
     }
-    setTimeout(() => setSavedToast(''), 2000);
   };
 
   const copyCitation = () => {
-    const parts = [
-      docDetail?.citation,
-      docDetail?.title,
-      docDetail?.court && `Court: ${docDetail.court}`,
-      docDetail?.date && `Date: ${formatDate(docDetail.date)}`,
-    ].filter(Boolean);
-    copy(parts.join('\n'));
+    const text = [docDetail?.citation, docDetail?.title, `Court: ${docDetail?.court}`, `Date: ${formatDate(docDetail?.date)}`].filter(Boolean).join('\n');
+    try {
+      navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta); setCopied(true); setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const filterChips = [
-    { id: 'all-courts',     label: 'All Courts',     icon: Building2, query: null },
-    { id: 'landmark',       label: 'Landmark',       icon: null,      query: 'landmark judgment supreme court' },
-    { id: 'criminal',       label: 'Criminal',       icon: null,      query: 'criminal law IPC CrPC section' },
-    { id: 'constitutional', label: 'Constitutional', icon: null,      query: 'constitutional law fundamental rights article' },
-    { id: 'overruled',      label: 'Overruled',      icon: null,      query: 'overruled reversed judgment' },
-    { id: 'bench',          label: 'Full Bench',     icon: Users,     query: 'full bench constitution bench' },
+    { id: 'landmark',       label: 'Landmark',       query: 'landmark judgment india' },
+    { id: 'criminal',       label: 'Criminal',       query: 'criminal law IPC CrPC bail' },
+    { id: 'constitutional', label: 'Constitutional', query: 'constitutional law fundamental rights' },
+    { id: 'overruled',      label: 'Overruled',      query: 'overruled reversed judgment' },
   ];
 
-  return (
-    <div className="flex flex-col h-screen bg-slate-950 font-sans overflow-hidden">
+  // Shared button styles
+  const btnBase = { display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s' };
 
-      {/* TOPBAR */}
-      <div className="h-12 bg-slate-900 border-b border-slate-700/60 flex items-center justify-between px-5 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-yellow-700 rounded flex items-center justify-center text-sm">⚖</div>
-          <span className="text-sm font-medium text-yellow-100">Talk N <span className="text-yellow-500">Type</span></span>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.pageBg, fontFamily: "'Inter', 'DM Sans', sans-serif", overflow: 'hidden' }}>
+
+      {/* ── TOPBAR ────────────────────────────────────────────── */}
+      <div style={{ height: 52, background: C.topbar, borderBottom: `1px solid ${C.topbarBor}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 28, height: 28, background: '#B45309', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⚖</div>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#FEF3C7' }}>Talk N <span style={{ color: '#F59E0B' }}>Type</span></span>
         </div>
-        <div className="flex gap-0.5">
+
+        <div style={{ display: 'flex', gap: 2 }}>
           {TOP_TABS.map(tab => (
-            <button key={tab.id} onClick={() => handleTopTab(tab)}
-              className={`px-3.5 py-1.5 rounded text-xs font-medium transition-colors ${
-                activeTab === tab.id ? 'bg-yellow-600/15 text-yellow-400' : 'text-white/45 hover:text-white/75 hover:bg-white/5'
-              }`}>{tab.label}</button>
+            <button key={tab.id} onClick={() => handleTopTab(tab)} style={{
+              padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 500, transition: 'all 0.15s',
+              background: activeTab === tab.id ? 'rgba(245,158,11,0.15)' : 'transparent',
+              color: activeTab === tab.id ? '#F59E0B' : 'rgba(255,255,255,0.55)',
+            }}>{tab.label}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/dashboard')}
-            className="text-xs px-3 py-1.5 rounded bg-slate-800 text-white/60 hover:text-white/80 border border-slate-700 transition-colors">
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => navigate('/dashboard')} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #475569', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer' }}>
             Back
           </button>
-          <div className="w-7 h-7 rounded-full bg-slate-800 border border-yellow-600/50 flex items-center justify-center text-xs font-medium text-yellow-400">AS</div>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1E293B', border: '1px solid #F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 500, color: '#F59E0B' }}>AS</div>
         </div>
       </div>
 
-      {/* BODY */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ── BODY ──────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-          {/* SEARCH */}
-          <div className="px-4 py-3 border-b border-slate-700/60 bg-slate-950 flex-shrink-0 relative">
-            <div className="flex gap-2 mb-2.5">
-              <div className="flex-1 h-9 bg-slate-800/80 border border-slate-600/60 rounded flex items-center px-3 gap-2 focus-within:border-yellow-600/50 transition-colors">
-                <Search size={14} className="text-white/30 flex-shrink-0" />
-                <input type="text" value={inputValue}
+          {/* ── SEARCH ─────────────────────────────────────────── */}
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, background: C.white, flexShrink: 0, position: 'relative' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <div style={{ flex: 1, height: 38, background: '#F9FAFB', border: `1px solid ${C.borderMid}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8 }}>
+                <Search size={15} color={C.text4} style={{ flexShrink: 0 }} />
+                <input
+                  type="text" value={inputValue}
                   onChange={e => setInputValue(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  placeholder={citationMode ? 'Enter citation e.g. AIR 1973 SC 1461 or (1978) 1 SCC 248…' : 'Search by case name, citation, subject or keywords…'}
-                  className="flex-1 bg-transparent text-sm text-white/85 placeholder-white/25 outline-none" />
-                {searchLoading && <Loader2 size={14} className="text-yellow-500 animate-spin flex-shrink-0" />}
+                  placeholder={citationMode ? 'Enter citation e.g. AIR 1973 SC 1461…' : 'Search by case name, party, citation, section, or keywords…'}
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: C.text1 }}
+                />
+                {searchLoading && <Loader2 size={14} color="#B45309" className="animate-spin" style={{ flexShrink: 0 }} />}
               </div>
-              <button onClick={() => setShowAdvanced(v => !v)}
-                className={`h-9 px-3 rounded border text-xs font-medium flex items-center gap-1 transition-colors ${showAdvanced ? 'border-yellow-600/50 text-yellow-400 bg-yellow-600/10' : 'border-slate-600 text-white/50 hover:text-white/75 bg-slate-800/50'}`}>
-                Filters <ChevronDown size={12} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              <button onClick={() => setShowAdv(v => !v)} style={{
+                ...btnBase,
+                background: showAdv ? C.goldLight : '#F9FAFB',
+                borderColor: showAdv ? C.gold : C.borderMid,
+                color: showAdv ? C.gold : C.text3,
+              }}>
+                Filters <ChevronDown size={12} style={{ transform: showAdv ? 'rotate(180deg)' : 'none' }} />
               </button>
-              <button onClick={handleSearch} disabled={searchLoading}
-                className="h-9 px-5 bg-yellow-700 rounded text-xs font-semibold text-slate-900 hover:bg-yellow-600 disabled:opacity-50 transition-colors whitespace-nowrap">
-                {searchLoading ? 'Searching…' : 'Search Database'}
+              <button onClick={handleSearch} disabled={searchLoading} style={{
+                ...btnBase, padding: '0 20px', background: C.gold, borderColor: C.gold,
+                color: '#FFFFFF', fontWeight: 600, opacity: searchLoading ? 0.6 : 1,
+              }}>
+                {searchLoading ? 'Searching…' : 'Search'}
               </button>
             </div>
 
             {/* Quick filter chips */}
-            <div className="flex gap-1.5 flex-wrap">
-              {filterChips.map(({ id, label, icon: Icon, query }) => {
-                const isActive = activeFilters.includes(id);
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: C.text4, marginRight: 2 }}>Quick:</span>
+              {filterChips.map(({ id, label, query }) => {
+                const active = activeFilters.includes(id);
                 return (
-                  <button key={id}
-                    onClick={() => { toggleFilter(id); if (query) { setInputValue(query); doSearch(query, 0); } }}
-                    className={`h-6 px-3 rounded-full text-xs font-medium flex items-center gap-1 transition-colors ${
-                      isActive ? 'border border-yellow-600/50 text-yellow-400 bg-yellow-600/10' : 'border border-slate-700 text-white/45 bg-slate-900 hover:border-slate-500 hover:text-white/65'
-                    }`}>
-                    {Icon && <Icon size={11} />}{label}
-                  </button>
+                  <button key={id} onClick={() => { toggleFilter(id); setInputValue(query); doSearch(query); }} style={{
+                    height: 24, padding: '0 10px', borderRadius: 100, cursor: 'pointer',
+                    border: `1px solid ${active ? C.gold : C.border}`,
+                    background: active ? C.goldLight : C.white,
+                    color: active ? C.gold : C.text3, fontSize: 11, fontWeight: 500,
+                  }}>{label}</button>
                 );
               })}
+              <button onClick={() => setCitationMode(v => !v)} style={{
+                height: 24, padding: '0 10px', borderRadius: 100, cursor: 'pointer',
+                border: `1px solid ${citationMode ? C.accent : C.border}`,
+                background: citationMode ? '#EFF6FF' : C.white,
+                color: citationMode ? C.accent : C.text3, fontSize: 11,
+              }}>Citation Search</button>
             </div>
 
-            {/* Advanced filters panel */}
-            {showAdvanced && (
-              <AdvancedFilters
-                onSearch={(q, page, filters) => { doSearch(q, page, filters); setQueryText(q); }}
-                onClose={() => setShowAdvanced(false)}
-              />
-            )}
+            {showAdv && <AdvancedFilters onSearch={(q, f) => { setInputValue(q); doSearch(q, f); }} onClose={() => setShowAdv(false)} />}
           </div>
 
-          {/* SPLIT VIEW */}
-          <div className="flex flex-1 overflow-hidden">
+          {/* ── SPLIT VIEW ───────────────────────────────────────── */}
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
             {/* LIST */}
-            <div className="w-80 flex-shrink-0 border-r border-slate-700/60 flex flex-col overflow-hidden">
-              <div className="px-4 py-2 border-b border-slate-700/60 flex items-center justify-between flex-shrink-0 bg-slate-900/40">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                  <span className="text-xs text-white/60 font-medium">
+            <div style={{ width: 300, flexShrink: 0, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: C.listBg }}>
+              <div style={{ padding: '8px 14px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F9FAFB', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#16A34A' }} />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: C.text3 }}>
                     {isSearching ? `"${queryText}"` : 'Recent Judgements'}
                   </span>
                 </div>
                 {searchData?.total && (
-                  <span className="text-[10px] text-white/30 bg-white/5 px-2 py-0.5 rounded-full">
-                    {String(searchData.total).includes('of')
-                      ? String(searchData.total).split('of')[1].trim()
-                      : searchData.total}+
+                  <span style={{ fontSize: 10, color: C.text4, background: C.border, padding: '2px 8px', borderRadius: 100 }}>
+                    {String(searchData.total).includes('of') ? String(searchData.total).split('of')[1].trim() : searchData.total}+
                   </span>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div style={{ flex: 1, overflowY: 'auto' }}>
                 {listLoading && (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2">
-                    <Loader2 size={22} className="animate-spin text-yellow-600" />
-                    <span className="text-xs text-white/30">Fetching from Indian Kanoon…</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 180, gap: 10 }}>
+                    <Loader2 size={22} color="#B45309" className="animate-spin" />
+                    <span style={{ fontSize: 12, color: C.text4 }}>Fetching from Indian Kanoon…</span>
                   </div>
                 )}
                 {searchError && !listLoading && (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-red-400/80 px-4 text-center">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 180, gap: 8, color: '#DC2626', padding: 16, textAlign: 'center' }}>
                     <AlertCircle size={22} />
-                    <span className="text-xs">{searchError}</span>
+                    <span style={{ fontSize: 12 }}>{searchError}</span>
                   </div>
                 )}
                 {!listLoading && !searchError && listItems.map(item => (
-                  <div key={item.id} onClick={() => setSelectedDocid(item.id)}
-                    className={`px-4 py-3 border-b border-white/[0.04] cursor-pointer transition-all ${
-                      selectedDocid === item.id ? 'bg-yellow-600/8 border-l-2 border-l-yellow-500' : 'hover:bg-white/[0.03]'
-                    }`}>
-                    <div className="text-[10px] font-mono text-yellow-500/70 mb-1">
+                  <div key={item.id} onClick={() => setSelectedDocid(item.id)} style={{
+                    padding: '12px 14px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer',
+                    background: selectedDocid === item.id ? C.listSel : C.listBg,
+                    borderLeft: selectedDocid === item.id ? '3px solid #B45309' : '3px solid transparent',
+                    transition: 'all 0.1s',
+                  }}
+                  onMouseEnter={e => { if (selectedDocid !== item.id) e.currentTarget.style.background = C.listHover; }}
+                  onMouseLeave={e => { if (selectedDocid !== item.id) e.currentTarget.style.background = C.listBg; }}
+                  >
+                    <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#B45309', marginBottom: 4 }}>
                       {item.citation || `Doc #${item.id}`}
                     </div>
-                    <div className="text-sm font-medium text-slate-200 mb-1.5 leading-snug">
-                      {truncate(item.title, 75)}
+                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text1, marginBottom: 6, lineHeight: 1.4 }}>
+                      {truncate(item.title, 70)}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <CourtBadge courtName={item.court} />
-                      <span className="text-[10px] text-white/30 ml-auto">{formatDate(item.date)}</span>
+                      <span style={{ fontSize: 10, color: C.text4, marginLeft: 'auto' }}>{formatDate(item.date)}</span>
                     </div>
                   </div>
                 ))}
                 {!listLoading && !searchError && listItems.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-48 gap-2 text-white/20">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 180, gap: 8, color: C.text4 }}>
                     <FileText size={26} />
-                    <span className="text-xs">No results found</span>
-                    <span className="text-[10px] text-white/15">Try different keywords</span>
+                    <span style={{ fontSize: 12 }}>No results found</span>
+                    <span style={{ fontSize: 11, color: C.text4, opacity: 0.6 }}>Try different keywords</span>
                   </div>
                 )}
               </div>
 
               {/* PAGINATION */}
               {isSearching && listItems.length > 0 && (
-                <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-700/60 bg-slate-900/40 flex-shrink-0">
-                  <button onClick={() => { searchPrevPage(); setSelectedDocid(null); }}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderTop: `1px solid ${C.border}`, background: '#F9FAFB', flexShrink: 0 }}>
+                  <button
+                    onClick={() => { searchPrevPage(); setSelectedDocid(null); }}
                     disabled={!searchPage || searchLoading}
-                    className="flex items-center gap-1 text-xs text-white/45 hover:text-yellow-400 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: (!searchPage || searchLoading) ? 'not-allowed' : 'pointer', color: (!searchPage || searchLoading) ? C.text4 : C.gold, fontSize: 12, fontWeight: 500, opacity: (!searchPage || searchLoading) ? 0.4 : 1 }}>
                     <ChevronLeft size={14} /> Prev
                   </button>
-                  <span className="text-[11px] text-white/30 bg-white/5 px-2.5 py-1 rounded-full">
+                  <span style={{ fontSize: 11, color: C.text3, background: C.border, padding: '3px 10px', borderRadius: 100 }}>
                     Page {(searchPage || 0) + 1}
                   </span>
-                  <button onClick={() => { searchNextPage(); setSelectedDocid(null); }}
+                  <button
+                    onClick={() => { searchNextPage(); setSelectedDocid(null); }}
                     disabled={searchLoading || listItems.length < 10}
-                    className="flex items-center gap-1 text-xs text-white/45 hover:text-yellow-400 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: (searchLoading || listItems.length < 10) ? 'not-allowed' : 'pointer', color: (searchLoading || listItems.length < 10) ? C.text4 : C.gold, fontSize: 12, fontWeight: 500, opacity: (searchLoading || listItems.length < 10) ? 0.4 : 1 }}>
                     Next <ChevronRight size={14} />
                   </button>
                 </div>
@@ -515,54 +592,54 @@ const JudgementsPage = () => {
             </div>
 
             {/* DETAIL */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: C.detailBg }}>
               {docLoading ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3">
-                  <Loader2 size={28} className="animate-spin text-yellow-600" />
-                  <span className="text-xs text-white/30">Loading judgement…</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                  <Loader2 size={28} color="#B45309" className="animate-spin" />
+                  <span style={{ fontSize: 13, color: C.text4 }}>Loading judgement…</span>
                 </div>
               ) : docDetail ? (
                 <>
-                  {/* Detail header */}
-                  <div className="px-5 py-4 border-b border-slate-700/60 flex-shrink-0">
+                  {/* Header */}
+                  <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, flexShrink: 0, background: C.white }}>
                     {docDetail.citation && (
-                      <div className="text-[10px] font-mono text-yellow-500/80 mb-1.5 tracking-wide">
+                      <div style={{ fontSize: 10, fontFamily: 'monospace', color: C.gold, marginBottom: 6 }}>
                         {docDetail.citation}
                       </div>
                     )}
-                    <div className="text-base font-semibold text-white mb-2.5 leading-snug">
+                    <div style={{ fontSize: 16, fontWeight: 600, color: C.text1, marginBottom: 10, lineHeight: 1.35 }}>
                       {docDetail.title}
                     </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <span className="h-5 px-2.5 rounded text-xs flex items-center gap-1 bg-red-900/30 text-red-300">
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ height: 20, padding: '0 8px', borderRadius: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, background: '#FEE2E2', color: '#991B1B' }}>
                         <Building2 size={10} /> {docDetail.court || 'N/A'}
                       </span>
                       {docDetail.date && (
-                        <span className="h-5 px-2.5 rounded text-xs flex items-center gap-1 bg-emerald-900/25 text-emerald-300">
+                        <span style={{ height: 20, padding: '0 8px', borderRadius: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, background: '#D1FAE5', color: '#065F46' }}>
                           <Calendar size={10} /> {formatDate(docDetail.date)}
                         </span>
                       )}
                       {docDetail.bench && (
-                        <span className="h-5 px-2.5 rounded text-xs flex items-center gap-1 bg-slate-700/60 text-slate-300">
+                        <span style={{ height: 20, padding: '0 8px', borderRadius: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, background: '#F3F4F6', color: '#374151' }}>
                           <Users size={10} /> {truncate(docDetail.bench, 40)}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Detail body */}
-                  <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+                  {/* Body */}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                    {/* AI Headnote button */}
+                    {/* AI Headnote */}
                     <Headnote doc={docDetail} />
 
                     {/* Snippet */}
                     {docDetail.snippet && (
                       <div>
-                        <div className="text-[10px] font-semibold tracking-widest uppercase text-yellow-500/70 pb-2 border-b border-yellow-600/10 mb-3">
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: C.text4, paddingBottom: 6, borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
                           Summary / Excerpt
                         </div>
-                        <div className="text-sm leading-relaxed text-slate-300"
+                        <div style={{ fontSize: 13, lineHeight: 1.85, color: C.text2 }}
                           dangerouslySetInnerHTML={{ __html: docDetail.snippet }} />
                       </div>
                     )}
@@ -570,33 +647,32 @@ const JudgementsPage = () => {
                     {/* Full text */}
                     {docDetail.fulltext ? (
                       <div>
-                        <div className="text-[10px] font-semibold tracking-widest uppercase text-yellow-500/70 pb-2 border-b border-yellow-600/10 mb-3">
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: C.text4, paddingBottom: 6, borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
                           Full Judgement
                         </div>
-                        <div className="text-sm leading-relaxed text-slate-300"
+                        <div style={{ fontSize: 13, lineHeight: 1.95, color: C.text2 }}
                           dangerouslySetInnerHTML={{ __html: docDetail.fulltext }} />
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-10 gap-2 text-white/20">
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 0', gap: 8, color: C.text4 }}>
                         <FileText size={28} />
-                        <span className="text-xs">Full text not available inline</span>
-                        <a href={`https://indiankanoon.org/doc/${docDetail.id}/`}
-                          target="_blank" rel="noreferrer"
-                          className="text-[11px] text-yellow-500/60 hover:text-yellow-400 underline">
-                          Read full judgement on Indian Kanoon →
+                        <span style={{ fontSize: 13 }}>Full text not available inline</span>
+                        <a href={`https://indiankanoon.org/doc/${docDetail.id}/`} target="_blank" rel="noreferrer"
+                          style={{ fontSize: 12, color: C.gold }}>
+                          Read on Indian Kanoon →
                         </a>
                       </div>
                     )}
 
-                    {/* Acts cited */}
+                    {/* Acts */}
                     {docDetail.acts?.length > 0 && (
                       <div>
-                        <div className="text-[10px] font-semibold tracking-widest uppercase text-yellow-500/70 pb-2 border-b border-yellow-600/10 mb-3">
-                          Provisions / Acts Cited
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: C.text4, paddingBottom: 6, borderBottom: `1px solid ${C.border}`, marginBottom: 10 }}>
+                          Provisions Cited
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {docDetail.acts.slice(0, 20).map((act, i) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 font-mono">
+                            <span key={i} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: '#F3F4F6', border: `1px solid ${C.border}`, color: C.text2, fontFamily: 'monospace' }}>
                               {act}
                             </span>
                           ))}
@@ -606,69 +682,53 @@ const JudgementsPage = () => {
                   </div>
 
                   {/* Footer */}
-                  <div className="px-5 py-3 border-t border-slate-700/60 flex gap-2 flex-shrink-0 bg-slate-900/80 items-center">
-                    <button onClick={() => printJudgement(docDetail)}
-                      className="h-8 px-4 bg-yellow-700 rounded text-xs font-semibold text-slate-900 hover:bg-yellow-600 transition-colors flex items-center gap-1.5">
+                  <div style={{ padding: '10px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexShrink: 0, background: '#F9FAFB', alignItems: 'center' }}>
+                    <button onClick={() => printJudgement(docDetail)} style={{ ...btnBase, background: C.gold, borderColor: C.gold, color: '#fff', fontWeight: 600 }}>
                       <Printer size={13} /> Print / PDF
                     </button>
-
-                    <button onClick={copyCitation}
-                      className="h-8 px-3 bg-transparent border border-slate-600 rounded text-xs text-slate-300 hover:text-white hover:border-slate-400 transition-colors flex items-center gap-1.5">
-                      <Copy size={13} />
-                      {copied ? '✓ Copied!' : 'Copy Citation'}
+                    <button onClick={() => saveToFile(docDetail)} style={{ ...btnBase, background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF' }}>
+                      <FileText size={13} /> Save to File
                     </button>
-
-                    <button onClick={handleSaveToggle}
-                      className={`h-8 px-3 border rounded text-xs transition-colors flex items-center gap-1.5 ${
-                        isSaved(docDetail.id)
-                          ? 'border-yellow-600/60 text-yellow-400 bg-yellow-600/10'
-                          : 'bg-transparent border-slate-600 text-slate-300 hover:text-white hover:border-slate-400'
-                      }`}>
+                    <button onClick={copyCitation} style={{ ...btnBase, background: C.white, borderColor: C.borderMid, color: copied ? '#16A34A' : C.text2 }}>
+                      <Copy size={13} /> {copied ? '✓ Copied!' : 'Copy Citation'}
+                    </button>
+                    <button onClick={handleSaveToggle} style={{
+                      ...btnBase,
+                      background: isSaved(docDetail.id) ? C.goldLight : C.white,
+                      borderColor: isSaved(docDetail.id) ? C.gold : C.borderMid,
+                      color: isSaved(docDetail.id) ? C.gold : C.text2,
+                    }}>
                       <Bookmark size={13} fill={isSaved(docDetail.id) ? 'currentColor' : 'none'} />
-                      {savedToast || (isSaved(docDetail.id) ? 'Saved ✓' : 'Save')}
+                      {isSaved(docDetail.id) ? 'Saved ✓' : 'Save'}
                     </button>
-
-                    <div className="flex-1" />
-
-                    <a href={`https://indiankanoon.org/doc/${docDetail.id}/`}
-                      target="_blank" rel="noreferrer"
-                      className="h-8 px-3 bg-transparent border border-slate-600 rounded text-xs text-slate-300 hover:text-white hover:border-slate-400 transition-colors flex items-center gap-1.5">
+                    <div style={{ flex: 1 }} />
+                    <a href={`https://indiankanoon.org/doc/${docDetail.id}/`} target="_blank" rel="noreferrer"
+                      style={{ ...btnBase, background: C.white, borderColor: C.borderMid, color: C.text3, textDecoration: 'none' }}>
                       <ExternalLink size={13} /> Indian Kanoon
                     </a>
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/15">
-                  <Gavel size={36} />
-                  <span className="text-sm">Select a judgement to read</span>
-                  <span className="text-[11px] text-white/10">Click any case from the list on the left</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: C.text4 }}>
+                  <Gavel size={40} color={C.text4} style={{ opacity: 0.3 }} />
+                  <span style={{ fontSize: 14 }}>Select a judgement to read</span>
+                  <span style={{ fontSize: 12, color: C.text4, opacity: 0.6 }}>Click any case from the list</span>
                 </div>
               )}
             </div>
           </div>
-
-          {/* MODULE BAR */}
-          <div className="h-11 bg-slate-900 border-t border-slate-700/60 flex items-center gap-1 px-4 overflow-x-auto flex-shrink-0">
-            {MODULES.map(mod => (
-              <button key={mod.id} onClick={() => handleModuleClick(mod)}
-                className={`h-7 px-3 rounded text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0 ${
-                  activeModule === mod.id
-                    ? 'bg-yellow-600/15 text-yellow-400'
-                    : 'bg-white/4 text-white/40 hover:text-white/70 hover:bg-white/7'
-                }`}>
-                {mod.isLatest && <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse flex-shrink-0" />}
-                {mod.label}
-              </button>
-            ))}
-          </div>
-
         </div>
       </div>
 
-      {/* Toast notification */}
-      {savedToast && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-slate-800 border border-yellow-600/30 text-yellow-400 text-xs px-4 py-2 rounded-full shadow-lg z-50">
-          {savedToast}
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#1E293B', color: '#F59E0B', fontSize: 13, fontWeight: 500,
+          padding: '8px 20px', borderRadius: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          zIndex: 9999, whiteSpace: 'nowrap',
+        }}>
+          {toast}
         </div>
       )}
     </div>
