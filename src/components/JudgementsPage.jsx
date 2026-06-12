@@ -59,7 +59,7 @@ function Headnote({ doc }) {
       const data = await res.json();
 
       // Try every possible field name
-      const result =
+     const result = data?.reply || '';
         data?.reply         ||
         data?.message       ||
         data?.response      ||
