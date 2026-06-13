@@ -73,20 +73,40 @@ const COURT_CODES = {
 // GET /search/?formInput=<query>&pagenum=<n>
 // ─────────────────────────────────────────────────────────────────────────────
 async function searchJudgements({ formtext = "", pagenum = 0, filters = {} }) {
-  let parts = [formtext.trim()].filter(Boolean);
+  let query = formtext.trim();
+
+  // Smart query: case names get exact phrase matching
+  const isCaseName = /\bv\.?\s|\bvs\.?\s|\bversus\b/i.test(query);
+  const isCitation = /\b(AIR|SCC|SCR|All|Bom|Cal|Mad|Del)\b.*\d{4}/i.test(query);
+
+  let formattedQuery = query;
+  if (isCaseName && !query.startsWith('"')) {
+    const cleanName = query.replace(/\s*\(\d{4}\)\s*/g, "").trim();
+    formattedQuery = `"${cleanName}"`;
+  } else if (isCitation) {
+    formattedQuery = `"${query}"`;
+  }
+
+  let parts = [formattedQuery].filter(Boolean);
 
   // Court filter
   const courtCode = COURT_CODES[filters.court];
   if (courtCode) parts.push(`doctype:${courtCode}`);
 
+  // Year filter
+  if (filters.year) {
+    parts.push(`fromdate:01-01-${filters.year}`);
+    parts.push(`todate:31-12-${filters.year}`);
+  }
+
   // Date range
   if (filters.fromdate) parts.push(`fromdate:${filters.fromdate}`);
   if (filters.todate)   parts.push(`todate:${filters.todate}`);
 
-  // Author / judge name
-  if (filters.author)   parts.push(`author:${filters.author}`);
+  // Author
+  if (filters.author) parts.push(`author:${filters.author}`);
 
-  // Fallback so we always get results
+  // Fallback
   if (parts.length === 0) parts.push("doctypes:judgments");
 
   const formInput = parts.join(" ");

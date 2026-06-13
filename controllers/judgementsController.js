@@ -1,20 +1,15 @@
 // controllers/judgementsController.js
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix applied: changed  import ikService from "..."
-// to named default import — matches how ikService is exported
-// ─────────────────────────────────────────────────────────────────────────────
 
 import ikService from "../services/indianKanoonService.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/judgements/search?q=...&page=0&court=...&from=...&to=...&author=...
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GET /api/judgements/search ────────────────────────────────────────────────
 async function search(req, res) {
   try {
     const {
       q      = "",
       page   = "0",
       court  = "",
+      year   = "",      // ← added
       from   = "",
       to     = "",
       author = "",
@@ -27,7 +22,7 @@ async function search(req, res) {
     const raw  = await ikService.searchJudgements({
       formtext : q,
       pagenum  : parseInt(page, 10) || 0,
-      filters  : { court, fromdate: from, todate: to, author },
+      filters  : { court, year, fromdate: from, todate: to, author },
     });
 
     const data = ikService.normaliseSearchResult(raw);
@@ -39,9 +34,7 @@ async function search(req, res) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/judgements/latest
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GET /api/judgements/latest ────────────────────────────────────────────────
 async function getLatest(req, res) {
   try {
     const raw  = await ikService.searchJudgements({
@@ -58,9 +51,7 @@ async function getLatest(req, res) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/judgements/:docid
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GET /api/judgements/:docid ────────────────────────────────────────────────
 async function getById(req, res) {
   try {
     const { docid } = req.params;
@@ -71,7 +62,7 @@ async function getById(req, res) {
 
     const raw = await ikService.getDocument(docid);
     const doc = ikService.normaliseDoc(raw);
-    doc.fulltext = raw.doc || ""; // full HTML text from IK
+    doc.fulltext = raw.doc || "";
 
     return res.json(doc);
 
@@ -84,9 +75,7 @@ async function getById(req, res) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/judgements/:docid/fragment?q=...
-// ─────────────────────────────────────────────────────────────────────────────
+// ── GET /api/judgements/:docid/fragment ──────────────────────────────────────
 async function getFragment(req, res) {
   try {
     const { docid } = req.params;
