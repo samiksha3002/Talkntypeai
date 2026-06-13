@@ -36,11 +36,13 @@ import audioRoutes             from "./routes/audio.js";
 import legalRoutes             from "./routes/legal.js";
 import legalAiRoute            from "./routes/legalaidraft.js";
 
+// ── LexArchive Route Imports ──────────────────────────────────────────────────
 import judgementsRouter from "./routes/judgements.js";
 import savedRouter      from "./routes/saved.js";
-
-import { apiLimiter } from "./middleware/rateLimiter.js";
 import judgementAiRouter from "./routes/judgementAi.js";
+
+// ── Middleware Imports ────────────────────────────────────────────────────────
+import { apiLimiter } from "./middleware/rateLimiter.js";
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 connectDB();
@@ -81,7 +83,7 @@ app.use(cors(corsOptions));
 
 // ── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ extended: true, limit: "105mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 app.use("/api", apiLimiter);
