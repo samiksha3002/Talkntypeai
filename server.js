@@ -42,6 +42,7 @@ import savedRouter      from "./routes/saved.js";
 
 // ── Middleware Imports ────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
+import judgementAiRouter from "./routes/judgementAi.js";
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 connectDB();
@@ -119,6 +120,7 @@ app.use("/api/legal-ai",      legalAiRoute);
 // ── LexArchive Routes ─────────────────────────────────────────────────────────
 app.use("/api/judgements", judgementsRouter);
 app.use("/api/saved",      savedRouter);
+app.use("/api/judgement-ai", judgementAiRouter);
 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

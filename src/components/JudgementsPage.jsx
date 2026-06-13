@@ -40,38 +40,41 @@ function Headnote({ doc }) {
   const [shown,   setShown]   = useState(false);
   const [error,   setError]   = useState('');
 
- const generate = async () => {
-  if (summary) { setShown(s => !s); return; }
-  setLoading(true);
-  setShown(true);
-  setError('');
-  try {
-    const text = ((doc.snippet || '') + ' ' + (doc.fulltext || '')).slice(0, 3000);
-    const prompt = `You are a legal expert. Summarize this Indian court judgment in exactly 3 bullet points:\n\nCase: ${doc.title}\nCourt: ${doc.court}\nDate: ${doc.date}\nContent: ${text}\n\nFormat:\n• Facts: (what happened, 1 sentence)\n• Held: (what court decided, 1-2 sentences)\n• Significance: (why this matters legally, 1 sentence)\n\nBe concise and accurate.`;
+  const generate = async () => {
+    if (summary) { setShown(s => !s); return; }
+    setLoading(true);
+    setShown(true);
+    setError('');
+    try {
+      const res = await fetch('https://talkntypeai.onrender.com/api/judgement-ai/headnote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title    : doc.title,
+          court    : doc.court,
+          date     : doc.date,
+          snippet  : doc.snippet  || '',
+          fulltext : doc.fulltext || '',
+        }),
+      });
 
-    // ✅ FIX: Use YOUR backend instead of external API
-    const res = await fetch('/api/chat', {  // Change this line
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: prompt }),
-    });
+      const data = await res.json();
 
-    if (!res.ok) throw new Error(`API error ${res.status}`);
-    const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
 
-    const result = data?.reply || '';
-
-    if (result) {
-      setSummary(result);
-    } else {
-      setError(`No response from API. Response: ${JSON.stringify(data)}`);
+      if (data.headnote) {
+        setSummary(data.headnote);
+      } else {
+        setError('No summary returned from server.');
+      }
+    } catch (e) {
+      setError(`Failed: ${e.message}`);
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    setError(`Failed: ${e.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div style={{ marginBottom: 20 }}>
