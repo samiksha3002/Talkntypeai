@@ -75,14 +75,17 @@ const COURT_CODES = {
 async function searchJudgements({ formtext = "", pagenum = 0, filters = {} }) {
   let query = formtext.trim();
 
-  // Smart query: case names get exact phrase matching
+  // ── Smart query building ──────────────────────────────────────────────────
   const isCaseName = /\bv\.?\s|\bvs\.?\s|\bversus\b/i.test(query);
-  const isCitation = /\b(AIR|SCC|SCR|All|Bom|Cal|Mad|Del)\b.*\d{4}/i.test(query);
+  const isCitation = /\b(AIR|SCC|SCR|\d{4}\s+SCC|\d{4}\s+AIR)/i.test(query);
 
   let formattedQuery = query;
+
   if (isCaseName && !query.startsWith('"')) {
+    // Remove year in brackets e.g. "(1973)"
     const cleanName = query.replace(/\s*\(\d{4}\)\s*/g, "").trim();
-    formattedQuery = `"${cleanName}"`;
+    // Use title: operator for better exact case matching
+    formattedQuery = `title:"${cleanName}"`;
   } else if (isCitation) {
     formattedQuery = `"${query}"`;
   }
