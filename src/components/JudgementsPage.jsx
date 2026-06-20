@@ -847,4 +847,4 @@ const JudgementsPage = () => {
   );
 };
 
-export default JudgementsPage;
+export default JudgementsPage;s
