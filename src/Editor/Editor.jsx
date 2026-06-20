@@ -211,60 +211,57 @@ const Editor = ({
 
 // 🔠 Font Conversion Effect
 useEffect(() => {
-  const runFontConversion = async () => {
-    if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-
-    try {
-      setIsConverting(true);
-
-      // Strip HTML tags — send plain Devanagari text to the API
-      const plainText = fontConvertCommand.textToConvert
-        .replace(/<\/p>/gi, "\n")
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<[^>]+>/g, "")
-        .replace(/&nbsp;/g, " ")
-        .replace(/\u00A0/g, " ")
-        .trim();
-
-      // Map FontConvertCard's conversionType IDs → what the API expects
-      // FontConvertCard sends: "krutidev-to-unicode", "unicode-to-krutidev",
-      //   "unicode-to-shivaji", "mangal-to-krutidev", etc.
-      // We pass it straight through to /api/font/convert
-      const conversionType = fontConvertCommand.font;
-
-      const res = await fetch(`${API_BASE_URL}/api/font/convert`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: plainText, conversionType }),
-      });
-
-      // Guard: if server returned non-JSON (404 HTML page), show clear error
-      const contentType = res.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
-        throw new Error(
-          `Server returned ${res.status}. Route /api/font/convert not found.`
-        );
+    const runFontConversion = async () => {
+      if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
+ 
+      try {
+        setIsConverting(true);
+ 
+        // HTML strip karke plain text nikalo
+        const plainText = fontConvertCommand.textToConvert
+          .replace(/<\/p>/gi, "\n")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/\u00A0/g, " ")
+          .trim();
+ 
+        // FontConvertCard.font = "unicode-to-krutidev" / "unicode-to-shivaji" / "unicode-to-preeti"
+        const conversionType = fontConvertCommand.font;
+ 
+        // ✅ CORRECT URL — /api/font/convert (not /api/font-convert/)
+        // API_BASE_URL will be "http://localhost:5000" locally
+        // and your production URL on server
+        const res = await fetch(`${API_BASE_URL}/api/font/convert`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: plainText, conversionType }),
+        });
+ 
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(`Route not found (${res.status}). Check server.js has: app.use("/api/font", fontConvertRouter)`);
+        }
+ 
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `Server error: ${res.status}`);
+        }
+ 
+        setManualText(`<p>${data.convertedText}</p>`);
+ 
+      } catch (err) {
+        console.error("Font conversion error:", err.message);
+        alert(`Font conversion failed:\n${err.message}`);
+      } finally {
+        setIsConverting(false);
+        setFontConvertCommand(null);
       }
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Conversion failed: ${res.status}`);
-      }
-
-      setManualText(`<p>${data.convertedText}</p>`);
-
-    } catch (err) {
-      console.error("Font conversion error:", err.message);
-      alert(`Font conversion failed: ${err.message}`);
-    } finally {
-      setIsConverting(false);
-      setFontConvertCommand(null);
-    }
-  };
-
-  runFontConversion();
-}, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
+    };
+ 
+    runFontConversion();
+  }, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
+ 
 
   // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
   const clearAutoSave = () => {
