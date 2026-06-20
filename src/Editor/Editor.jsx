@@ -4,8 +4,6 @@ import EditorTextarea from "./EditorTextarea";
 import EditorStatusBar from "./EditorStatusBar";
 import DraftPopup from "./DraftPopup";
 // Agar file ka naam fontConverter.js hai toh:
-import { convertToKrutiDev , convertToShivaji } from "../../utils/fontConverter";
-
 
 const Editor = ({
   user,
@@ -201,42 +199,80 @@ const Editor = ({
   }, [transliterationCommand, API_BASE_URL, setManualText, setIsTransliterating, setTransliterationCommand]);
 
   // 🔠 Font Conversion Effect
-useEffect(() => {
-    const runFontConversion = async () => {
-      if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-      try {
-        setIsConverting(true);
-        const plainText = fontConvertCommand.textToConvert.replace(/<[^>]*>/g, "");
-        let convertedText = plainText;
-        setTimeout(async () => {
-          if (fontConvertCommand.font === "krutidev") convertedText = convertToKrutiDev(plainText);
-          else if (fontConvertCommand.font === "Shivaji") convertedText = convertToShivaji(plainText);
-          else if (fontConvertCommand.font === "Preeti") convertedText = convertToPreeti(plainText);
-          else if (fontConvertCommand.font === "unicode") {
-            const res = await fetch(`${API_BASE_URL}/api/font-convert/krutidev-to-unicode`, {
-              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: plainText })
-            });
-            const data = await res.json();
-            convertedText = data.convertedText || plainText;
-          }
-          setManualText(`<p>${convertedText}</p>`);
-          setIsConverting(false);
-          setFontConvertCommand(null);
-        }, 500);
-      } catch (err) {
-        setIsConverting(false);
-        setFontConvertCommand(null);
-      }
-    };
-    runFontConversion();
-  }, [fontConvertCommand, setManualText, setIsConverting, setFontConvertCommand]);
+// ─────────────────────────────────────────────────────────────────────────────
+// REPLACE ONLY the Font Conversion useEffect in your Editor.js
+// Find the existing useEffect that has "runFontConversion" and replace it
+// with this entire block.
+//
+// ALSO: Remove this old import at the top of Editor.js:
+//   import { convertToKrutiDev, convertToShivaji } from "../../utils/fontConverter";
+// It is no longer needed — all conversions now go through the API.
+// ─────────────────────────────────────────────────────────────────────────────
 
+// 🔠 Font Conversion Effect
+useEffect(() => {
+  const runFontConversion = async () => {
+    if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
+
+    try {
+      setIsConverting(true);
+
+      // Strip HTML tags — send plain Devanagari text to the API
+      const plainText = fontConvertCommand.textToConvert
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\u00A0/g, " ")
+        .trim();
+
+      // Map FontConvertCard's conversionType IDs → what the API expects
+      // FontConvertCard sends: "krutidev-to-unicode", "unicode-to-krutidev",
+      //   "unicode-to-shivaji", "mangal-to-krutidev", etc.
+      // We pass it straight through to /api/font/convert
+      const conversionType = fontConvertCommand.font;
+
+      const res = await fetch(`${API_BASE_URL}/api/font/convert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: plainText, conversionType }),
+      });
+
+      // Guard: if server returned non-JSON (404 HTML page), show clear error
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `Server returned ${res.status}. Route /api/font/convert not found.`
+        );
+      }
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Conversion failed: ${res.status}`);
+      }
+
+      setManualText(`<p>${data.convertedText}</p>`);
+
+    } catch (err) {
+      console.error("Font conversion error:", err.message);
+      alert(`Font conversion failed: ${err.message}`);
+    } finally {
+      setIsConverting(false);
+      setFontConvertCommand(null);
+    }
+  };
+
+  runFontConversion();
+}, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
+
+  // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
   const clearAutoSave = () => {
     if (user?._id) {
       localStorage.removeItem(`autosave_${user._id}`);
       setManualText('');
     }
-  }
+  };
 
   return (
     <div className="flex-1 w-full h-full flex flex-col bg-white relative overflow-hidden">

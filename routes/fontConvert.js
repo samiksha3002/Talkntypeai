@@ -20,7 +20,8 @@
  */
 
 import express from "express";
-import { convert, SUPPORTED_CONVERSIONS } from "./fontConverterUtils.js";
+
+import { convert, SUPPORTED_CONVERSIONS } from "../utils/fontConverterUtils.js";
 
 const router = express.Router();
 

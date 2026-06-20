@@ -102,7 +102,7 @@ app.use("/api/chat",          aiChatRoutes);
 app.use("/api/ocr",           ocrRoutes);
 app.use("/api/expand",        expandRoute);
 app.use("/api/fix-grammar",   fixGrammarRoute);
-app.use("/api/font-convert",  fontConvertRouter);
+app.use("/api/font",  fontConvertRouter);
 app.use("/api/draft",         draftRouter);
 app.use("/api/transliterate", transliterateFinalRoute);
 app.use("/api/clients",       clientsRoutes);
