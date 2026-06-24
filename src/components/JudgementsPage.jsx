@@ -117,151 +117,6 @@ function Headnote({ doc }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Print Modal — Advocate Details
-// ─────────────────────────────────────────────────────────────────────────────
-function PrintModal({ doc, onClose }) {
-  const [name,    setName]    = useState('');
-  const [enroll,  setEnroll]  = useState('');
-  const [bar,     setBar]     = useState('');
-  const [contact, setContact] = useState('');
-
-  const handlePrint = () => {
-    if (!name.trim()) { alert('Kripya apna naam bharein'); return; }
-    const win = window.open('', '_blank');
-    if (!win) { alert('Allow popups to print/save as PDF'); return; }
-
-    const cleanName = name.replace(/^adv\.?\s*/i, '');
-    const advocateStamp = `
-      <div class="advocate-stamp">
-        <div class="stamp-label">Research / Reference provided by</div>
-        <div class="stamp-name">Adv. ${cleanName}</div>
-        ${enroll ? `<div class="stamp-meta">Enrollment No: ${enroll}${bar ? ` &nbsp;|&nbsp; Bar Council of ${bar}` : ''}</div>` : ''}
-        ${contact ? `<div class="stamp-meta">Contact: ${contact}</div>` : ''}
-      </div>
-    `;
-
-    win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
-      <style>
-        body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #111; line-height: 1.9; padding: 0 24px; }
-        h1 { font-size: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
-        .meta { background: #f9f9f0; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #444; margin-bottom: 24px; border: 1px solid #e5e5cc; }
-        .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #888; margin: 24px 0 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-        .content { font-size: 14px; line-height: 1.9; color: #222; }
-        .advocate-stamp {
-          margin-top: 40px;
-          padding: 14px 18px;
-          border: 1.5px solid #B45309;
-          border-radius: 6px;
-          background: #FFFBEB;
-          page-break-inside: avoid;
-        }
-        .stamp-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #92400E; margin-bottom: 4px; }
-        .stamp-name { font-size: 16px; font-weight: 700; color: #78350F; font-family: Georgia, serif; }
-        .stamp-meta { font-size: 12px; color: #92400E; margin-top: 2px; }
-        @media print { body { margin: 10px; } }
-      </style>
-    </head><body>
-      <h1>${doc.title}</h1>
-      <div class="meta">
-        ${doc.citation ? `<strong>${doc.citation}</strong><br>` : ''}
-        <strong>Court:</strong> ${doc.court || 'N/A'} &nbsp;|&nbsp;
-        <strong>Date:</strong> ${formatDate(doc.date) || 'N/A'}
-      </div>
-      ${doc.fulltext
-        ? `<div class="label">Full Judgement</div><div class="content">${doc.fulltext}</div>`
-        : doc.snippet
-          ? `<div class="label">Excerpt</div><div class="content">${doc.snippet}</div>`
-          : '<p style="color:#999">Full text not available.</p>'
-      }
-      ${advocateStamp}
-    </body></html>`);
-    win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 600);
-    onClose();
-  };
-
-  const overlayStyle = {
-    position: 'fixed', inset: 0, zIndex: 9999,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 16,
-  };
-  const boxStyle = {
-    background: '#FFFFFF', borderRadius: 12, padding: 24,
-    width: '100%', maxWidth: 420,
-    boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-  };
-  const inp = {
-    width: '100%', height: 34, padding: '0 10px', borderRadius: 6,
-    border: '1px solid #D1D5DB', background: '#F9FAFB',
-    fontSize: 13, color: '#111827', outline: 'none', boxSizing: 'border-box',
-  };
-
-  const cleanName = name.replace(/^adv\.?\s*/i, '');
-  const previewName = cleanName || 'Aapka Naam';
-
-  return (
-    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={boxStyle}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Printer size={18} color="#B45309" />
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>Print / Save as PDF</span>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
-            <X size={16} />
-          </button>
-        </div>
-        <p style={{ fontSize: 12, color: '#6B7280', margin: '0 0 18px' }}>
-          Apna naam bharein — print page pe stamp ki tarah dikhega
-        </p>
-
-        {/* Fields */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Advocate ka naam *</div>
-          <input style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Adv. Ramesh Kumar Singh" autoFocus />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Enrollment No.</div>
-            <input style={inp} value={enroll} onChange={e => setEnroll(e.target.value)} placeholder="MH/1234/2018" />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Bar Council</div>
-            <input style={inp} value={bar} onChange={e => setBar(e.target.value)} placeholder="Maharashtra" />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Contact / Mobile (optional)</div>
-          <input style={inp} value={contact} onChange={e => setContact(e.target.value)} placeholder="+91 98765 43210" />
-        </div>
-
-        {/* Live Preview */}
-        <div style={{ padding: '10px 14px', border: '1px dashed #D1D5DB', borderRadius: 8, background: '#FFFBEB', marginBottom: 16 }}>
-          <div style={{ fontSize: 9, color: '#92400E', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Preview — print pe aise dikhega</div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#78350F' }}>Adv. {previewName}</div>
-          {(enroll || bar) && <div style={{ fontSize: 11, color: '#92400E' }}>Enrollment: {enroll || '—'}{bar ? ` | Bar Council of ${bar}` : ''}</div>}
-          {contact && <div style={{ fontSize: 11, color: '#92400E' }}>{contact}</div>}
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #D1D5DB', background: 'transparent', color: '#6B7280', fontSize: 13, cursor: 'pointer' }}>
-            Cancel
-          </button>
-          <button onClick={handlePrint} style={{ flex: 1, padding: '8px 0', borderRadius: 6, background: '#B45309', border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Printer size={14} /> Print karein
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Advanced Filter Panel
 // ─────────────────────────────────────────────────────────────────────────────
 const COURTS = [
@@ -367,6 +222,38 @@ function AdvancedFilters({ onSearch, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Print / Save PDF
+// ─────────────────────────────────────────────────────────────────────────────
+function printJudgement(doc) {
+  const win = window.open('', '_blank');
+  if (!win) { alert('Allow popups to print/save as PDF'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
+    <style>
+      body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.9;padding:0 24px}
+      h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:16px}
+      .meta{background:#f9f9f0;padding:12px 16px;border-radius:6px;font-size:13px;color:#444;margin-bottom:24px;border:1px solid #e5e5cc}
+      .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#888;margin:24px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
+      .content{font-size:14px;line-height:1.9;color:#222}
+      @media print{body{margin:10px}}
+    </style></head><body>
+    <h1>${doc.title}</h1>
+    <div class="meta">
+      ${doc.citation ? `<strong>${doc.citation}</strong><br>` : ''}
+      <strong>Court:</strong> ${doc.court || 'N/A'} &nbsp;|&nbsp;
+      <strong>Date:</strong> ${formatDate(doc.date) || 'N/A'}
+    </div>
+    ${doc.fulltext
+      ? `<div class="label">Full Judgement</div><div class="content">${doc.fulltext}</div>`
+      : doc.snippet
+        ? `<div class="label">Excerpt</div><div class="content">${doc.snippet}</div>`
+        : '<p style="color:#999">Full text not available.</p>'
+    }
+    </body></html>`);
+  win.document.close();
+  setTimeout(() => { win.focus(); win.print(); }, 600);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Save to file (download as .txt)
 // ─────────────────────────────────────────────────────────────────────────────
 function saveToFile(doc) {
@@ -447,7 +334,6 @@ const JudgementsPage = () => {
   const [inputValue,   setInputValue]   = useState('');
   const [citationMode, setCitationMode] = useState(false);
   const [showAdv,      setShowAdv]      = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [toast,        setToast]        = useState('');
   const [copied,       setCopied]       = useState(false);
 
@@ -790,7 +676,7 @@ const JudgementsPage = () => {
 
                   {/* Footer */}
                   <div style={{ padding: '10px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexShrink: 0, background: '#F9FAFB', alignItems: 'center' }}>
-                    <button onClick={() => setShowPrintModal(true)} style={{ ...btnBase, background: C.gold, borderColor: C.gold, color: '#fff', fontWeight: 600 }}>
+                    <button onClick={() => printJudgement(docDetail)} style={{ ...btnBase, background: C.gold, borderColor: C.gold, color: '#fff', fontWeight: 600 }}>
                       <Printer size={13} /> Print / PDF
                     </button>
                     <button onClick={() => saveToFile(docDetail)} style={{ ...btnBase, background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF' }}>
@@ -826,11 +712,6 @@ const JudgementsPage = () => {
           </div>
         </div>
       </div>
-
-      {/* Print Modal */}
-      {showPrintModal && docDetail && (
-        <PrintModal doc={docDetail} onClose={() => setShowPrintModal(false)} />
-      )}
 
       {/* Toast */}
       {toast && (
