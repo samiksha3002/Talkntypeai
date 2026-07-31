@@ -1,4 +1,4 @@
-// frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied
+// frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied + Print Details Feature
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -222,11 +222,20 @@ function AdvancedFilters({ onSearch, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Print / Save PDF
+// Print / Save PDF (Updated to accept user details)
 // ─────────────────────────────────────────────────────────────────────────────
-function printJudgement(doc) {
+function printJudgement(doc, printDetails = {}) {
   const win = window.open('', '_blank');
   if (!win) { alert('Allow popups to print/save as PDF'); return; }
+  
+  const userDetailsHtml = (printDetails.name || printDetails.notes) 
+    ? `<div style="background:#fefce8; padding:12px 16px; border:1px dashed #ca8a04; border-radius:6px; margin-bottom:20px; font-size:13px; color:#444;">
+         <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#a16207; margin-bottom:6px;">Print Details</div>
+         ${printDetails.name ? `<strong>Prepared By / Advocate:</strong> ${printDetails.name}<br>` : ''}
+         ${printDetails.notes ? `<strong>Notes / Ref:</strong> ${printDetails.notes}` : ''}
+       </div>` 
+    : '';
+
   win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
     <style>
       body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.9;padding:0 24px}
@@ -236,6 +245,7 @@ function printJudgement(doc) {
       .content{font-size:14px;line-height:1.9;color:#222}
       @media print{body{margin:10px}}
     </style></head><body>
+    ${userDetailsHtml}
     <h1>${doc.title}</h1>
     <div class="meta">
       ${doc.citation ? `<strong>${doc.citation}</strong><br>` : ''}
@@ -336,6 +346,11 @@ const JudgementsPage = () => {
   const [showAdv,      setShowAdv]      = useState(false);
   const [toast,        setToast]        = useState('');
   const [copied,       setCopied]       = useState(false);
+  
+  // NEW STATE: Print Modal logic
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printName, setPrintName] = useState('');
+  const [printNotes, setPrintNotes] = useState('');
 
   const { data: latestData, loading: latestLoading } = useLatestJudgements();
   const {
@@ -399,6 +414,11 @@ const JudgementsPage = () => {
       ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy');
       document.body.removeChild(ta); setCopied(true); setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const executePrint = () => {
+    printJudgement(docDetail, { name: printName, notes: printNotes });
+    setShowPrintModal(false);
   };
 
   const filterChips = [
@@ -676,9 +696,12 @@ const JudgementsPage = () => {
 
                   {/* Footer */}
                   <div style={{ padding: '10px 20px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexShrink: 0, background: '#F9FAFB', alignItems: 'center' }}>
-                    <button onClick={() => printJudgement(docDetail)} style={{ ...btnBase, background: C.gold, borderColor: C.gold, color: '#fff', fontWeight: 600 }}>
+                    
+                    {/* CHANGED: Opens the print modal instead of printing directly */}
+                    <button onClick={() => setShowPrintModal(true)} style={{ ...btnBase, background: C.gold, borderColor: C.gold, color: '#fff', fontWeight: 600 }}>
                       <Printer size={13} /> Print / PDF
                     </button>
+                    
                     <button onClick={() => saveToFile(docDetail)} style={{ ...btnBase, background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF' }}>
                       <FileText size={13} /> Save to File
                     </button>
@@ -712,6 +735,58 @@ const JudgementsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* NEW: Print Details Modal */}
+      {showPrintModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
+          background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(2px)'
+        }}>
+          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: 400, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: '#111827', fontSize: 18 }}>Print Settings</h3>
+              <button onClick={() => setShowPrintModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.4 }}>
+              Add your details or client reference to include them at the top of the printed document. Leave blank if not required.
+            </p>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: '#374151' }}>Prepared By / Advocate Name</label>
+              <input
+                type="text" value={printName} onChange={e => setPrintName(e.target.value)}
+                style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 8, border: '1px solid #D1D5DB', boxSizing: 'border-box', outline: 'none', fontSize: 14 }}
+                placeholder="e.g. Adv. R. K. Sharma"
+              />
+            </div>
+            
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: '#374151' }}>Notes / Client Reference</label>
+              <input
+                type="text" value={printNotes} onChange={e => setPrintNotes(e.target.value)}
+                style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 8, border: '1px solid #D1D5DB', boxSizing: 'border-box', outline: 'none', fontSize: 14 }}
+                placeholder="e.g. For Client File #104 - Bail App"
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowPrintModal(false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151', fontWeight: 500 }}>
+                Cancel
+              </button>
+              <button
+                onClick={executePrint}
+                style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#B45309', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <Printer size={16} /> Continue to Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
