@@ -1,4 +1,4 @@
-// frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied + Print Details Feature
+// frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -222,19 +222,54 @@ function AdvancedFilters({ onSearch, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Print / Save PDF (Updated to accept user details)
+// Print / Save PDF (Updated with Chamber, Email, Contact, Case Type & Letterhead)
 // ─────────────────────────────────────────────────────────────────────────────
 function printJudgement(doc, printDetails = {}) {
   const win = window.open('', '_blank');
   if (!win) { alert('Allow popups to print/save as PDF'); return; }
   
-  const userDetailsHtml = (printDetails.name || printDetails.notes) 
-    ? `<div style="background:#fefce8; padding:12px 16px; border:1px dashed #ca8a04; border-radius:6px; margin-bottom:20px; font-size:13px; color:#444;">
-         <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#a16207; margin-bottom:6px;">Print Details</div>
-         ${printDetails.name ? `<strong>Prepared By / Advocate:</strong> ${printDetails.name}<br>` : ''}
-         ${printDetails.notes ? `<strong>Notes / Ref:</strong> ${printDetails.notes}` : ''}
-       </div>` 
-    : '';
+  let userDetailsHtml = '';
+
+  if (printDetails.letterhead) {
+    // Letterhead Style (Centered, Formal)
+    userDetailsHtml = `
+      <div style="text-align:center; border-bottom: 2px solid #ca8a04; padding-bottom: 16px; margin-bottom: 24px;">
+        <h2 style="margin:0; font-size:24px; color:#a16207; text-transform:uppercase; letter-spacing:1px;">
+          ${printDetails.name || 'Advocate'}
+        </h2>
+        <div style="font-size:14px; color:#333; margin-top:8px; line-height:1.6;">
+          ${printDetails.chamber ? `<strong>Chamber:</strong> ${printDetails.chamber} &nbsp;|&nbsp; ` : ''}
+          ${printDetails.contact ? `<strong>Mob:</strong> ${printDetails.contact} &nbsp;|&nbsp; ` : ''}
+          ${printDetails.email ? `<strong>Email:</strong> ${printDetails.email}` : ''}
+        </div>
+        <div style="font-size:13px; color:#555; margin-top:4px;">
+          ${printDetails.caseType ? `<strong>Case Type:</strong> ${printDetails.caseType} &nbsp;|&nbsp; ` : ''}
+          ${printDetails.notes ? `<strong>Ref:</strong> ${printDetails.notes}` : ''}
+        </div>
+      </div>
+    `;
+  } else if (printDetails.name || printDetails.chamber || printDetails.contact || printDetails.email || printDetails.caseType || printDetails.notes) {
+    // Standard Box Style (If Letterhead is off)
+    userDetailsHtml = `
+      <div style="background:#fefce8; padding:12px 16px; border:1px dashed #ca8a04; border-radius:6px; margin-bottom:20px; font-size:13px; color:#444;">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#a16207; margin-bottom:10px;">Print Details</div>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <tr>
+            <td style="padding:4px 0; width:50%;">${printDetails.name ? `<strong>Advocate:</strong> ${printDetails.name}` : ''}</td>
+            <td style="padding:4px 0; width:50%;">${printDetails.chamber ? `<strong>Chamber:</strong> ${printDetails.chamber}` : ''}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;">${printDetails.contact ? `<strong>Contact:</strong> ${printDetails.contact}` : ''}</td>
+            <td style="padding:4px 0;">${printDetails.email ? `<strong>Email:</strong> ${printDetails.email}` : ''}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;">${printDetails.caseType ? `<strong>Case Type:</strong> ${printDetails.caseType}` : ''}</td>
+            <td style="padding:4px 0;">${printDetails.notes ? `<strong>Notes:</strong> ${printDetails.notes}` : ''}</td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
 
   win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
     <style>
@@ -347,10 +382,15 @@ const JudgementsPage = () => {
   const [toast,        setToast]        = useState('');
   const [copied,       setCopied]       = useState(false);
   
-  // NEW STATE: Print Modal logic
+  // NEW STATE: Expanded Print Modal logic
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printName, setPrintName] = useState('');
+  const [printChamber, setPrintChamber] = useState('');
+  const [printContact, setPrintContact] = useState('');
+  const [printEmail, setPrintEmail] = useState('');
+  const [printCaseType, setPrintCaseType] = useState('');
   const [printNotes, setPrintNotes] = useState('');
+  const [printLetterhead, setPrintLetterhead] = useState(false);
 
   const { data: latestData, loading: latestLoading } = useLatestJudgements();
   const {
@@ -417,7 +457,15 @@ const JudgementsPage = () => {
   };
 
   const executePrint = () => {
-    printJudgement(docDetail, { name: printName, notes: printNotes });
+    printJudgement(docDetail, { 
+      name: printName, 
+      chamber: printChamber,
+      contact: printContact,
+      email: printEmail,
+      caseType: printCaseType,
+      notes: printNotes, 
+      letterhead: printLetterhead 
+    });
     setShowPrintModal(false);
   };
 
@@ -736,14 +784,14 @@ const JudgementsPage = () => {
         </div>
       </div>
 
-      {/* NEW: Print Details Modal */}
+      {/* NEW: Expanded Print Details Modal */}
       {showPrintModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
           background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(2px)'
         }}>
-          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: 400, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+          <div style={{ background: '#fff', padding: 24, borderRadius: 12, width: 550, maxWidth: '90%', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, color: '#111827', fontSize: 18 }}>Print Settings</h3>
               <button onClick={() => setShowPrintModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
@@ -752,35 +800,68 @@ const JudgementsPage = () => {
             </div>
             
             <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 20, lineHeight: 1.4 }}>
-              Add your details or client reference to include them at the top of the printed document. Leave blank if not required.
+              Fill details to include them at the top of the print. Enable "Letterhead Format" to center the details formally.
             </p>
             
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: '#374151' }}>Prepared By / Advocate Name</label>
-              <input
-                type="text" value={printName} onChange={e => setPrintName(e.target.value)}
-                style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 8, border: '1px solid #D1D5DB', boxSizing: 'border-box', outline: 'none', fontSize: 14 }}
-                placeholder="e.g. Adv. R. K. Sharma"
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 20 }}>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Advocate Name</label>
+                <input type="text" value={printName} onChange={e => setPrintName(e.target.value)} placeholder="e.g. Adv. R. K. Sharma"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Chamber Number / Address</label>
+                <input type="text" value={printChamber} onChange={e => setPrintChamber(e.target.value)} placeholder="e.g. Chamber No. 42"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Contact Number</label>
+                <input type="text" value={printContact} onChange={e => setPrintContact(e.target.value)} placeholder="e.g. +91 98765 43210"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Email ID</label>
+                <input type="email" value={printEmail} onChange={e => setPrintEmail(e.target.value)} placeholder="e.g. lawyer@example.com"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Case Type</label>
+                <input type="text" value={printCaseType} onChange={e => setPrintCaseType(e.target.value)} placeholder="e.g. Criminal Appeal"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: '#374151' }}>Notes / Ref</label>
+                <input type="text" value={printNotes} onChange={e => setPrintNotes(e.target.value)} placeholder="e.g. Client File #104"
+                  style={{ width: '100%', height: 36, padding: '0 10px', borderRadius: 6, border: '1px solid #D1D5DB', outline: 'none', fontSize: 13 }} />
+              </div>
+
             </div>
-            
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: '#374151' }}>Notes / Client Reference</label>
-              <input
-                type="text" value={printNotes} onChange={e => setPrintNotes(e.target.value)}
-                style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 8, border: '1px solid #D1D5DB', boxSizing: 'border-box', outline: 'none', fontSize: 14 }}
-                placeholder="e.g. For Client File #104 - Bail App"
+
+            {/* Toggle switch for Letterhead */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24, gap: 10, padding: '10px 14px', background: '#F9FAFB', borderRadius: 8, border: '1px solid #E5E7EB' }}>
+              <input 
+                type="checkbox" 
+                id="letterhead-toggle" 
+                checked={printLetterhead} 
+                onChange={e => setPrintLetterhead(e.target.checked)} 
+                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#B45309' }}
               />
+              <label htmlFor="letterhead-toggle" style={{ fontSize: 13, color: '#374151', cursor: 'pointer', fontWeight: 500 }}>
+                Print as Formal Letterhead
+              </label>
             </div>
             
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowPrintModal(false)} style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151', fontWeight: 500 }}>
                 Cancel
               </button>
-              <button
-                onClick={executePrint}
-                style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#B45309', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}
-              >
+              <button onClick={executePrint} style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: '#B45309', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Printer size={16} /> Continue to Print
               </button>
             </div>
