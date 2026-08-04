@@ -2,7 +2,6 @@ import React from "react";
 import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import AiChat from "../components/AiChat";
-import { Document, Packer, Paragraph, TextRun } from "docx";
 
 // ── Register Fonts ─────────────────────────────────────────
 const FontAttributor = Quill.import('formats/font');
@@ -46,32 +45,6 @@ const EditorTextarea = ({ manualText, setManualText, showChat, quillRef }) => {
     'color', 'background', 'link', 'image',
   ];
 
-  // ── DOCX Export Function ───────────────────────────
-  const exportDOCX = async () => {
-    if (!quillRef.current) return;
-    const editor = quillRef.current.getEditor();
-    const text = editor.getText();
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              children: [new TextRun(text)],
-            }),
-          ],
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "document.docx";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -99,25 +72,6 @@ const EditorTextarea = ({ manualText, setManualText, showChat, quillRef }) => {
           placeholder="Start typing or speaking..."
           style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
         />
-
-        {/* Export Button */}
-        <button
-          onClick={exportDOCX}
-          style={{
-            margin: "10px",
-            padding: "8px 12px",
-            background: "linear-gradient(90deg, #2563eb, #1e40af)", // 🔵 Gradient button
-            color: "#fff",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            alignSelf: "flex-start",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
-          }}
-        >
-          Download as Word
-        </button>
       </div>
 
       {/* ── AI CHAT COLUMN ────────────────────────── */}

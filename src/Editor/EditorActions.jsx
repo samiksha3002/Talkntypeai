@@ -5,6 +5,8 @@ import { Save, Printer, Mic, Trash2, FileUp, FileText } from "lucide-react";
 import { fixGrammar, expandText, uploadOCR, uploadAudio, uploadPDF } from "./editor.api";
 import jsPDF from "jspdf";
 import { saveAs } from "file-saver";
+// 🔴 NAYA IMPORT: DOCX library for perfectly formatted Word Export
+import { Document, Packer, Paragraph, TextRun } from "docx"; 
 
 const EditorActions = ({
   manualText,
@@ -18,7 +20,8 @@ const EditorActions = ({
   setIsAudioLoading,
   setShowDraftPopup,
   isAIGenerating,
-  API
+  API,
+  quillRef // 🔴 IMPORTANT: Make sure this is passed from parent component
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
@@ -43,51 +46,80 @@ const EditorActions = ({
   }, []);
 
   const handlePageBreak = () => {
-    const range = quillRef.current.getEditor().getSelection();
-    if (range) {
-      quillRef.current.getEditor().insertEmbed(range.index, 'break', true);
+    if (quillRef && quillRef.current) {
+      const range = quillRef.current.getEditor().getSelection();
+      if (range) {
+        quillRef.current.getEditor().insertEmbed(range.index, 'break', true);
+      }
     }
   }; 
-// --- 📄 Save as PDF (Final Fix: Clean Text + Auto Wrapping) ---
+
+  // --- 📄 Save as PDF ---
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
     
-    // 1. Remove HTML tags and convert entities like &nbsp; to actual spaces
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = manualText;
     const cleanText = tempDiv.textContent || tempDiv.innerText || "";
 
-    // 2. Set PDF styles
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
 
-    // 3. Auto-wrap the text based on page width (180mm is standard for A4)
     const splitText = doc.splitTextToSize(cleanText, 180);
-
-    // 4. Add the wrapped text to the document at coordinates x:15, y:20
     doc.text(splitText, 15, 20);
 
-    // 5. Save the file
     doc.save("document.pdf");
     setShowSaveOptions(false);
   };
-  // --- 📝 Save as Word ---
-  const handleDownloadWord = () => {
-    const header = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' 
-            xmlns:w='urn:schemas-microsoft-com:office:word' 
-            xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'></head><body>`;
-    const footer = "</body></html>";
-    
-    const sourceHTML = header + manualText + footer;
 
-    const blob = new Blob(['\ufeff', sourceHTML], {
-      type: 'application/msword'
-    });
+  // --- 📝 Save as Word (🔴 EXACT AS IT IS FROM YOUR EditorTextarea CODE) ---
+  const handleDownloadWord = async () => {
+    if (!quillRef || !quillRef.current) {
+      console.error("Quill Ref is missing!");
+      return;
+    }
 
-    saveAs(blob, "document.doc");
-    setShowSaveOptions(false);
+    try {
+      const editor = quillRef.current.getEditor();
+      const delta = editor.getContents();
+
+      const children = delta.ops.map(op => {
+        const insert = op.insert;
+        const attrs = op.attributes || {};
+
+        // Skip non-text inserts (like images)
+        if (typeof insert !== "string") return null;
+
+        return new Paragraph({
+          children: [
+            new TextRun({
+              text: insert,
+              bold: attrs.bold || false,
+              italic: attrs.italic || false,
+              underline: attrs.underline ? {} : undefined,
+              size: attrs.size ? parseInt(attrs.size) * 2 : 24, // Quill size → Word half-points
+              font: attrs.font || "Times New Roman",
+            }),
+          ],
+        });
+      }).filter(Boolean);
+
+      const doc = new Document({
+        sections: [{ children }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "document.docx";
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      setShowSaveOptions(false); // Dropdown band karne ke liye
+    } catch (error) {
+      console.error("Failed to generate DOCX:", error);
+    }
   };
 
   // --- 🖨️ Handle Print ---
@@ -130,27 +162,21 @@ const EditorActions = ({
     }
   };
 
+  const handleFileSelect = (e, uploadFn, setLoading) => {
+    const file = e?.target?.files?.[0]; 
+    if (!file) return;
+    uploadFn(e, setManualText, setLoading); 
+    if (e.target) e.target.value = null;
+  };
 
-// EditorActions.jsx - Change these two functions
-const handleFileSelect = (e, uploadFn, setLoading) => {
-  const file = e?.target?.files?.[0]; 
-  if (!file) return;
+  const handlePDFSelect = (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    uploadPDF(file, setManualText, setIsOCRLoading); 
+    if (e.target) e.target.value = null;
+  };  
 
-  // FIX: Pass 'e' (the event) or rewrite the API to take 'file'
-  uploadFn(e, setManualText, setLoading); // Pass 'e' instead of 'file'
-  if (e.target) e.target.value = null;
-};
-
-const handlePDFSelect = (e) => {
-  const file = e?.target?.files?.[0];
-  if (!file) return;
-
-  // FIX: Match the uploadPDF signature (file, setText, setLoading)
-  uploadPDF(file, setManualText, setIsOCRLoading); // Ensure parameters match
-  if (e.target) e.target.value = null;
-};  
-
-const COMMANDS = [
+  const COMMANDS = [
     { symbol: ",", en: "comma", hi: "अल्पविराम", mr: "स्वल्पविराम" },
     { symbol: ".", en: "full stop", hi: "पूर्ण विराम", mr: "पूर्णविराम" },
     { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },
@@ -191,14 +217,14 @@ const COMMANDS = [
 
         <button onClick={() => setShowCommands(true)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-all" title="Voice Commands"><Mic size={20} strokeWidth={2.5} /></button>
         <button onClick={() => setManualText("")} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all" title="Clear All"><Trash2 size={18} strokeWidth={2} /></button>
-         <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
-       <input
-  ref={pdfRef}
-  type="file"
-  accept="application/pdf"
-  hidden
-  onChange={handlePDFSelect}
-/>
+        <button onClick={() => pdfRef.current.click()} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Import PDF"><FileUp size={18} strokeWidth={2} /></button>
+        <input
+          ref={pdfRef}
+          type="file"
+          accept="application/pdf"
+          hidden
+          onChange={handlePDFSelect}
+        />
       </div>
 
       {showDictionary && (
