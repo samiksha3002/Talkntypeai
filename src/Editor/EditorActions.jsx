@@ -27,6 +27,7 @@ const EditorActions = ({
   const audioRef = useRef(null);
   const pdfRef = useRef(null); 
   const saveMenuRef = useRef(null);
+  const newOcrRef = useRef(null);    
 
   const [showCommands, setShowCommands] = useState(false);
   const [showDictionary, setShowDictionary] = useState(false);
@@ -34,6 +35,10 @@ const EditorActions = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [definition, setDefinition] = useState("");
   const [isDictLoading, setIsDictLoading] = useState(false);
+ const [isNewOcrLoading, setIsNewOcrLoading] = useState(false);   // 🆕
+const [showOcrModal, setShowOcrModal] = useState(false);         // 🆕
+const [ocrImagePreview, setOcrImagePreview] = useState(null);    // 🆕
+const [ocrExtractedText, setOcrExtractedText] = useState("");   
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -182,7 +187,42 @@ const EditorActions = ({
     { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },
     { symbol: "⇥", en: "new paragraph", hi: "नया पैराग्राफ", mr: "नवीन परिच्छेद" }
   ];
+    const handleNewOcrSelect = async (e) => {
+  const file = e?.target?.files?.[0];
+  if (!file) return;
 
+  const previewUrl = URL.createObjectURL(file);
+  setOcrImagePreview(previewUrl);
+  setOcrExtractedText("");
+  setShowOcrModal(true);
+  setIsNewOcrLoading(true);
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try {
+    const res = await fetch(`${API}/api/ocr/image-to-text`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    setOcrExtractedText(data.success ? (data.text || "") : "⚠️ Text nahi mil paaya, dobara try karein.");
+  } catch (err) {
+    console.error("OCR error:", err);
+    setOcrExtractedText("⚠️ OCR failed. Server check karein.");
+  } finally {
+    setIsNewOcrLoading(false);
+  }
+
+  if (e.target) e.target.value = null;
+};
+
+const closeOcrModal = () => {
+  if (ocrImagePreview) URL.revokeObjectURL(ocrImagePreview);
+  setShowOcrModal(false);
+  setOcrImagePreview(null);
+  setOcrExtractedText("");
+};
   return (
     <div className="bg-indigo-50 border-b p-2 flex items-center justify-between flex-wrap gap-2 font-sans relative">
       <div className="flex gap-2 flex-wrap">
@@ -195,6 +235,15 @@ const EditorActions = ({
         <AiButton label={isAIGenerating ? "⏳ Generating..." : "🧠 Draft"} color="purple" disabled={isAIGenerating} onClick={() => !isAIGenerating && setShowDraftPopup(true)} />
         <AiButton label="↔️ Expand" color="green" onClick={() => expandText(manualText, setManualText, setIsTranslating)} />
         <AiButton label="📖 Dictionary" color="purple" onClick={() => setShowDictionary(true)} />
+
+{/* 🆕 NEW OCR BUTTON */}
+<AiButton
+  label={isNewOcrLoading ? "⏳ Scanning..." : "🔍 OCR"}
+  color="blue"
+  onClick={() => newOcrRef.current.click()}
+/>
+<input ref={newOcrRef} type="file" accept="image/*" hidden onChange={handleNewOcrSelect} />
+        
       </div>
 
       <div className="flex items-center gap-1 ml-auto border-l pl-2 border-indigo-200 relative">
@@ -286,6 +335,49 @@ const EditorActions = ({
           </div>
         </div>
       )}
+      {showOcrModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm">
+    <div className="bg-white w-[550px] max-h-[85vh] rounded-xl shadow-2xl p-6 border border-indigo-100 flex flex-col">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">🔍 OCR Result</h2>
+        <button onClick={closeOcrModal} className="text-gray-400 hover:text-red-500 transition-colors text-2xl font-bold">&times;</button>
+      </div>
+
+      {ocrImagePreview && (
+        <img src={ocrImagePreview} alt="Uploaded" className="w-full max-h-48 object-contain rounded-lg border border-gray-200 mb-4" />
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        {isNewOcrLoading ? (
+          <p className="text-center text-indigo-600 py-6">⏳ Text extract ho raha hai...</p>
+        ) : (
+          <textarea
+            readOnly
+            value={ocrExtractedText}
+            onFocus={(e) => e.target.select()}
+            className="w-full h-48 border-2 border-indigo-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed select-text focus:border-indigo-500 outline-none"
+          />
+        )}
+      </div>
+
+      <p className="text-xs text-gray-400 mt-2">Text select karke Ctrl+C se copy karein, ya neeche se poora document mein insert karein.</p>
+
+      <div className="flex justify-end mt-4">
+        <button
+          onClick={() => {
+            const formatted = ocrExtractedText.replace(/\n/g, "<br />");
+            setManualText(prev => (prev ? prev + "<br /><br />" + formatted : formatted));
+            closeOcrModal();
+          }}
+          disabled={!ocrExtractedText || isNewOcrLoading}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg font-semibold transition-colors shadow-md text-sm"
+        >
+          ➕ Insert Full Text
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
