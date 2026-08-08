@@ -13,3 +13,10 @@ export default defineConfig({
     },
   },
 })  
+export default defineConfig({
+  server: {
+    mimeTypes: {
+      'pdf.worker.min.js': 'application/javascript'
+    }
+  }
+});

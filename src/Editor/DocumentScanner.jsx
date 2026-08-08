@@ -4,10 +4,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 // ✅ PDF worker setup (mandatory for react-pdf)
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const DocumentScanner = ({ file, onClose, onInsertText }) => {
   const [numPages, setNumPages] = useState(null);
@@ -61,7 +58,7 @@ const DocumentScanner = ({ file, onClose, onInsertText }) => {
             >
               <Page
                 pageNumber={pageNumber}
-                renderTextLayer={true}   // ✅ Invisible selectable text layer
+                renderTextLayer={true}   // ✅ Selectable text layer
                 renderAnnotationLayer={false}
                 width={800}
               />
