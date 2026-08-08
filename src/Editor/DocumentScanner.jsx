@@ -3,17 +3,15 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// ✅ Use official worker entry (works in Vite + Render)
-import workerSrc from "pdfjs-dist/build/pdf.worker.entry";
+// ✅ Use Vite worker import
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?worker";
 pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const DocumentScanner = ({ file, onClose, onInsertText }) => {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
 
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-  };
+  const onDocumentLoadSuccess = ({ numPages }) => setNumPages(numPages);
 
   const handleInsertSelection = () => {
     const selectedText = window.getSelection().toString();
@@ -50,14 +48,10 @@ const DocumentScanner = ({ file, onClose, onInsertText }) => {
         {/* PDF Viewer */}
         <div className="flex-1 overflow-auto bg-gray-100 p-4 border rounded flex justify-center">
           {file && file.type === "application/pdf" ? (
-            <Document
-              file={file}
-              onLoadSuccess={onDocumentLoadSuccess}
-              className="border shadow-sm"
-            >
+            <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
               <Page
                 pageNumber={pageNumber}
-                renderTextLayer={true}   // ✅ Selectable text layer
+                renderTextLayer={true}
                 renderAnnotationLayer={false}
                 width={800}
               />

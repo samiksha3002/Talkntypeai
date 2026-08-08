@@ -19,5 +19,12 @@ export default defineConfig({
     mimeTypes: {
       'pdf.worker.min.js': 'application/javascript'
     }
+  },
+
+  // ✅ Optional: ensure Rollup bundles worker correctly in production
+  build: {
+    rollupOptions: {
+      external: [], // keep empty to avoid excluding pdfjs worker
+    }
   }
 })
