@@ -9,7 +9,7 @@ export default defineConfig({
     alias: {
       react: path.resolve(__dirname, './node_modules/react'),
       'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
-      // ✅ Alias for pdfjs worker
+      // ✅ Explicit alias for pdfjs worker
       'pdfjs-dist/build/pdf.worker.min.js': path.resolve(__dirname, './node_modules/pdfjs-dist/build/pdf.worker.min.js'),
     },
   },
