@@ -3,22 +3,18 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// ✅ PDF worker setup (local worker from node_modules)
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.js",
-  import.meta.url
-).toString();
+// ✅ Local worker import with ?url
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url";
+pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const DocumentScanner = ({ file, onClose, onInsertText }) => {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
 
-  // PDF load success → total pages set
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
   };
 
-  // User selection → insert into editor
   const handleInsertSelection = () => {
     const selectedText = window.getSelection().toString();
     if (selectedText.trim().length > 0) {
@@ -61,7 +57,7 @@ const DocumentScanner = ({ file, onClose, onInsertText }) => {
             >
               <Page
                 pageNumber={pageNumber}
-                renderTextLayer={true}   // ✅ Selectable text layer
+                renderTextLayer={true}
                 renderAnnotationLayer={false}
                 width={800}
               />
