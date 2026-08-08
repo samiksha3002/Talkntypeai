@@ -13,7 +13,7 @@ const Login = () => {
   const navigate = useNavigate(); 
 
   // 2. Handle typing
-  const handleChange = (e) => {
+  const handleChange = (e) => { 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 

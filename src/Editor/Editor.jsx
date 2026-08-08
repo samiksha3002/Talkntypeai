@@ -3,6 +3,7 @@
   import EditorTextarea from "./EditorTextarea";
   import EditorStatusBar from "./EditorStatusBar";
   import DraftPopup from "./DraftPopup";
+  import DocumentScanner from './DocumentScanner';
   // Agar file ka naam fontConverter.js hai toh:
 
   const Editor = ({
@@ -27,6 +28,8 @@
     const quillRef = useRef(null);
     const [showChat, setShowChat] = useState(false);
     const [showDraftPopup, setShowDraftPopup] = useState(false);
+    const [scannerFile, setScannerFile] = useState(null);
+    
 
     // 🌐 API Base URL
     const [API_BASE_URL, setApiBaseUrl] = useState(
@@ -261,6 +264,27 @@
   
       runFontConversion();
     }, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
+
+    const handleInsertScannedText = (text) => {
+    if (quillRef.current) {
+      const editor = quillRef.current.getEditor();
+      const range = editor.getSelection();
+      
+      // कर्सर की जगह पर टेक्स्ट डालें, या फिर आखिर में डालें
+      if (range) {
+        editor.insertText(range.index, text, 'user');
+        editor.setSelection(range.index + text.length, 0); // कर्सर को टेक्स्ट के आगे ले जाएँ
+      } else {
+        const length = editor.getLength();
+        editor.insertText(length - 1, text, 'user');
+      }
+      
+      // State अपडेट करें
+      setManualText(editor.root.innerHTML);
+    }
+    // इन्सर्ट होने के बाद स्कैनर बंद कर दें
+    setScannerFile(null); 
+  };
   
 
     // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
@@ -298,6 +322,7 @@
             API={API_BASE_URL}
             onClear={clearAutoSave}
             quillRef = {quillRef}
+            onOpenScanner={(file) => setScannerFile(file)}
           />
 
           {/* Text Area */}
@@ -328,6 +353,14 @@
             onClose={() => setShowDraftPopup(false)}
             setManualText={setManualText}
             setIsAIGenerating={setIsAIGenerating}
+          />
+          
+        )}
+        {scannerFile && (
+          <DocumentScanner 
+            file={scannerFile} 
+            onClose={() => setScannerFile(null)}
+            onInsertText={handleInsertScannedText}
           />
         )}
       </div>

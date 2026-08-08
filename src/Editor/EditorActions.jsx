@@ -21,7 +21,8 @@ const EditorActions = ({
   setShowDraftPopup,
   isAIGenerating,
   API,
-  quillRef // 🔴 IMPORTANT: Make sure this is passed from parent component
+  quillRef,
+  onOpenScanner // 🔴 IMPORTANT: Make sure this is passed from parent component
 }) => {
   const ocrRef = useRef(null);
   const audioRef = useRef(null);
@@ -187,43 +188,7 @@ const [ocrExtractedText, setOcrExtractedText] = useState("");
     { symbol: "!", en: "exclamation", hi: "विस्मयादिबोधक", mr: "आश्चर्यवाचक" },
     { symbol: "⇥", en: "new paragraph", hi: "नया पैराग्राफ", mr: "नवीन परिच्छेद" }
   ];
-    const handleNewOcrSelect = async (e) => {
-  const file = e?.target?.files?.[0];
-  if (!file) return;
-
-  const previewUrl = URL.createObjectURL(file);
-  setOcrImagePreview(previewUrl);
-  setOcrExtractedText("");
-  setShowOcrModal(true);
-  setIsNewOcrLoading(true);
-
-  const formData = new FormData();
-  formData.append("image", file);
-
-  try {
-    const res = await fetch(`${API}/api/ocr/image-to-text`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    setOcrExtractedText(data.success ? (data.text || "") : "⚠️ Text nahi mil paaya, dobara try karein.");
-  } catch (err) {
-    console.error("OCR error:", err);
-    setOcrExtractedText("⚠️ OCR failed. Server check karein.");
-  } finally {
-    setIsNewOcrLoading(false);
-  }
-
-  if (e.target) e.target.value = null;
-};
-
-const closeOcrModal = () => {
-  if (ocrImagePreview) URL.revokeObjectURL(ocrImagePreview);
-  setShowOcrModal(false);
-  setOcrImagePreview(null);
-  setOcrExtractedText("");
-};
-  return (
+    return (
     <div className="bg-indigo-50 border-b p-2 flex items-center justify-between flex-wrap gap-2 font-sans relative">
       <div className="flex gap-2 flex-wrap">
         <AiButton label="✨ Fix Grammar" color="blue" onClick={() => fixGrammar(manualText, setManualText, setIsTranslating)} />
@@ -237,12 +202,26 @@ const closeOcrModal = () => {
         <AiButton label="📖 Dictionary" color="purple" onClick={() => setShowDictionary(true)} />
 
 {/* 🆕 NEW OCR BUTTON */}
-<AiButton
-  label={isNewOcrLoading ? "⏳ Scanning..." : "🔍 OCR"}
-  color="blue"
-  onClick={() => newOcrRef.current.click()}
+
+
+<AiButton 
+  label="🖼️ Scan Document" 
+  color="purple" 
+  onClick={() => ocrRef.current.click()} 
 />
-<input ref={newOcrRef} type="file" accept="image/*" hidden onChange={handleNewOcrSelect} />
+<input 
+  ref={ocrRef} 
+  type="file" 
+  accept="application/pdf, image/*" 
+  hidden 
+  onChange={(e) => {
+    const file = e.target.files[0];
+    if (file) {
+       onOpenScanner(file); // API कॉल की जगह यह नया prop कॉल होगा
+    }
+    e.target.value = null; // Reset input
+  }} 
+/>
         
       </div>
 

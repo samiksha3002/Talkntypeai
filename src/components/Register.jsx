@@ -86,9 +86,9 @@ const Register = () => {
                 <option value="A111">Dhiraj_01</option>
                 <option value="B222">Atul_02</option>
                 <option value="C333">Arjun_03</option>
-                <option value="D444">Vikas Zarbade_04</option>
-                <option value="E555">Parvati_05</option>
-                 <option value="f666">Datta_06</option>
+                <option value="D444">Ansari_04</option>
+                <option value="E555">Sandesh_05</option>
+               
                  
             </select>
           </div>
