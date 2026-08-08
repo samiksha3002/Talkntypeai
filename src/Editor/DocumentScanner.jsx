@@ -3,8 +3,8 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// ✅ Local worker import with ?url
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url";
+// ✅ Use official worker entry (works in Vite + Render)
+import workerSrc from "pdfjs-dist/build/pdf.worker.entry";
 pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const DocumentScanner = ({ file, onClose, onInsertText }) => {
@@ -57,7 +57,7 @@ const DocumentScanner = ({ file, onClose, onInsertText }) => {
             >
               <Page
                 pageNumber={pageNumber}
-                renderTextLayer={true}
+                renderTextLayer={true}   // ✅ Selectable text layer
                 renderAnnotationLayer={false}
                 width={800}
               />
