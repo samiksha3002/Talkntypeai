@@ -25,10 +25,10 @@ const EditorActions = ({
   onOpenScanner // 🔴 IMPORTANT: Make sure this is passed from parent component
 }) => {
   const ocrRef = useRef(null);
+  const scanRef = useRef(null); // 🟢 FIX: separate ref for "Scan Document" — was sharing ocrRef, which broke both buttons
   const audioRef = useRef(null);
   const pdfRef = useRef(null); 
   const saveMenuRef = useRef(null);
-  const newOcrRef = useRef(null);    
 
   const [showCommands, setShowCommands] = useState(false);
   const [showDictionary, setShowDictionary] = useState(false);
@@ -36,10 +36,14 @@ const EditorActions = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [definition, setDefinition] = useState("");
   const [isDictLoading, setIsDictLoading] = useState(false);
- const [isNewOcrLoading, setIsNewOcrLoading] = useState(false);   // 🆕
-const [showOcrModal, setShowOcrModal] = useState(false);         // 🆕
-const [ocrImagePreview, setOcrImagePreview] = useState(null);    // 🆕
-const [ocrExtractedText, setOcrExtractedText] = useState("");   
+  // 🟢 FIX: removed isNewOcrLoading / showOcrModal / ocrImagePreview / ocrExtractedText —
+  // this was an unfinished in-component OCR modal that nothing ever triggered
+  // (no setShowOcrModal(true) anywhere) and whose Close/Insert buttons called
+  // closeOcrModal(), a function that was never defined — that would have crashed
+  // the app the moment showOcrModal became true. The DocumentScanner component
+  // now covers this exact job (preview + OCR text + insert), so it's removed
+  // rather than patched. See note at the end if you actually wanted a separate,
+  // lighter modal for this.
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -207,10 +211,10 @@ const [ocrExtractedText, setOcrExtractedText] = useState("");
 <AiButton 
   label="🖼️ Scan Document" 
   color="purple" 
-  onClick={() => ocrRef.current.click()} 
+  onClick={() => scanRef.current.click()} 
 />
 <input 
-  ref={ocrRef} 
+  ref={scanRef} 
   type="file" 
   accept="application/pdf, image/*" 
   hidden 
@@ -314,49 +318,6 @@ const [ocrExtractedText, setOcrExtractedText] = useState("");
           </div>
         </div>
       )}
-      {showOcrModal && (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm">
-    <div className="bg-white w-[550px] max-h-[85vh] rounded-xl shadow-2xl p-6 border border-indigo-100 flex flex-col">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">🔍 OCR Result</h2>
-        <button onClick={closeOcrModal} className="text-gray-400 hover:text-red-500 transition-colors text-2xl font-bold">&times;</button>
-      </div>
-
-      {ocrImagePreview && (
-        <img src={ocrImagePreview} alt="Uploaded" className="w-full max-h-48 object-contain rounded-lg border border-gray-200 mb-4" />
-      )}
-
-      <div className="flex-1 overflow-y-auto">
-        {isNewOcrLoading ? (
-          <p className="text-center text-indigo-600 py-6">⏳ Text extract ho raha hai...</p>
-        ) : (
-          <textarea
-            readOnly
-            value={ocrExtractedText}
-            onFocus={(e) => e.target.select()}
-            className="w-full h-48 border-2 border-indigo-50 rounded-lg p-3 text-sm text-gray-700 leading-relaxed select-text focus:border-indigo-500 outline-none"
-          />
-        )}
-      </div>
-
-      <p className="text-xs text-gray-400 mt-2">Text select karke Ctrl+C se copy karein, ya neeche se poora document mein insert karein.</p>
-
-      <div className="flex justify-end mt-4">
-        <button
-          onClick={() => {
-            const formatted = ocrExtractedText.replace(/\n/g, "<br />");
-            setManualText(prev => (prev ? prev + "<br /><br />" + formatted : formatted));
-            closeOcrModal();
-          }}
-          disabled={!ocrExtractedText || isNewOcrLoading}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg font-semibold transition-colors shadow-md text-sm"
-        >
-          ➕ Insert Full Text
-        </button>
-      </div>
-    </div>
-  </div>
-)}
     </div>
   );
 };
