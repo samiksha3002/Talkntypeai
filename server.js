@@ -43,6 +43,7 @@ import judgementAiRouter from "./routes/judgementAi.js";
 
 // ── Middleware Imports ────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
+import searchablePdfRouter from "./routes/searchablePdf.routes.js";
 
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────

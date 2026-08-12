@@ -42,11 +42,11 @@
  *     dyno has the RAM/CPU headroom.
  */
 
-const express = require("express");
-const multer = require("multer");
-const { createWorker } = require("tesseract.js");
-const { pdf: renderPdfToImages } = require("pdf-to-img");
-const { PDFDocument, StandardFonts } = require("pdf-lib");
+import express from "express";
+import multer from "multer";
+import { createWorker } from "tesseract.js";
+import { pdf as renderPdfToImages } from "pdf-to-img";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 
 const router = express.Router();
 const upload = multer({
@@ -202,4 +202,4 @@ router.post("/pdf-to-searchable-pdf", upload.single("file"), async (req, res) =>
   }
 });
 
-module.exports = router;
+export default router;
