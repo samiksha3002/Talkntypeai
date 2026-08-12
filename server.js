@@ -64,7 +64,7 @@ const allowedOrigins = [
   "https://www.talkntpe.pro",
 ];
 
-const searchablePdfRouter = require("./routes/searchablePdf.routes");
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
