@@ -44,6 +44,7 @@ import judgementAiRouter from "./routes/judgementAi.js";
 // ── Middleware Imports ────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 connectDB();
 
@@ -62,6 +63,7 @@ const allowedOrigins = [
   "https://www.talkntpe.pro",
 ];
 
+const searchablePdfRouter = require("./routes/searchablePdf.routes");
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -121,7 +123,7 @@ app.use("/api/legal-ai",      legalAiRoute);
 app.use("/api/judgements", judgementsRouter);
 app.use("/api/saved",      savedRouter);
 app.use("/api/judgement-ai", judgementAiRouter);
-
+app.use("/api/ocr", searchablePdfRouter); 
 // ── 404 Handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found." });
