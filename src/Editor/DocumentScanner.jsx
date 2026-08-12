@@ -2,7 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import { ChevronLeft, ChevronRight, ScanText, Copy, Plus, X, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ScanText,
+  Copy,
+  Plus,
+  X,
+  Loader2,
+  Download,
+  FileCheck2,
+} from "lucide-react";
 
 // ✅ FIX: the old "?worker" import handed pdf.js a Worker *class*, not a URL —
 // GlobalWorkerOptions.workerSrc needs a URL string. Pulling it from a CDN that
@@ -26,25 +36,26 @@ const DEFAULT_API =
 /**
  * DocumentScanner
  *
- * Opens a PDF or image in a modal, exactly as before, but now:
- *  - Actually supports images (the old version only rendered PDFs even though
- *    the file input accepted "application/pdf, image/*").
- *  - Detects whether the current PDF page has a real, selectable text layer.
- *    A PDF "having text" doesn't guarantee it's *good* text — a scanned PDF
- *    can carry a garbled OCR layer baked in already — so both paths
- *    (select-to-insert AND run-OCR) stay available side by side.
- *  - Falls back to server-side OCR for scanned pages / images, with a
- *    results panel to copy or insert the extracted text.
+ * Opens a PDF or image in a modal. Supports three separate things now:
+ *  1. Selecting real text out of a born-digital PDF page and inserting it.
+ *  2. Server-side OCR that returns plain TEXT (existing "Run OCR" flow) —
+ *     good when you just want to paste the content into the editor.
+ *  3. 🆕 Server-side OCR that returns a brand new, downloadable PDF FILE
+ *     with an invisible, searchable/selectable text layer stitched onto
+ *     the original scanned page image ("Convert to Searchable PDF") —
+ *     same idea as iLovePDF's "OCR PDF" tool: the page looks identical,
+ *     but Ctrl+F / text-select now works on it.
  *
  * Props:
  *  - file        : File object (application/pdf or image/*)
  *  - onClose     : () => void
  *  - onInsertText: (text: string) => void
- *  - API         : string — backend base URL (same one EditorActions gets),
- *                  used to call POST `${API}/api/ocr/extract`.
- *                  Expected response shape: { text: string }
- *                  Adjust the endpoint/response parsing below to match your
- *                  actual backend route if it differs.
+ *  - API         : string — backend base URL (same one EditorActions gets).
+ *                  Expected endpoints (adjust to match your backend):
+ *                    POST `${API}/api/ocr/image-to-text`            → { success, text }
+ *                    POST `${API}/api/upload-pdf`                   → { success, text }
+ *                    POST `${API}/api/ocr/image-to-searchable-pdf`  → PDF file (application/pdf)
+ *                    POST `${API}/api/ocr/pdf-to-searchable-pdf`    → PDF file (application/pdf)
  */
 const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
   const [numPages, setNumPages] = useState(null);
@@ -58,6 +69,12 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
   const [ocrText, setOcrText] = useState("");
   const [showOcrPanel, setShowOcrPanel] = useState(false);
   const [liveSelection, setLiveSelection] = useState(""); // 🟢 FIX: holds the last real selection
+
+  // 🆕 Searchable-PDF generation state
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfGenError, setPdfGenError] = useState(null);
+  const [searchablePdfUrl, setSearchablePdfUrl] = useState(null);
+  const [searchablePdfName, setSearchablePdfName] = useState("");
 
   const viewerRef = useRef(null);
 
@@ -75,6 +92,14 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
     setShowOcrPanel(false);
     setLiveSelection("");
 
+    // 🆕 clear any previously generated searchable PDF + free its blob URL
+    setPdfGenError(null);
+    setSearchablePdfUrl((prevUrl) => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return null;
+    });
+    setSearchablePdfName("");
+
     if (isImage) {
       const url = URL.createObjectURL(file);
       setImageUrl(url);
@@ -83,6 +108,15 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
     setImageUrl(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
+
+  // 🆕 Make sure the generated-PDF blob URL is always released, even if the
+  // modal is closed (unmounted) without opening a new file first.
+  useEffect(() => {
+    return () => {
+      if (searchablePdfUrl) URL.revokeObjectURL(searchablePdfUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 🟢 FIX: clicking the "Insert Selected Text" button itself collapses the
   // browser's live selection (happens on mousedown, before onClick even runs) —
@@ -143,9 +177,8 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
   };
 
   // Server-side OCR fallback — used for scanned PDF pages and for images.
-  // 🟢 FIX: wired to the SAME endpoints editor.api.js already uses successfully
-  // elsewhere (uploadOCR / uploadPDF) instead of a guessed "/api/ocr/extract"
-  // route that doesn't exist on the backend — that mismatch was the 404.
+  // Returns plain TEXT (for pasting into the editor). For a downloadable
+  // searchable PDF file, see generateSearchablePdf() below.
   const runOCR = async () => {
     setIsOcrLoading(true);
     setOcrError(null);
@@ -185,6 +218,75 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
       setOcrError(`OCR extract nahi ho paya: ${err.message}`);
     } finally {
       setIsOcrLoading(false);
+    }
+  };
+
+  // 🆕 Server-side OCR that returns an actual, downloadable PDF FILE — the
+  // scanned page(s) rendered exactly as before, with an invisible text layer
+  // laid on top so the PDF becomes selectable + searchable (Ctrl+F works).
+  // This is the "OCR PDF" feature — same concept as iLovePDF's tool.
+  const generateSearchablePdf = async () => {
+    setIsGeneratingPdf(true);
+    setPdfGenError(null);
+    const baseUrl = API || DEFAULT_API;
+
+    // Free any previous result before making a new one
+    setSearchablePdfUrl((prevUrl) => {
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      return null;
+    });
+
+    try {
+      const formData = new FormData();
+      let endpoint;
+
+      if (isImage) {
+        formData.append("image", file); // same field-naming convention as runOCR()
+        endpoint = `${baseUrl}/api/ocr/image-to-searchable-pdf`;
+      } else {
+        formData.append("file", file);
+        endpoint = `${baseUrl}/api/ocr/pdf-to-searchable-pdf`;
+        // Whole-document, same scope as "Run OCR on Full PDF" above.
+      }
+
+      const res = await fetch(endpoint, { method: "POST", body: formData });
+
+      if (!res.ok) {
+        // Backend sends JSON on failure ({ error: "..." })
+        let message = `Server error ${res.status}`;
+        try {
+          const errBody = await res.json();
+          message = errBody.error || message;
+        } catch {
+          // response wasn't JSON — keep the generic message
+        }
+        throw new Error(message);
+      }
+
+      const blob = await res.blob();
+
+      // Guard: if the backend accidentally sent a 200 with a JSON error body
+      // instead of a real PDF, don't hand the user a broken "PDF".
+      if (blob.type && !blob.type.includes("pdf")) {
+        const text = await blob.text();
+        let message = "Searchable PDF ban nahi paayi.";
+        try {
+          message = JSON.parse(text).error || message;
+        } catch {
+          // not JSON either — keep the generic message
+        }
+        throw new Error(message);
+      }
+
+      const url = URL.createObjectURL(blob);
+      const baseName = (file.name || "document").replace(/\.[^/.]+$/, "");
+      setSearchablePdfUrl(url);
+      setSearchablePdfName(`${baseName}-searchable.pdf`);
+    } catch (err) {
+      console.error("Searchable PDF generation failed:", err);
+      setPdfGenError(`Searchable PDF nahi ban payi: ${err.message}`);
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -322,7 +424,72 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
                   )}
                 </button>
               )}
+
+              {/* 🆕 Convert to Searchable PDF — same visibility rule as the OCR-text
+                  button (scanned PDF page, or any image), since it's the same
+                  underlying situation: "this content isn't machine-readable yet". */}
+              {showOcrButton && (
+                <button
+                  onClick={generateSearchablePdf}
+                  disabled={isGeneratingPdf}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
+                  title="Original scan jaisa hi dikhega, bas text ab select/search bhi ho payega"
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Converting...
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck2 size={16} /> Convert to Searchable PDF
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+
+            {/* 🆕 Searchable-PDF result banner */}
+            {(isGeneratingPdf || pdfGenError || searchablePdfUrl) && (
+              <div className="px-4 pb-3">
+                {isGeneratingPdf && (
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    Searchable PDF taiyar ho rahi hai — bade documents mein thoda time lag sakta hai...
+                  </div>
+                )}
+
+                {!isGeneratingPdf && pdfGenError && (
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    ⚠️ {pdfGenError}
+                  </div>
+                )}
+
+                {!isGeneratingPdf && !pdfGenError && searchablePdfUrl && (
+                  <div className="flex flex-wrap items-center gap-3 justify-between text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <span className="text-emerald-800 flex items-center gap-2">
+                      <FileCheck2 size={16} /> Searchable PDF ready!
+                    </span>
+                    <div className="flex gap-2">
+                      <a
+                        href={searchablePdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-700 border border-emerald-600 px-3 py-1.5 rounded-md hover:bg-emerald-100 transition"
+                      >
+                        Preview
+                      </a>
+                      <a
+                        href={searchablePdfUrl}
+                        download={searchablePdfName || "searchable.pdf"}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 transition"
+                      >
+                        <Download size={14} /> Download
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right: OCR result panel */}
