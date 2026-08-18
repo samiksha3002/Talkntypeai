@@ -1,29 +1,3 @@
-/**
- * fontConverterUtils.js  — v5 FINAL
- * ─────────────────────────────────────────────────────────────────
- * Location : utils/fontConverterUtils.js  (backend, same level as routes/)
- *
- * Supported conversions (3 output fonts only):
- *   unicode-to-krutidev  — Hindi/Marathi Unicode → KrutiDev
- *   unicode-to-shivaji   — Hindi/Marathi Unicode → Shivaji
- *   unicode-to-preeti    — Hindi/Marathi Unicode → Preeti
- *   krutidev-to-unicode  — KrutiDev → Unicode
- *   shivaji-to-unicode   — Shivaji  → Unicode
- *   mangal-to-krutidev   — Mangal (is Unicode) → KrutiDev
- *   mangal-to-unicode    — Mangal → normalised Unicode
- *
- * Bug fixes vs original:
- *  1. ध+matra  : "/" = ध् in library, so full ध needs "/k". Pre-patched.
- *  2. थ+matra  : "Fk" = थ् in library, so full था = "Fkk" etc. Pre-patched.
- *  3. धि / थि  : chhoti-i (f) must appear BEFORE consonant → f/k, fFk
- *  4. Half ब्  : "C" not "c"  |  Half व् : "O" not "o"
- *  5. रू       : ":" (colon) in KrutiDev, not "jw"
- *  6. Half क्ष : "{" — pre-patched BEFORE main map to avoid brace clash
- *  7. ड् before consonant (षड्यंत्र) : "M~" not "M"
- *  8. त्त+ि (संपत्ति) : half-त (R) + ति (fr) = "Rfr", triggers via "त्+ति" pre-patch
- *  9. Reph+Anuswara order: Za → aZ  (शर्तों = 'krksaZ not 'krksZa)
- * ─────────────────────────────────────────────────────────────────
- */
 
 import kru2uni from "@anthro-ai/krutidev-unicode";
 
@@ -32,11 +6,11 @@ import kru2uni from "@anthro-ai/krutidev-unicode";
 /* ──────────────────────────────────────────────────────────────── */
 function preProcess(text) {
   return text
-    .replace(/<\/p>/gi,    "\n")
+    .replace(/<\/p>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g,  "")
-    .replace(/&nbsp;/g,   " ")
-    .replace(/\u00A0/g,   " ");
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\u00A0/g, " ");
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -224,52 +198,43 @@ export function unicodeToKrutidev(sourceText) {
 
 export const mangalToKrutidev = unicodeToKrutidev;
 
-/* ──────────────────────────────────────────────────────────────── */
-/* 2.  Unicode  →  Shivaji                                         */
-/* ──────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────── */
+/* Unicode → Shivaji               */
+/* ─────────────────────────────── */
 export function unicodeToShivaji(sourceText) {
   if (!sourceText) return "";
   let text = preProcess(sourceText);
 
-  /* STEP 0 */
-  text = text.replace(/द्\s*्\s*ध/g, "द्ध");
-  text = text.replace(/त्\s*्\s*त/g, "त्त");
-  text = text.replace(/द\s*्\s*द/g,  "द्द");
-  text = text.replace(/द\s*्\s*य/g,  "द्य");
-  text = text.replace(/ह\s*्\s*म/g,  "ह्म");
-
-  /* STEP 0.5 */
-  text = text.replace(/ल्ल/g,  "Yy");
-  text = text.replace(/श्व/g,  "Üo");
-  text = text.replace(/र्थ/g,  "FkZ");
-  text = text.replace(/दृ/g,   "—");
-  text = text.replace(/कृ/g,   "—");
+  // Pre-patches
+  text = text.replace(/दृ/g, "—d");
+  text = text.replace(/कृ/g, "—k");
+  text = text.replace(/श्व/g, "Üo");
   text = text.replace(/क्ष्/g, "{");
+  text = text.replace(/ड्([क-ह])/g, "M~$1");
+  text = text.replace(/त्ति/g, "Rfr");
 
-  /* Same ध / थ / रू patches — Shivaji shares these codepoints */
-  text = text.replace(/धो/g,"/ks"); text = text.replace(/धौ/g,"/kS");
-  text = text.replace(/धा/g,"/kk"); text = text.replace(/धि/g,"f/k");
-  text = text.replace(/धी/g,"/kh"); text = text.replace(/धु/g,"/kq");
-  text = text.replace(/धू/g,"/kw"); text = text.replace(/धे/g,"/ks");
-  text = text.replace(/धं/g,"/ka"); text = text.replace(/ध्/g,"/");
-  text = text.replace(/ध(?=[^ािीुूृेैोौंःँॅ]|$)/g, "/k");
+  // ध / थ / रू patches
+  text = text.replace(/धो/g,"/ks").replace(/धौ/g,"/kS")
+             .replace(/धा/g,"/kk").replace(/धि/g,"f/k")
+             .replace(/धी/g,"/kh").replace(/धु/g,"/kq")
+             .replace(/धू/g,"/kw").replace(/धे/g,"/ks")
+             .replace(/धं/g,"/ka").replace(/ध्/g,"/")
+             .replace(/ध(?=[^ािीुूृेैोौंःँॅ]|$)/g,"/k");
 
-  text = text.replace(/था/g,"Fkk");  text = text.replace(/थि/g,"fFk");
-  text = text.replace(/थी/g,"Fkh");  text = text.replace(/थ्/g,"F");
-  text = text.replace(/थ(?=[^ािीुूृेैोौंःँॅ]|$)/g, "Fk");
+  text = text.replace(/था/g,"Fkk").replace(/थि/g,"fFk")
+             .replace(/थी/g,"Fkh").replace(/थ्/g,"F")
+             .replace(/थ(?=[^ािीुूृेैोौंःँॅ]|$)/g,"Fk");
 
   text = text.replace(/रू/g, ":");
-  text = text.replace(/त्ति/g, "Rfr");
-  text = text.replace(/ड्([क-ह])/g, "M~$1");
 
-  /* STEP 1 : Reph */
+  // Reph
   text = text.replace(/र्([क-ह])/g, "$1Z");
   const matras = "ािीुूृेैोौं:ँॅ";
-  const zR     = new RegExp(`Z([${matras}])`, "g");
-  text = text.replace(zR,"$1Z"); text = text.replace(zR,"$1Z");
+  const zR = new RegExp(`Z([${matras}])`, "g");
+  text = text.replace(zR,"$1Z").replace(zR,"$1Z");
   text = text.replace(/Za/g,"aZ");
 
-  /* STEP 2 : Chhoti i */
+  // Chhoti i
   let pos = text.indexOf("ि");
   while (pos !== -1) {
     const left = text.charAt(pos-1), lp = text.charAt(pos-2);
@@ -282,65 +247,35 @@ export function unicodeToShivaji(sourceText) {
     pos = text.search(/ि/, pos+1);
   }
 
-  /* STEP 3 : Shivaji map
-     Key differences from KrutiDev:
-       ण् = "."  (not ".k")
-       त् = "R",  थ् = "F",  ध् = "/"
-       प् = "I",  ब् = "C",  म् = "E"
-       ल् = "Y",  व् = "O"
-       द्ध = "ð", द्व = "n~o"                                      */
+  // Mapping table (Shivaji)
   const FROM = [
-    "\u2018","\u2019","\u201C","\u201D",
-    "(",")", "=","।","?","-","µ","॰",",",".","् ",
-    "०","१","२","३","४","५","६","७","८","९", "x",
-    "द्ध","ट्ट","ट्ठ","ड्ढ",
-    "क्र","प्र","द्र","म्र","ग्र","ब्र","स्र",
-    "त्र","क्ष","ज्ञ","श्र","त्त","क्त",
-    "ह्न","हृ","ह्म","द्य","ट्र","ड्र","श्व","द्व",
-    "क्","ख्","ग्","घ्","ङ्",
-    "च्","छ्","ज्","झ्","ञ्",
-    "ट्","ठ्","ड्","ढ्","ण्",
-    "त्",      "द्","ध्","न्",
-    "प्","फ्","ब्","भ्","म्",
-    "य्","र्","ल्","व्","श्","ष्","स्","ह्",
-    "ळ","ॐ","ऱ",
-    "ा","ि","ी","ु","ू","ृ","े","ै","ो","ौ",
-    "ं","ँ","ः","ॅ","ऽ","़",
+    "द्ध","द्व","ट्ट","ट्ठ","ड्ढ","श्व","क्ष","त्र","ज्ञ","श्र",
+    "कृ","दृ","ॐ","ऱ",
+    "क्","ख्","ग्","घ्","ङ्","च्","छ्","ज्","झ्","ञ्",
+    "ट्","ठ्","ड्","ढ्","ण्","त्","थ्","द्","ध्","न्",
+    "प्","फ्","ब्","भ्","म्","य्","र्","ल्","व्","श्","ष्","स्","ह्",
+    "ा","ि","ी","ु","ू","ृ","े","ै","ो","ौ","ं","ँ","ः","ॅ","ऽ","़",
     "अ","आ","इ","ई","उ","ऊ","ऋ","ए","ऐ","ओ","औ","अं","अः",
     "क","ख","ग","घ","ङ","च","छ","ज","झ","ञ",
     "ट","ठ","ड","ढ","ण","त","थ","द","ध","न",
-    "प","फ","ब","भ","म","य","र","ल","व","श","ष","स","ह",
-    "्",
+    "प","फ","ब","भ","म","य","र","ल","व","श","ष","स","ह","ळ",
+    "०","१","२","३","४","५","६","७","८","९","।"
   ];
   const TO = [
-    "^","*","Þ","ß",
-    "¼","½","¾","A","\\","&","&","A","]","-","~ ",
-    "0","1","2","3","4","5","6","7","8","9", "N",
-    "ð","ê","ë","ï",
-    "Ø","iz","nz","ez","xz","cz","lz",
-    "=","{k","K","Jh","Ù","Dr",
-    "à","º","ã","|","Vª","Mª","Üo","n~o",
-    "D","[","X","¿","?",
-    "P","N","T",">","¥",
-    "V","B","M","<",".",          // ← ण् = "."  (Shivaji)
-    "R",      "n","/","U",        // ← त्=R, द्=n, ध्=/, न्=U
-    "I","Q","C","H","E",          // ← प्=I, ब्=C, म्=E  (Shivaji)
-    "¸","j","Y","O","'","\"","L","g",   // ← ल्=Y, व्=O  (Shivaji)
-    "Ø","†","J",
-    "k","f","h","q","w","`","s","S","ks","kS",
-    "a","¡","%","W","·","¸",
+    "ð","n~o","ê","ë","ï","Üo","{k","q","1","Zo",
+    "—k","—d","†","J",
+    "D","[","X","¿","?","P","N","T",">","¥",
+    "V","B","M","<",".","R","F","n","/","U",
+    "I","Q","C","H","E","¸","j","Y","O","'","\"","L","g",
+    "k","f","h","q","w","`","s","S","ks","kS","a","¡","%","W","·","¸",
     "v","vk","b","bZ","m","Å","_",",","S","vks","vkS","va","v%",
     "d","[k","x","?k","?","p","N","t",">","¥",
     "V","B","M","<",".k","r","Fk","n","/k","u",
-    "i","Q","c","Hk","e",";","j","y","o","'k","\"k","l","g",
-    "~",
+    "i","Q","c","Hk","e",";","j","y","o","'k","\"k","l","g","Ø",
+    "0","1","2","3","4","5","6","7","8","9","A"
   ];
 
-  for (let i = 0; i < FROM.length; i++) {
-    if (text.includes(FROM[i])) {
-      text = text.split(FROM[i]).join(TO[i]);
-    }
-  }
+  for (let i=0;i<FROM.length;i++) if(text.includes(FROM[i])) text=text.split(FROM[i]).join(TO[i]);
   return text;
 }
 
@@ -370,17 +305,17 @@ export function shivajiToUnicode(text) {
   return kru2uni(t);
 }
 
-/* ──────────────────────────────────────────────────────────────── */
-/* 5.  Unicode  →  Preeti                                          */
-/* ──────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────── */
+/* Unicode → Preeti                */
+/* ─────────────────────────────── */
 export function unicodeToPreeti(sourceText) {
   if (!sourceText) return "";
   let text = preProcess(sourceText);
 
   // Reph
-  text = text.replace(/र्([क-ह])/g, "$1«");   // placeholder for reph
+  text = text.replace(/र्([क-ह])/g, "$1«");
   const zR = /«([ािीुूृेैोौं])/g;
-  text = text.replace(zR,"$1«"); text = text.replace(zR,"$1«");
+  text = text.replace(zR,"$1«").replace(zR,"$1«");
 
   // Chhoti i
   let pos = text.indexOf("ि");
@@ -392,31 +327,31 @@ export function unicodeToPreeti(sourceText) {
   }
 
   const FROM = [
-    "क्ष","त्र","ज्ञ","श्र",
+    "द्ध","द्व","ट्ट","ट्ठ","ड्ढ","क्ष","त्र","ज्ञ","श्र",
     "क्","ख्","ग्","घ्","च्","छ्","ज्","झ्","ट्","ठ्","ड्","ढ्",
     "ण्","त्","थ्","द्","ध्","न्","प्","फ्","ब्","भ्","म्",
-    "य्","र्","ल्","व्","श्","ष्","स्","ह्",
-    "ा","ि","ी","ु","ू","ृ","े","ै","ो","ौ","ं","ँ","ः",
-    "अ","आ","इ","ई","उ","ऊ","ए","ऐ","ओ","औ",
+    "य्","र्","ल्","व्","श्","ष्","स्","ह्","ळ","ऱ","ॐ",
+    "ा","ि","ी","ु","ू","ृ","े","ै","ो","ौ","ं","ँ","ः","ॅ","ऽ","़",
+    "अ","आ","इ","ई","उ","ऊ","ऋ","ए","ऐ","ओ","औ","अं","अः",
     "क","ख","ग","घ","ङ","च","छ","ज","झ","ञ",
     "ट","ठ","ड","ढ","ण","त","थ","द","ध","न",
-    "प","फ","ब","भ","म","य","र","ल","व","श","ष","स","ह","ळ",
+    "प","फ","ब","भ","म","य","र","ल","व","श","ष","स","ह",
     "०","१","२","३","४","५","६","७","८","९","।",
-    "्","«",
+    "्","«"
   ];
+
   const TO = [
-    "If","q","1","Zo",
+    "If","n]o","q","1","Zo","If","q","1","Zo",
     "s","v","u","3","r","5","h","em","6","7","8","9",
     "0","t","F","b","w","g","k","km","a","e","d",
-    "o","/","n","j","z","if",";","x",
-    "-","f","L","'","\"","`","s","P","]","O",
-    "F","M",";",
-    "v","g","O","{","=","+","s","P","cf]","{]",
-    "c","v","u","3","~","r","5","h","em","~",
-    "6","7","8","9","0","t","F","b","w","g",
-    "k","km","a","e","d","o","/","n","j","z","if",";","x","Ø",
+    "o","/","n","j","z","if",";","x","Ø","J","†",
+    "-","f","L","'","\"","`","s","P","]","O","F","M",";","~","¤","°",
+    "v","g","O","{","=","+","_","cf]","{]","c","v","u","3","~",
+    "r","5","h","em","~","6","7","8","9","0",
+    "t","F","b","w","g","k","km","a","e","d",
+    "o","/","n","j","z","if",";","x","Ø",
     "å","!","@","#","$","%","^","&","*","(","A",
-    "\\","Z",
+    "\\","Z"
   ];
 
   for (let i=0;i<FROM.length;i++) if(text.includes(FROM[i])) text=text.split(FROM[i]).join(TO[i]);

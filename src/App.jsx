@@ -35,6 +35,7 @@ import WebsiteShowcase from "./components/WebsiteShowcase";
 import ManageClientsPage from "./pages/ManageClientsPage";
 import EditCasePage from "./pages/EditCasePage";
 import EditInquiryPage from "./pages/EditInquiryPage";
+import Packages from "./components/Packages";
 
 // Landing Page Wrapper
 const LandingPage = () => {
@@ -43,6 +44,7 @@ const LandingPage = () => {
       <Navbar />
       <section id="home-section"><Hero /></section>
       <section id="features-section"><Features /></section>
+      <section id="packages-section"><Packages /></section>
       <section id="testimonials-section"><Testimonials /></section>
       <section id="contact-section"><Contact /></section>
       <Footer />
