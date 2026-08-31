@@ -10,7 +10,7 @@ function TrashIcon(props) { return (<svg viewBox="0 0 24 24" fill="none" stroke=
 
 /* ------------------------------------------------------------------------- */
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/chat";
+const API_URL = import.meta.env.VITE_API_URL || "https://talkntypeai.onrender.com/api/chat";
 
 const timeNow = () =>
   new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
