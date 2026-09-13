@@ -78,13 +78,18 @@ function TrashIcon(props) {
   );
 }
 
+function MicIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" x2="12" y1="19" y2="22" />
+    </svg>
+  );
+}
+
 /* ------------------------------------------------------------------------- */
 
-// Hardcoded on purpose: this is the version that is confirmed working.
-// If this project is set up with Vite, you can swap it for:
-//   const API_URL = import.meta.env.VITE_API_URL || "https://talkntypeai.onrender.com/api/chat";
-// but `import.meta.env` will throw a build error on non-Vite setups (e.g. CRA/webpack),
-// which is the most likely reason the Copilot version was failing.
 const API_URL = "https://talkntypeai.onrender.com/api/chat";
 
 const timeNow = () =>
@@ -102,6 +107,10 @@ export default function AiChat({ contextText }) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  
+  // Voice Recognition States
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -109,7 +118,6 @@ export default function AiChat({ contextText }) {
   const handleInputChange = (e) => setInput(e.target.value);
 
   const handleKeyDown = (e) => {
-    // Enter sends the message, Shift+Enter inserts a new line.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -121,6 +129,9 @@ export default function AiChat({ contextText }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+
+    // Stop mic if active when sending
+    if (isListening) recognitionRef.current?.stop();
 
     const userMessage = {
       id: Date.now().toString(),
@@ -139,8 +150,6 @@ export default function AiChat({ contextText }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // The local welcome greeting is UI-only; it was never produced by
-          // the model, so it is excluded from the conversation sent to the backend.
           messages: nextMessages.filter((m) => m.id !== "welcome"),
           provider: "openai",
         }),
@@ -152,8 +161,7 @@ export default function AiChat({ contextText }) {
       }
 
       const json = await response.json();
-      const reply =
-        json.reply || json.content || json.text || "(Empty response from AI)";
+      const reply = json.reply || json.content || json.text || "(Empty response from AI)";
 
       setMessages((prev) => [
         ...prev,
@@ -175,7 +183,47 @@ export default function AiChat({ contextText }) {
     }
   };
 
-  // Auto-resize the textarea as the advocate types, capped at ~6 lines.
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-IN'; // Set to Indian English
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map((result) => result[0].transcript)
+          .join("");
+        setInput(transcript);
+      };
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = (e) => {
+        console.error("Speech recognition error:", e.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Voice search is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setInput(""); 
+      recognitionRef.current.start();
+    }
+  };
+
+  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -183,12 +231,10 @@ export default function AiChat({ contextText }) {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Keep the latest message in view.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Let Escape close full-screen mode.
   useEffect(() => {
     if (!isFullScreen) return undefined;
     const onKeyDown = (e) => {
@@ -198,14 +244,13 @@ export default function AiChat({ contextText }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFullScreen]);
 
+  // Changed z-50 to z-[9999] so it hovers above your bottom navbar
   const wrapperClass = isFullScreen
-    ? "fixed inset-0 z-50 flex flex-col bg-white"
+    ? "fixed inset-0 z-[9999] flex flex-col bg-white"
     : "flex h-full flex-col border-l border-gray-200 bg-white";
 
   return (
     <div className={wrapperClass}>
-      {/* Local keyframes so the message fade-in works even if tailwind.config.js
-          hasn't been extended with a custom "fadeIn" animation. */}
       <style>{`
         @keyframes tntFadeIn {
           from { opacity: 0; transform: translateY(4px); }
@@ -327,16 +372,33 @@ export default function AiChat({ contextText }) {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Type your legal query..."
+              placeholder={isListening ? "Listening..." : "Type your legal query..."}
               className="max-h-40 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-black placeholder-gray-400 focus:outline-none"
             />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <SendIcon className="h-4 w-4" />
-            </button>
+            
+            {/* Added Wrapper for Mic and Send Button */}
+            <div className="mb-0.5 flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                  isListening 
+                    ? "bg-red-500 text-white animate-pulse" 
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+                title={isListening ? "Stop listening" : "Search by voice"}
+              >
+                <MicIcon className="h-4 w-4" />
+              </button>
+              
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <SendIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <p className="mt-1.5 text-[10px] text-gray-400">Press Enter to send, Shift + Enter for a new line.</p>
         </div>
