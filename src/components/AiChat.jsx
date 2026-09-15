@@ -88,6 +88,34 @@ function MicIcon(props) {
   );
 }
 
+// Added New Icons for Copy and Download features
+function CopyIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function DownloadIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function CheckIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 /* ------------------------------------------------------------------------- */
 
 const API_URL = "https://talkntypeai.onrender.com/api/chat";
@@ -108,6 +136,9 @@ export default function AiChat({ contextText }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
+  // Track which message ID was recently copied for visual feedback
+  const [copiedId, setCopiedId] = useState(null);
+  
   // Voice Recognition States
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
@@ -125,6 +156,24 @@ export default function AiChat({ contextText }) {
   };
 
   const handleClearChat = () => setMessages([welcomeMessage()]);
+
+  // Copy text handler
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000); // Revert icon after 2 seconds
+  };
+
+  // Download text handler
+  const handleDownload = (text, id) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `tnt-response-${id}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -324,11 +373,35 @@ export default function AiChat({ contextText }) {
                   }`}
                 >
                   <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
-                  {m.time && (
-                    <div className={`mt-1 text-[10px] italic ${isUser ? "text-blue-100" : "text-gray-400"}`}>
-                      {m.time}
-                    </div>
-                  )}
+                  
+                  {/* Footer containing timestamp and Action Buttons */}
+                  <div className={`mt-2 flex items-center justify-between text-[10px] ${isUser ? "text-blue-100" : "text-gray-400"}`}>
+                    <span className="italic">{m.time}</span>
+                    
+                    {/* Only show Copy/Download buttons for AI messages that are not errors */}
+                    {!isUser && !m.isError && (
+                      <div className="flex items-center gap-2.5 ml-4">
+                        <button
+                          onClick={() => handleCopy(m.content, m.id)}
+                          className="flex items-center gap-1 hover:text-blue-600 transition"
+                          title="Copy to clipboard"
+                        >
+                          {copiedId === m.id ? (
+                            <CheckIcon className="h-3.5 w-3.5 text-emerald-500" />
+                          ) : (
+                            <CopyIcon className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDownload(m.content, m.id)}
+                          className="flex items-center gap-1 hover:text-blue-600 transition"
+                          title="Download as text file"
+                        >
+                          <DownloadIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {isUser && (
@@ -376,7 +449,6 @@ export default function AiChat({ contextText }) {
               className="max-h-40 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-black placeholder-gray-400 focus:outline-none"
             />
             
-            {/* Added Wrapper for Mic and Send Button */}
             <div className="mb-0.5 flex shrink-0 items-center gap-1">
               <button
                 type="button"

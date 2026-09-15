@@ -1,0 +1,267 @@
+.draft-create-page {
+  min-height: 100vh;
+  background: #f7f8fc;
+  color: #1f2937;
+  padding: 0 48px 60px;
+  font-family: Inter, sans-serif;
+}
+
+.draft-create-header {
+  max-width: 1200px;
+  margin: auto;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.draft-back-button {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.draft-create-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #1e293b;
+}
+
+.draft-create-header p {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.draft-create-main {
+  max-width: 1200px;
+  margin: 35px auto;
+}
+
+.draft-form-card,
+.draft-preview-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(30, 41, 59, 0.04);
+}
+
+.draft-form-heading {
+  margin-bottom: 28px;
+}
+
+.draft-step {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d5ce7;
+  letter-spacing: 1px;
+}
+
+.draft-form-heading h2,
+.draft-preview-header h2 {
+  margin: 8px 0;
+  color: #1e293b;
+  font-size: 22px;
+}
+
+.draft-form-heading p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.draft-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+}
+
+.draft-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.draft-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 4px;
+}
+
+.draft-field input,
+.draft-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 12px;
+  font-size: 14px;
+  color: #334155;
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.draft-field input:focus,
+.draft-field textarea:focus {
+  border-color: #8b7ee8;
+  box-shadow: 0 0 0 3px rgba(139, 126, 232, 0.1);
+}
+
+.draft-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.draft-cancel-button,
+.draft-generate-button,
+.draft-save-button {
+  border-radius: 9px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draft-cancel-button {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.draft-generate-button {
+  background: #6558d9;
+  border: none;
+  color: white;
+}
+
+.draft-generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.draft-preview-card {
+  margin-top: 30px;
+}
+
+.draft-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.draft-ready-badge {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.draft-preview-editor {
+  width: 100%;
+  min-height: 450px;
+  box-sizing: border-box;
+  margin-top: 20px;
+  padding: 25px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1e293b;
+  resize: vertical;
+}
+
+.draft-preview-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.draft-save-button {
+  background: #16a34a;
+  border: none;
+  color: white;
+}
+
+.draft-loading,
+.draft-error {
+  max-width: 600px;
+  margin: 100px auto;
+  background: white;
+  padding: 40px;
+  text-align: center;
+  border-radius: 16px;
+}
+
+.draft-error h2 {
+  color: #334155;
+}
+
+.draft-error p {
+  color: #64748b;
+}
+
+.draft-error button {
+  background: #6558d9;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+.draft-form-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 20px;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .draft-create-page {
+    padding: 0 18px 40px;
+  }
+
+  .draft-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .full-width {
+    grid-column: auto;
+  }
+
+  .draft-form-card,
+  .draft-preview-card {
+    padding: 20px;
+  }
+
+  .draft-preview-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

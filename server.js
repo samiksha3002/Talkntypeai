@@ -44,6 +44,7 @@ import judgementAiRouter from "./routes/judgementAi.js";
 // ── Middleware Imports ────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
+import draftsRouter from "./routes/draft.ready.js";
 
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ const allowedOrigins = [
   "https://www.talkntype.pro",
   "https://talkntpe.pro",
   "https://www.talkntpe.pro",
+  "http://localhost:5174",
 ];
 
 
@@ -119,6 +121,7 @@ app.use("/api",               legalRoutes);
 app.use("/api",               pdfRoutes);
 app.use("/api/audio",         audioRoutes);
 app.use("/api/legal-ai",      legalAiRoute);
+app.use("/api/drafts", draftsRouter);
 
 // ── LexArchive Routes ─────────────────────────────────────────────────────────
 app.use("/api/judgements", judgementsRouter);

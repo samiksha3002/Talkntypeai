@@ -36,6 +36,8 @@ import ManageClientsPage from "./pages/ManageClientsPage";
 import EditCasePage from "./pages/EditCasePage";
 import EditInquiryPage from "./pages/EditInquiryPage";
 import Packages from "./components/Packages";
+import DraftStudio from "./Features/LegalHubMain/pages/DraftStudio";
+import DraftCreate from "../src/Features/LegalHubMain/pages/DraftCreate";
 
 // Landing Page Wrapper
 const LandingPage = () => {
@@ -133,7 +135,9 @@ function App() {
                 <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
                 <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
                 <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
-                
+                <Route path="/draft-studio" element={<DraftStudio />}/>
+                <Route
+  path="/draft/create" element={<DraftCreate />}/>
                 {/* ADMIN ROUTE */}
                 <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
                 

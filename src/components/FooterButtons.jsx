@@ -1,14 +1,17 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   Feather,
   Scale,
   BrainCircuit,
+  FileText,
 } from "lucide-react";
 
 /* =====================================
    Premium Footer Button
 ===================================== */
+
 const FooterTab = ({
   title,
   icon,
@@ -49,6 +52,17 @@ const FooterTab = ({
       active:
         "ring-2 ring-blue-400 shadow-blue-300/40",
     },
+
+    green: {
+      gradient:
+        "from-emerald-50 via-green-50 to-teal-100",
+      iconBg:
+        "bg-gradient-to-br from-emerald-500 to-green-600",
+      glow: "bg-emerald-500/20",
+      text: "text-emerald-700",
+      active:
+        "ring-2 ring-emerald-400 shadow-emerald-300/40",
+    },
   };
 
   const style = colorStyles[color];
@@ -75,6 +89,7 @@ const FooterTab = ({
       `}
     >
       {/* Glow effect */}
+
       <div
         className={`
           absolute
@@ -89,9 +104,11 @@ const FooterTab = ({
       />
 
       {/* Glossy top overlay */}
+
       <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent opacity-70" />
 
       {/* Icon Box */}
+
       <div
         className={`
           relative z-10
@@ -108,6 +125,7 @@ const FooterTab = ({
       </div>
 
       {/* Text */}
+
       <div className="relative z-10 flex flex-col items-start">
         <span
           className={`
@@ -125,6 +143,7 @@ const FooterTab = ({
       </div>
 
       {/* Active Indicator */}
+
       {active && (
         <div className="absolute right-4">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse block" />
@@ -134,9 +153,11 @@ const FooterTab = ({
   );
 };
 
+
 /* =====================================
    Main Footer Component
 ===================================== */
+
 const FooterButtons = ({
   setActiveView,
   activeView,
@@ -147,6 +168,7 @@ const FooterButtons = ({
     <footer className="h-[88px] border-t border-slate-200 bg-white px-4 flex items-center">
 
       {/* LEFT SIDE - SYSTEM STATUS */}
+
       <div className="w-[230px] flex items-center gap-2 text-sm font-medium text-slate-600 border-r border-slate-200 pr-5">
 
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -157,12 +179,16 @@ const FooterButtons = ({
             Online
           </span>
         </span>
+
       </div>
 
+
       {/* RIGHT SIDE BUTTONS */}
-      <div className="flex-1 grid grid-cols-3 gap-3 pl-5">
+
+      <div className="flex-1 grid grid-cols-4 gap-3 pl-5">
 
         {/* EDITOR */}
+
         <FooterTab
           title="Editor"
           color="purple"
@@ -173,7 +199,9 @@ const FooterButtons = ({
           }
         />
 
+
         {/* JUDGEMENTS */}
+
         <FooterTab
           title="Judgements"
           color="orange"
@@ -183,7 +211,9 @@ const FooterButtons = ({
           }
         />
 
+
         {/* LEGAL AI HUB */}
+
         <FooterTab
           title="Legal AI Hub"
           color="blue"
@@ -193,7 +223,23 @@ const FooterButtons = ({
             setActiveView("legalHub")
           }
         />
+
+
+        {/* DRAFT — NEW BUTTON */}
+
+        <FooterTab
+          title="Draft"
+          color="green"
+          active={activeView === "draft"}
+          icon={<FileText size={22} />}
+          onClick={() => {
+            setActiveView("draft");
+            navigate("/draft-studio");
+          }}
+        />
+
       </div>
+
     </footer>
   );
 };
