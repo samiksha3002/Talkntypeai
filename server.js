@@ -1,17 +1,7 @@
-// server.js
-// ─────────────────────────────────────────────────────────────────────────────
-// CRITICAL: dotenv MUST be the very first thing — before any other imports.
-// In ES Modules, all imports execute before any code in this file runs.
-// So we use a separate env.js file that loads dotenv, and import IT first.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import "./env.js";   // ← must be FIRST import — loads .env before everything else
-
+import "./env.js";
 import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
-
-// ── TalkNType Route Imports ───────────────────────────────────────────────────
 import draftRouter             from "./routes/draft.routes.js";
 import authRoutes              from "./routes/auth.js";
 import adminRoutes             from "./routes/admin.js";
@@ -37,113 +27,377 @@ import legalRoutes             from "./routes/legal.js";
 import legalAiRoute            from "./routes/legalaidraft.js";
 
 // ── LexArchive Route Imports ──────────────────────────────────────────────────
-import judgementsRouter from "./routes/judgements.js";
-import savedRouter      from "./routes/saved.js";
+import judgementsRouter  from "./routes/judgements.js";
+import savedRouter       from "./routes/saved.js";
 import judgementAiRouter from "./routes/judgementAi.js";
 
-// ── Middleware Imports ────────────────────────────────────────────────────────
+// ── Middleware Imports ─────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
+
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
-import draftsRouter from "./routes/draft.ready.js";
+import draftsRouter        from "./routes/draft.ready.js";
 
-
-// ── Bootstrap ─────────────────────────────────────────────────────────────────
 connectDB();
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 5000;
-
 app.set("trust proxy", 1);
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
+  // Local development
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
+
+  // Production
   "https://talkntype.pro",
   "https://www.talkntype.pro",
+
+  // Existing typo/alternate domain kept intentionally
   "https://talkntpe.pro",
   "https://www.talkntpe.pro",
-  "http://localhost:5174",
 ];
-
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn("CORS blocked origin:", origin);
-      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+
+    if (!origin) {
+      return callback(null, true);
     }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn(
+      "⚠️ CORS blocked origin:",
+      origin
+    );
+
+    return callback(
+      new Error(
+        `CORS policy: origin ${origin} not allowed`
+      )
+    );
   },
-  methods:        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials:    true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+
+  credentials: true,
+ preflightContinue: false,
+ optionsSuccessStatus: 204,
 };
 
+
+
 app.use(cors(corsOptions));
+app.use(
+  express.json({
+    limit: "100mb",
+  })
+);
 
-// ── Body Parsing ──────────────────────────────────────────────────────────────
-app.use(express.json({ limit: "100mb" }));
-app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+app.use(express.urlencoded({extended: true,limit: "100mb",}));
 
-// ── Rate Limiting ─────────────────────────────────────────────────────────────
-app.use("/api", apiLimiter);
+app.use((req, res, next) => {
 
-// ── Health / Root ─────────────────────────────────────────────────────────────
-app.get("/",       (req, res) => res.send("TalkNType Server Running!"));
-app.get("/health", (req, res) => res.json({ status: "ok", time: new Date() }));
+  const start = Date.now();
 
-// ── TalkNType Routes ──────────────────────────────────────────────────────────
-app.use("/api",               authRoutes);
-app.use("/api/admin",         adminRoutes);
-app.use("/api/deepgram",      deepgramRoutes);
-app.use("/api/cases",         casesRoutes);
-app.use("/api/chattranslate", chatTranslateRoute);
-app.use("/api/chat",          aiChatRoutes);
-app.use("/api/ocr",           ocrRoutes);
-app.use("/api/expand",        expandRoute);
-app.use("/api/fix-grammar",   fixGrammarRoute);
-app.use("/api/font",  fontConvertRouter);
-app.use("/api/draft",         draftRouter);
-app.use("/api/transliterate", transliterateFinalRoute);
-app.use("/api/clients",       clientsRoutes);
-app.use("/api/inquiries",     inquiriesRouter);
-app.use("/api/reports",       reportsRoute);
-app.use("/api/team",          teamRoute);
-app.use("/api/payments",      paymentsRoute);
-app.use("/api/dictionary",    dictionaryRoutes);
-app.use("/api/csv-manager",   csvUploadRoute);
-app.use("/api",               legalRoutes);
-app.use("/api",               pdfRoutes);
-app.use("/api/audio",         audioRoutes);
-app.use("/api/legal-ai",      legalAiRoute);
-app.use("/api/drafts", draftsRouter);
+  res.on("finish", () => {
 
-// ── LexArchive Routes ─────────────────────────────────────────────────────────
-app.use("/api/judgements", judgementsRouter);
-app.use("/api/saved",      savedRouter);
-app.use("/api/judgement-ai", judgementAiRouter);
-app.use("/api/ocr", searchablePdfRouter); 
-// ── 404 Handler ───────────────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ error: "Route not found." });
-});
+    const duration = Date.now() - start;
 
-// ── Global Error Handler ──────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error("🔥 Server Error:", err.stack || err.message);
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
+    // Only log API requests
+    if (req.originalUrl.startsWith("/api")) {
+
+      console.log(
+        `📡 ${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms)`
+      );
+
+    }
   });
+
+  next();
 });
 
-// ── Start Server ──────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 TalkNType + LexArchive server running on http://localhost:${PORT}`);
-  console.log(`✅ Indian Kanoon token: ${process.env.INDIAN_KANOON_API_TOKEN ? process.env.INDIAN_KANOON_API_TOKEN.slice(0,8) + "..." : "❌ NOT SET"}`);
-});
+app.use(
+  "/api",
+  apiLimiter
+);
+
+app.get(
+  "/",
+  (req, res) => {
+
+    res.status(200).json({
+      success: true,
+      service: "TalkNType + LexArchive API",
+      status: "running",
+      message: "TalkNType Server Running!",
+    });
+
+  }
+);
+
+
+app.get(
+  "/health",
+  (req, res) => {
+
+    res.status(200).json({
+      success: true,
+      status: "ok",
+      service: "TalkNType API",
+      time: new Date().toISOString(),
+    });
+
+  }
+);
+
+app.use( "/api",authRoutes);
+app.use("/api/admin",adminRoutes);
+app.use("/api/deepgram",deepgramRoutes);
+app.use("/api/cases",casesRoutes);
+app.use("/api/chattranslate",chatTranslateRoute);
+app.use("/api/chat",aiChatRoutes);
+app.use("/api/ocr", ocrRoutes);
+app.use( "/api/expand", expandRoute);
+
+
+// ── Fix Grammar ───────────────────────────────────────────────────────────────
+app.use(
+  "/api/fix-grammar",
+  fixGrammarRoute
+);
+
+
+// ── Font Conversion ───────────────────────────────────────────────────────────
+app.use(
+  "/api/font",
+  fontConvertRouter
+);
+
+
+// ── Drafts ────────────────────────────────────────────────────────────────────
+app.use(
+  "/api/draft",
+  draftRouter
+);
+
+
+// ── Transliteration ───────────────────────────────────────────────────────────
+app.use(
+  "/api/transliterate",
+  transliterateFinalRoute
+);
+
+
+// ── Clients ───────────────────────────────────────────────────────────────────
+app.use(
+  "/api/clients",
+  clientsRoutes
+);
+
+
+// ── Inquiries ─────────────────────────────────────────────────────────────────
+app.use(
+  "/api/inquiries",
+  inquiriesRouter
+);
+
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+app.use(
+  "/api/reports",
+  reportsRoute
+);
+
+
+// ── Team ──────────────────────────────────────────────────────────────────────
+app.use(
+  "/api/team",
+  teamRoute
+);
+
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+app.use(
+  "/api/payments",
+  paymentsRoute
+);
+
+
+// ── Dictionary ────────────────────────────────────────────────────────────────
+app.use(
+  "/api/dictionary",
+  dictionaryRoutes
+);
+
+
+// ── CSV Manager ───────────────────────────────────────────────────────────────
+app.use(
+  "/api/csv-manager",
+  csvUploadRoute
+);
+
+
+// ── Legal Routes ──────────────────────────────────────────────────────────────
+app.use(
+  "/api",
+  legalRoutes
+);
+
+
+// ── PDF Routes ────────────────────────────────────────────────────────────────
+app.use(
+  "/api",
+  pdfRoutes
+);
+
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+app.use(
+  "/api/audio",
+  audioRoutes
+);
+
+
+// ── Legal AI Drafting ─────────────────────────────────────────────────────────
+app.use(
+  "/api/legal-ai",
+  legalAiRoute
+);
+
+
+// ── Advanced Draft System ─────────────────────────────────────────────────────
+app.use(
+  "/api/drafts",
+  draftsRouter
+);
+app.use("/api/judgements",judgementsRouter);
+app.use("/api/saved",savedRouter);
+app.use("/api/judgement-ai",judgementAiRouter);
+app.use( "/api/ocr", searchablePdfRouter);
+
+app.use(
+  (req, res) => {
+
+    res.status(404).json({
+      success: false,
+      error: "Route not found.",
+      path: req.originalUrl,
+      method: req.method,
+    });
+
+  }
+);
+
+app.use(
+  (err, req, res, next) => {
+
+    console.error(
+      "🔥 Server Error:",
+      err?.stack || err?.message || err
+    );
+
+
+    // CORS error
+    if (
+      err?.message &&
+      err.message.startsWith("CORS policy:")
+    ) {
+
+      return res.status(403).json({
+        success: false,
+        error: "CORS blocked",
+        message: err.message,
+      });
+
+    }
+
+
+    const statusCode =
+      Number(err?.status) ||
+      Number(err?.statusCode) ||
+      500;
+
+
+    const isProduction =
+      process.env.NODE_ENV === "production";
+
+
+    return res.status(statusCode).json({
+
+      success: false,
+
+      message:
+        isProduction
+          ? "Internal Server Error"
+          : (
+              err?.message ||
+              "Internal Server Error"
+            ),
+    });
+
+  }
+);
+
+app.listen(
+  PORT,
+  () => {
+
+    console.log("");
+    console.log("══════════════════════════════════════════════════");
+    console.log("🚀 TalkNType + LexArchive Server Started");
+    console.log("══════════════════════════════════════════════════");
+
+    console.log(
+      `🌐 Local: http://localhost:${PORT}`
+    );
+
+    console.log(
+      `❤️ Health: http://localhost:${PORT}/health`
+    );
+
+    console.log(
+      `🤖 AI Chat: http://localhost:${PORT}/api/chat`
+    );
+
+    console.log(
+      `📚 Judgements: http://localhost:${PORT}/api/judgements`
+    );
+
+    console.log(
+      `📄 Drafts: http://localhost:${PORT}/api/drafts`
+    );
+
+    console.log(
+      `🔧 Environment: ${process.env.NODE_ENV || "development"}`
+    );
+
+
+    console.log(
+      `🇮🇳 Indian Kanoon token: ${
+        process.env.INDIAN_KANOON_API_TOKEN
+          ? process.env.INDIAN_KANOON_API_TOKEN.slice(0, 8) + "..."
+          : "❌ NOT SET"
+      }`
+    );
+
+    console.log("══════════════════════════════════════════════════");
+    console.log("");
+
+  }
+);
