@@ -212,80 +212,182 @@
   // It is no longer needed — all conversions now go through the API.
   // ─────────────────────────────────────────────────────────────────────────────
 
+ 
   // 🔠 Font Conversion Effect
-  useEffect(() => {
-      const runFontConversion = async () => {
-        if (!fontConvertCommand?.textToConvert || !fontConvertCommand?.font) return;
-  
-        try {
-          setIsConverting(true);
-  
-          // HTML strip karke plain text nikalo
-          const plainText = fontConvertCommand.textToConvert
-            .replace(/<\/p>/gi, "\n")
-            .replace(/<br\s*\/?>/gi, "\n")
-            .replace(/<[^>]+>/g, "")
-            .replace(/&nbsp;/g, " ")
-            .replace(/\u00A0/g, " ")
-            .trim();
-  
-          // FontConvertCard.font = "unicode-to-krutidev" / "unicode-to-shivaji" / "unicode-to-preeti"
-          const conversionType = fontConvertCommand.font;
-  
-          // ✅ CORRECT URL — /api/font/convert (not /api/font-convert/)
-          // API_BASE_URL will be "http://localhost:5000" locally
-          // and your production URL on server
-          const res = await fetch(`${API_BASE_URL}/api/font/convert`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: plainText, conversionType }),
-          });
-  
-          const contentType = res.headers.get("content-type") || "";
-          if (!contentType.includes("application/json")) {
-            throw new Error(`Route not found (${res.status}). Check server.js has: app.use("/api/font", fontConvertRouter)`);
-          }
-  
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.error || `Server error: ${res.status}`);
-          }
-  
-          setManualText(`<p>${data.convertedText}</p>`);
-  
-        } catch (err) {
-          console.error("Font conversion error:", err.message);
-          alert(`Font conversion failed:\n${err.message}`);
-        } finally {
-          setIsConverting(false);
-          setFontConvertCommand(null);
-        }
-      };
-  
-      runFontConversion();
-    }, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
-
-    const handleInsertScannedText = (text) => {
-    if (quillRef.current) {
-      const editor = quillRef.current.getEditor();
-      const range = editor.getSelection();
-      
-      // कर्सर की जगह पर टेक्स्ट डालें, या फिर आखिर में डालें
-      if (range) {
-        editor.insertText(range.index, text, 'user');
-        editor.setSelection(range.index + text.length, 0); // कर्सर को टेक्स्ट के आगे ले जाएँ
-      } else {
-        const length = editor.getLength();
-        editor.insertText(length - 1, text, 'user');
-      }
-      
-      // State अपडेट करें
-      setManualText(editor.root.innerHTML);
+useEffect(() => {
+  const runFontConversion = async () => {
+    if (
+      !fontConvertCommand?.textToConvert ||
+      !fontConvertCommand?.font ||
+      !quillRef.current
+    ) {
+      return;
     }
-    // इन्सर्ट होने के बाद स्कैनर बंद कर दें
-    setScannerFile(null); 
+
+    try {
+      setIsConverting(true);
+
+      const editor = quillRef.current.getEditor();
+
+      /*
+       * IMPORTANT:
+       * Work with Quill Delta instead of stripping HTML.
+       *
+       * This preserves:
+       * - bold
+       * - italic
+       * - underline
+       * - alignment
+       * - indentation
+       * - paragraph structure
+       * - links
+       * - other Quill attributes
+       */
+      const delta = editor.getContents();
+
+      const conversionType = fontConvertCommand.font;
+
+      /*
+       * Convert every text operation individually.
+       * Newline operations are preserved.
+       */
+      const convertedOps = [];
+
+      for (const op of delta.ops || []) {
+        if (typeof op.insert !== "string") {
+          convertedOps.push(op);
+          continue;
+        }
+
+        const originalText = op.insert;
+
+        /*
+         * Don't send an empty string to the API.
+         */
+        if (!originalText) {
+          convertedOps.push(op);
+          continue;
+        }
+
+        const res = await fetch(
+          `${API_BASE_URL}/api/font/convert`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: originalText,
+              conversionType,
+            }),
+          }
+        );
+
+        const contentType =
+          res.headers.get("content-type") || "";
+
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            `Font conversion route not found (${res.status}). ` +
+            `Check server.js: app.use("/api/font", fontConvertRouter)`
+          );
+        }
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(
+            data.error || `Server error: ${res.status}`
+          );
+        }
+
+        /*
+         * Preserve the original Quill attributes.
+         */
+        convertedOps.push({
+          insert: data.convertedText,
+          ...(op.attributes
+            ? { attributes: { ...op.attributes } }
+            : {}),
+        });
+      }
+
+      /*
+       * Build the converted Delta.
+       */
+      const convertedDelta = {
+        ops: convertedOps,
+      };
+
+      /*
+       * Replace the editor contents while keeping formatting.
+       */
+      editor.setContents(convertedDelta, "api");
+
+      /*
+       * Apply the correct legacy font to the whole editor.
+       *
+       * The encoding and the font are separate things:
+       *
+       * Unicode:
+       *     महोदय
+       *
+       * KrutiDev encoded:
+       *     egksn;
+       *
+       * The KrutiDev font makes that encoded text visually
+       * appear as महोदय.
+       */
+      if (conversionType === "unicode-to-krutidev") {
+        editor.root.style.fontFamily = '"KrutiDev", sans-serif';
+      }
+
+      if (conversionType === "mangal-to-krutidev") {
+        editor.root.style.fontFamily = '"KrutiDev", sans-serif';
+      }
+
+      if (conversionType === "unicode-to-shivaji") {
+        editor.root.style.fontFamily = '"Shivaji01", sans-serif';
+      }
+
+      /*
+       * Preeti support.
+       * Keep normal browser font if Preeti isn't registered.
+       */
+      if (conversionType === "unicode-to-preeti") {
+        editor.root.style.fontFamily = "Preeti, sans-serif";
+      }
+
+      /*
+       * Update React state from the actual Quill editor.
+       */
+      setManualText(editor.root.innerHTML);
+
+    } catch (err) {
+      console.error(
+        "Font conversion error:",
+        err
+      );
+
+      alert(
+        `Font conversion failed:\n${err.message}`
+      );
+
+    } finally {
+      setIsConverting(false);
+      setFontConvertCommand(null);
+    }
   };
-  
+
+  runFontConversion();
+
+}, [
+  fontConvertCommand,
+  API_BASE_URL,
+  setManualText,
+  setIsConverting,
+  setFontConvertCommand,
+]);
 
     // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
     const clearAutoSave = () => {

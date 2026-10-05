@@ -1,21 +1,87 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+
+/* =========================================================
+   LEGACY DEVANAGARI FONTS
+   ========================================================= */
+
+/* Kruti Dev 010 */
 @font-face {
   font-family: "KrutiDev";
-  src: url("./fonts/KrutiDev010.ttf") format("truetype");
+  src: url("/KRDEV010.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
+
+/* Shivaji 01 */
+@font-face {
+  font-family: "Shivaji01";
+  src: url("/Shivaji01.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+
+/* =========================================================
+   LEGACY FONT UTILITY CLASSES
+   ========================================================= */
+
+.font-krutidev {
+  font-family: "KrutiDev", sans-serif !important;
+}
+
+.font-shivaji {
+  font-family: "Shivaji01", sans-serif !important;
+}
+
+
+/* =========================================================
+   QUILL EDITOR LEGACY FONTS
+   ========================================================= */
+
+.ql-editor .font-krutidev {
+  font-family: "KrutiDev", sans-serif !important;
+}
+
+.ql-editor .font-shivaji {
+  font-family: "Shivaji01", sans-serif !important;
+}
+
+
+/* =========================================================
+   LEGACY FONT TEXT HELPERS
+   ========================================================= */
+
+.legacy-krutidev {
+  font-family: "KrutiDev", sans-serif !important;
+}
+
+.legacy-shivaji {
+  font-family: "Shivaji01", sans-serif !important;
+}
+
+
+/* =========================================================
+   PAGE BREAK
+   ========================================================= */
 
 .page-break {
   border-top: 2px dashed #ccc;
   margin: 20px 0;
   page-break-after: always;
 }
-/* Sidebar items ko spacing aur icons dijiye */
+
+
+/* =========================================================
+   INTELLIGENCE CARD
+   ========================================================= */
+
 .intelligence-card {
   background: linear-gradient(to bottom right, #ffffff, #f8fafc);
   border-left: 4px solid #4f46e5;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
