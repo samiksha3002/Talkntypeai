@@ -20,7 +20,7 @@ const DraftTemplateSchema = new mongoose.Schema({
   content: { 
     type: String 
   },
-  description: { 
+  description: {  
     type: String 
   },
   language: { 

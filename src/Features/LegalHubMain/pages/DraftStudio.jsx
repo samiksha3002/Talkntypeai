@@ -169,18 +169,28 @@ export default function DraftStudio() {
   }, [search, allDocuments]);
 
   // Click handler me hum title ko DB drafts se match karenge taaki _id mil sake
-  const handleDocumentClick = (documentTitle, sectionTitle) => {
-    // Check agar ye title wala draft database me hai ya nahi
-    const foundInDb = dbDrafts.find(d => d.title.toLowerCase() === documentTitle.toLowerCase());
+  const handleDocumentClick = (documentTitle) => {
+  const foundInDb = dbDrafts.find(
+    (draft) =>
+      draft.title.trim().toLowerCase() ===
+      documentTitle.trim().toLowerCase()
+  );
 
-    navigate("/draft/create", {
-      state: {
-        documentType: documentTitle,
-        category: sectionTitle,
-        draftId: foundInDb ? foundInDb._id : null, // Agar DB me hai to _id bhejo, warna null
-      },
-    });
-  };
+  if (!foundInDb) {
+    alert(
+      `"${documentTitle}" ka template abhi database mein available nahi hai.`
+    );
+    return;
+  }
+
+  navigate("/draft/create", {
+    state: {
+      documentType: foundInDb.title,
+      category: foundInDb.category,
+      draftId: foundInDb._id,
+    },
+  });
+};
 
   return (
     <div className="draft-page">
