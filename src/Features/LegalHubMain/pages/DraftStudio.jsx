@@ -136,20 +136,36 @@ export default function DraftStudio() {
 
   // API Call to fetch drafts from Database
   useEffect(() => {
-    const fetchDrafts = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/drafts/all');
-        const result = await response.json();
-        
-        if (result.success) {
-          setDbDrafts(result.data);
-        }
-      } catch (error) {
-        console.error("Error fetching drafts from DB:", error);
+  const fetchDrafts = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL;
+
+      if (!API_URL) {
+        throw new Error("VITE_API_URL is not configured");
       }
-    };
-    fetchDrafts();
-  }, []);
+
+      const response = await fetch(
+        `${API_URL.replace(/\/$/, "")}/api/drafts/all`
+      );
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setDbDrafts(result.data);
+      } else {
+        console.error("Failed to fetch drafts:", result);
+      }
+    } catch (error) {
+      console.error("Error fetching drafts from DB:", error);
+    }
+  };
+
+  fetchDrafts();
+}, []);
 
   const allDocuments = useMemo(() => {
     return draftingSections.flatMap((section) =>
