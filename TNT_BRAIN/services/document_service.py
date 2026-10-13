@@ -1,414 +1,313 @@
+import base64
+import gc
+import logging
 import os
 import shutil
-import base64
-import fitz  # PyMuPDF
-import time
 import threading
-import gc
+import time
 import uuid
+from pathlib import Path
+from typing import List, Optional
+
+import fitz
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentService:
+    """
+    Single-active-document service for the current app architecture.
+    Note: this is process-local state; for multi-worker/multi-instance production,
+    store document/session IDs and vector data in shared storage.
+    """
+
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        self.db_dir = "temp_db"
-        self._db_lock = threading.Lock()          # ✅ Thread safety
-        self._cleanup_timer = None                # ✅ Track cleanup timer
-
-        self.llm_vision = ChatOpenAI(
-            model_name="gpt-4o-mini",
-            temperature=0,
-            max_tokens=2000
-        )
-        self.llm_answer = ChatOpenAI(
-            model_name="gpt-4o",
-            temperature=0.2,
-            max_tokens=2000
-        )
-        self.llm_timeline = ChatOpenAI(
-            model_name="gpt-4o",
-            temperature=0,
-            max_tokens=2000
-        )
-
+        self.db_dir = os.getenv("DOCUMENT_DB_DIR", "temp_db")
+        self._db_lock = threading.RLock()
+        self._cleanup_timer = None
         self.active_db = None
+        self.last_error = None
+        self.llm_vision = ChatOpenAI(model="gpt-4o-mini", temperature=0, max_tokens=3000)
+        self.llm_answer = ChatOpenAI(model="gpt-4o", temperature=0.2, max_tokens=2500)
+        self.llm_timeline = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=3000)
 
-    # ==========================================
-    # SAFE DB CLEANUP
-    # ==========================================
-    def _safe_delete_db(self, folder_path):
-        """Safely delete DB - acquire lock first"""
-        with self._db_lock:
+    def _close_active_db(self):
+        if self.active_db is not None:
             try:
-                # ✅ Release active_db reference before deleting
-                if self.active_db is not None:
-                    try:
-                        self.active_db._client.close()
-                    except Exception:
-                        pass
-                    self.active_db = None
+                client = getattr(self.active_db, "_client", None)
+                if client and hasattr(client, "close"):
+                    client.close()
+            except Exception:
+                logger.debug("Could not close Chroma client", exc_info=True)
+            self.active_db = None
+            gc.collect()
 
-                if os.path.exists(folder_path):
-                    # ✅ Retry logic for Windows file locking
-                    for attempt in range(5):
-                        try:
-                            shutil.rmtree(folder_path)
-                            print(f"🧹 Cleanup: Deleted {folder_path}")
-                            break
-                        except PermissionError:
-                            print(f"⚠️ Delete attempt {attempt+1} failed, retrying...")
-                            time.sleep(2)
-            except Exception as e:
-                print(f"⚠️ Cleanup Failed: {e}")
-
-    def _cleanup_task(self, folder_path, delay=7200):
-        """Background cleanup with cancel support"""
-        # Cancel previous timer if exists
+    def _cleanup_task(self, folder_path: str, delay: int = 7200):
         if self._cleanup_timer is not None:
             self._cleanup_timer.cancel()
 
-        def run():
-            time.sleep(delay)
-            self._safe_delete_db(folder_path)
+        def cleanup():
+            with self._db_lock:
+                # Do not delete a newer database if this timer belongs to an old one.
+                if os.path.abspath(folder_path) != os.path.abspath(self.db_dir):
+                    return
+                self._close_active_db()
+                try:
+                    if os.path.exists(folder_path):
+                        shutil.rmtree(folder_path, ignore_errors=False)
+                    logger.info("Temporary document database cleaned up.")
+                except Exception:
+                    logger.warning("Database cleanup failed", exc_info=True)
 
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
-        self._cleanup_timer = t
+        self._cleanup_timer = threading.Timer(delay, cleanup)
+        self._cleanup_timer.daemon = True
+        self._cleanup_timer.start()
 
-    # ==========================================
-    # VISION OCR
-    # ==========================================
-    def _perform_vision_ocr(self, file_path):
-        print(f"--- Vision OCR Starting: {file_path} ---")
-        doc = fitz.open(file_path)
-        ocr_docs = []
-
-        for page_num in range(min(len(doc), 25)):
-            page = doc.load_page(page_num)
-            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-            img_bytes = pix.tobytes("png")
-            base64_image = base64.b64encode(img_bytes).decode('utf-8')
-
-            message = HumanMessage(
-                content=[
+    def _perform_vision_ocr(self, file_path: str) -> List[Document]:
+        logger.info("Starting vision OCR for %s", file_path)
+        extracted = []
+        with fitz.open(file_path) as pdf:
+            page_count = min(len(pdf), int(os.getenv("OCR_MAX_PAGES", "25")))
+            for page_index in range(page_count):
+                page = pdf.load_page(page_index)
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), alpha=False)
+                image_bytes = pix.tobytes("png")
+                encoded = base64.b64encode(image_bytes).decode("ascii")
+                prompt = HumanMessage(content=[
                     {
                         "type": "text",
-                        "text": """You are an expert Indian Legal Document OCR specialist.
-Extract ALL text from this document page with 100% accuracy.
-
-INSTRUCTIONS:
-1. Document may be in Marathi, Hindi, or English - extract as-is in original language
-2. Also provide English translation below each paragraph in [TRANSLATION: ...]
-3. Identify and highlight: Dates, Party Names, Case Numbers, Legal Sections, FIR Numbers
-4. Keep Marathi/Hindi legal terms in original with English meaning: e.g., फिर्यादी (Complainant)
-5. Format dates consistently: DD/MM/YYYY
-6. If text is unclear, mark as [UNCLEAR]
-7. Preserve all numbers, amounts, and figures exactly
-
-Extract every word visible on this page:"""
+                        "text": (
+                            "You are an OCR specialist for Indian legal documents. Extract all "
+                            "visible text from this page, preserving the original language "
+                            "(English, Hindi, or Marathi), names, dates, numbers, case numbers, "
+                            "and legal provisions. Do not invent illegible text; mark it [UNCLEAR]. "
+                            "Return extracted text only. Page number: " + str(page_index + 1)
+                        ),
                     },
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/png;base64,{base64_image}",
-                            "detail": "high"
-                        }
+                            "url": f"data:image/png;base64,{encoded}",
+                            "detail": "high",
+                        },
                     },
-                ]
-            )
+                ])
+                try:
+                    result = self.llm_vision.invoke([prompt])
+                    content = result.content if isinstance(result.content, str) else str(result.content)
+                    extracted.append(Document(
+                        page_content=content,
+                        metadata={"page": page_index + 1, "source": "Vision-OCR", "file": os.path.basename(file_path)},
+                    ))
+                    logger.info("OCR page %s/%s completed", page_index + 1, page_count)
+                except Exception as exc:
+                    logger.exception("OCR failed on page %s", page_index + 1)
+                    extracted.append(Document(
+                        page_content=f"[OCR failed on page {page_index + 1}: {exc}]",
+                        metadata={"page": page_index + 1, "source": "OCR-Failed"},
+                    ))
+                time.sleep(0.2)
+        return extracted
 
+    def process_pdf(self, file_path: str):
+        with self._db_lock:
+            self.last_error = None
             try:
-                response = self.llm_vision.invoke([message])
-                ocr_docs.append(Document(
-                    page_content=response.content,
-                    metadata={
-                        "page": page_num + 1,
-                        "source": "Vision-OCR",
-                        "file": os.path.basename(file_path)
-                    }
-                ))
-                print(f"✅ Page {page_num + 1}/{min(len(doc), 25)} done")
-            except Exception as e:
-                print(f"⚠️ Page {page_num + 1} OCR failed: {e}")
-                ocr_docs.append(Document(
-                    page_content=f"[Page {page_num+1} extraction failed]",
-                    metadata={"page": page_num + 1, "source": "OCR-Failed"}
-                ))
+                if not os.path.isfile(file_path):
+                    raise FileNotFoundError("Uploaded PDF could not be found on the server.")
 
-            time.sleep(1.5)
-
-        doc.close()
-        gc.collect()
-        return ocr_docs
-
-    # ==========================================
-    # PROCESS PDF - FIXED
-    # ==========================================
-    def process_pdf(self, file_path):
-        with self._db_lock:  # ✅ Lock during entire DB creation
-            try:
                 loader = PyMuPDFLoader(file_path)
-                data = loader.load()
+                pages = loader.load()
+                all_text = "\n".join(page.page_content for page in pages).strip()
 
-                for doc in data:
-                    doc.page_content = doc.page_content.encode('utf-8', errors='replace').decode('utf-8')
-
-                all_text = "".join([doc.page_content for doc in data]).strip()
-
+                # Trigger OCR for image-only/scanned documents.
                 if len(all_text) < 100:
-                    print("Scanned PDF - Vision OCR starting...")
-                    data = self._perform_vision_ocr(file_path)
-                    for doc in data:
-                        doc.page_content = doc.page_content.encode('utf-8', errors='replace').decode('utf-8')
+                    pages = self._perform_vision_ocr(file_path)
 
-                if not data:
-                    return None
+                usable_pages = [
+                    page for page in pages
+                    if page.page_content and not page.page_content.startswith("[OCR failed")
+                ]
+                if not usable_pages or not any(len(p.page_content.strip()) > 0 for p in usable_pages):
+                    raise ValueError("No readable text could be extracted from this PDF.")
 
-                text_splitter = RecursiveCharacterTextSplitter(
+                splitter = RecursiveCharacterTextSplitter(
                     chunk_size=1500,
-                    chunk_overlap=300,
-                    separators=["\n\n", "\n", "।", ".", " "]
+                    chunk_overlap=250,
+                    separators=["\n\n", "\n", "।", ".", " "],
                 )
-                chunks = text_splitter.split_documents(data)
+                chunks = splitter.split_documents(usable_pages)
+                if not chunks:
+                    raise ValueError("No text chunks were created from this PDF.")
 
-                # ✅ FIX 1: Close existing DB before deleting directory
-                if self.active_db is not None:
-                    try:
-                        self.active_db._client.close()
-                    except Exception:
-                        pass
-                    self.active_db = None
-                    gc.collect()
-                    time.sleep(0.5)  # ✅ Wait for file handles to release
+                self._close_active_db()
+                if self._cleanup_timer is not None:
+                    self._cleanup_timer.cancel()
 
-                # ✅ FIX 2: Use unique collection name to avoid stale data
-                collection_name = f"legal_doc_{uuid.uuid4().hex[:8]}"
-
-                # ✅ FIX 3: Fresh directory every time
+                # A clean folder avoids stale collection data.
                 if os.path.exists(self.db_dir):
-                    for attempt in range(5):
-                        try:
-                            shutil.rmtree(self.db_dir)
-                            break
-                        except PermissionError:
-                            print(f"⚠️ rmtree attempt {attempt+1}, waiting...")
-                            time.sleep(1)
-
+                    shutil.rmtree(self.db_dir, ignore_errors=False)
                 os.makedirs(self.db_dir, exist_ok=True)
 
-                # ✅ FIX 4: Create Chroma with explicit settings
-                vector_db = Chroma.from_documents(
+                collection_name = f"legal_doc_{uuid.uuid4().hex[:10]}"
+                self.active_db = Chroma.from_documents(
                     documents=chunks,
                     embedding=self.embeddings,
                     persist_directory=self.db_dir,
                     collection_name=collection_name,
-                    collection_metadata={"hnsw:space": "cosine"}
+                    collection_metadata={"hnsw:space": "cosine"},
                 )
-
-                self.active_db = vector_db
-                self._cleanup_task(self.db_dir, delay=7200)
-                gc.collect()
-                return vector_db
-
-            except Exception as e:
-                print(f"❌ PDF Processing Error: {e}")
-                import traceback
-                traceback.print_exc()
+                # Force a simple DB read to verify that the collection is usable.
+                self.active_db._collection.count()
+                self._cleanup_task(self.db_dir, delay=int(os.getenv("DOCUMENT_DB_TTL_SECONDS", "7200")))
+                logger.info("PDF indexed: %s pages, %s chunks", len(usable_pages), len(chunks))
+                return self.active_db
+            except Exception as exc:
+                self.last_error = str(exc)
+                logger.exception("PDF processing failed: %s", exc)
+                self._close_active_db()
                 return None
 
-    # ==========================================
-    # GET ACTIVE DB - FIXED
-    # ==========================================
     def get_active_db(self):
         with self._db_lock:
-            # ✅ Test if existing DB is still alive
             if self.active_db is not None:
                 try:
-                    self.active_db._collection.count()  # Ping test
+                    self.active_db._collection.count()
                     return self.active_db
-                except Exception as e:
-                    print(f"⚠️ Active DB dead, reloading from disk: {e}")
-                    self.active_db = None
+                except Exception:
+                    logger.warning("Active document DB is unavailable", exc_info=True)
+                    self._close_active_db()
 
-            # ✅ Reload from disk if directory exists
-            if os.path.exists(self.db_dir):
-                try:
-                    print("🔄 Loading DB from Disk...")
-                    # ✅ Find the correct collection name from disk
-                    import chromadb
-                    client = chromadb.PersistentClient(path=self.db_dir)
-                    collections = client.list_collections()
-
-                    if not collections:
-                        print("❌ No collections found in DB directory")
-                        return None
-
-                    # Use the most recent collection
-                    collection_name = collections[0].name
-                    client_settings = chromadb.Settings(
-                        anonymized_telemetry=False,
-                        allow_reset=True
-                    )
-
-                    self.active_db = Chroma(
-                        persist_directory=self.db_dir,
-                        embedding_function=self.embeddings,
-                        collection_name=collection_name,
-                    )
-                    return self.active_db
-                except Exception as e:
-                    print(f"❌ Disk reload failed: {e}")
+            if not os.path.isdir(self.db_dir):
+                return None
+            try:
+                import chromadb
+                client = chromadb.PersistentClient(path=self.db_dir)
+                collections = client.list_collections()
+                if not collections:
                     return None
+                # There should be one collection because process_pdf recreates the directory.
+                collection_name = collections[0].name
+                self.active_db = Chroma(
+                    persist_directory=self.db_dir,
+                    embedding_function=self.embeddings,
+                    collection_name=collection_name,
+                )
+                self.active_db._collection.count()
+                return self.active_db
+            except Exception as exc:
+                self.last_error = str(exc)
+                logger.exception("Could not reload document database")
+                self._close_active_db()
+                return None
 
-            return None
-
-    # ==========================================
-    # TIMELINE GENERATOR
-    # ==========================================
     def get_timeline(self, vector_db):
         if vector_db is None:
             return "Analysis failed. Document could not be read."
-
         try:
-            search_queries = [
+            queries = [
                 "dates incidents events chronology timeline",
                 "marriage date FIR complaint filing court order",
                 "first incident second incident assault attack",
                 "registration date agreement property transaction",
+                "case number court name order date parties",
             ]
-
-            all_docs = []
-            seen = set()
-            for q in search_queries:
-                # ✅ Wrap in try/except per query
+            all_docs, seen = [], set()
+            for query in queries:
                 try:
-                    docs = vector_db.similarity_search(q, k=4)
-                    for d in docs:
-                        key = d.page_content[:100]
+                    for doc in vector_db.similarity_search(query, k=5):
+                        key = doc.page_content[:160]
                         if key not in seen:
                             seen.add(key)
-                            all_docs.append(d)
-                except Exception as e:
-                    print(f"⚠️ Timeline search failed for '{q}': {e}")
-                    continue
+                            all_docs.append(doc)
+                except Exception:
+                    logger.warning("Timeline retrieval query failed: %s", query, exc_info=True)
 
             if not all_docs:
                 return "Could not retrieve document content for timeline generation."
 
-            context = "\n\n".join([
-                f"[PAGE {d.metadata.get('page', '?')}]:\n{d.page_content}"
-                for d in all_docs
-            ])
+            context = "\n\n".join(
+                f"[PAGE {doc.metadata.get('page', '?')}]\n{doc.page_content}"
+                for doc in all_docs
+            )
+            system = SystemMessage(content=(
+                "You are a careful Indian legal case analyst. Create a chronology from the supplied "
+                "document excerpts only. Never invent dates or events. Clearly mark missing or unclear dates."
+            ))
+            human = HumanMessage(content=f"""
+Create a chronological timeline from the legal document excerpts.
 
-            system_msg = SystemMessage(content="""You are an expert Indian Legal Case Analyst.
-Your task is to create a PRECISE, DETAILED chronological timeline from legal documents.
-You work with documents in Marathi, Hindi, and English.""")
+Rules:
+- Format each event as: [DD/MM/YYYY or Date unclear] — Event — (Ref: Page X)
+- Group entries into Pre-Incident, Incident, Post-Incident, and Legal Proceedings when applicable.
+- Preserve names, locations, amounts, case numbers, and legal provisions exactly as shown.
+- If an event or date is uncertain, state that it is uncertain.
+- Do not fabricate a minimum number of events; include only supported events.
+- End with KEY PARTIES IDENTIFIED.
 
-            human_msg = HumanMessage(content=f"""Create a detailed CHRONOLOGICAL TIMELINE from this legal document.
-
-STRICT RULES:
-1. Every event MUST have exact date if available, else approximate period
-2. Format each entry as: 📅 [DD/MM/YYYY] — Event Description — (Ref: Page X)
-3. Keep Marathi/Hindi legal terms with English meaning: फिर्यादी (Complainant)
-4. Group by: Pre-Incident → Incident → Post-Incident → Legal Proceedings
-5. Include: All dates, names of parties, locations, amounts, case numbers
-6. If date is unclear, write: [Date Unknown - approximately YYYY]
-7. Minimum 10-15 timeline entries if available in document
-8. End with: "KEY PARTIES IDENTIFIED:" section listing all names
-
-DOCUMENT CONTEXT:
+DOCUMENT EXCERPTS:
 {context}
-
-Generate the complete timeline now:""")
-
-            response = self.llm_timeline.invoke([system_msg, human_msg])
+""")
+            response = self.llm_timeline.invoke([system, human])
             return response.content
+        except Exception as exc:
+            logger.exception("Timeline generation failed")
+            return f"Timeline generation failed: {exc}"
 
-        except Exception as e:
-            print(f"❌ Timeline Error: {e}")
-            return f"Timeline generation failed: {str(e)}"
-
-    # ==========================================
-    # ASK QUESTION
-    # ==========================================
-    def ask_question(self, vector_db, query, history=[]):
+    def ask_question(self, vector_db, query: str, history: Optional[List[dict]] = None):
         if vector_db is None:
-            return "❌ No document loaded. Please upload and analyze a PDF first."
-
+            return "No document database is loaded. Please upload and analyze a PDF first."
+        history = history or []
         try:
-            # ✅ Validate DB is alive before querying
             try:
                 vector_db._collection.count()
-            except Exception as e:
-                print(f"⚠️ DB health check failed: {e}")
-                # Try to recover from disk
+            except Exception:
                 recovered = self.get_active_db()
                 if recovered is None:
-                    return "❌ Document database is unavailable. Please re-upload the PDF."
+                    return "The document database is unavailable. Please re-upload the PDF."
                 vector_db = recovered
 
-            docs = vector_db.similarity_search(query, k=6)
-
+            docs = vector_db.similarity_search(query, k=7)
             if not docs:
-                return "The document does not contain information related to your question."
+                return "The uploaded document does not contain information relevant to this question."
 
-            context = "\n\n".join([
-                f"[PAGE {d.metadata.get('page', '?')}]:\n{d.page_content}"
-                for d in docs
-            ])
-
-            history_text = ""
-            if history:
-                recent_history = history[-4:]
-                history_text = "\n".join([
-                    f"{'Advocate' if h.get('role') == 'user' else 'Assistant'}: {h.get('content', '')}"
-                    for h in recent_history
-                ])
-
-            system_msg = SystemMessage(content="""You are an expert Indian Legal Document Assistant with deep knowledge of:
-- Indian Penal Code (IPC), CrPC, CPC, Evidence Act
-- Marathi, Hindi, and English legal documents
-- Family law, Criminal law, Civil law, Property law
-
-YOUR CORE RULES:
-1. ACCURACY FIRST: Answer ONLY from the provided document context. Never hallucinate.
-2. LANGUAGE MATCHING: Detect the language of the question and reply in THE SAME LANGUAGE.
-   - English question → English answer
-   - Hindi question → Hindi answer
-   - Marathi question → Marathi answer
-   - Mixed language → Match the primary language used
-3. CITATIONS: Always cite page numbers at end of statements: (Ref: Page X)
-4. LEGAL TERMS: Preserve original Marathi/Hindi terms with English translation in brackets
-5. MISSING INFO: If info not in document, clearly say: "This information is not mentioned in the uploaded document."
-6. SUMMARIES: For summary requests, give comprehensive structured summary from all available context
-7. BE THOROUGH: Give complete, detailed answers. Do not truncate important information.""")
-
-            human_msg = HumanMessage(content=f"""DOCUMENT EXCERPTS (Source of Truth):
+            context = "\n\n".join(
+                f"[PAGE {doc.metadata.get('page', '?')}]\n{doc.page_content}"
+                for doc in docs
+            )
+            history_text = "\n".join(
+                f"{'User' if item.get('role') == 'user' else 'Assistant'}: "
+                f"{item.get('content') or item.get('text') or ''}"
+                for item in history[-6:]
+                if item.get("content") or item.get("text")
+            )
+            system = SystemMessage(content="""You are a careful Indian legal document assistant.
+Answer only from the supplied document excerpts. Do not hallucinate facts, dates, provisions, or case citations.
+Answer in the same language as the question (English, Hindi, Marathi, or mixed language).
+Cite the page for document-based claims as (Ref: Page X). If information is absent, explicitly say it is not mentioned in the uploaded document.
+For legal analysis, distinguish facts stated in the document from general legal interpretation.""")
+            human = HumanMessage(content=f"""
+DOCUMENT EXCERPTS (source of truth):
 {context}
 
-CONVERSATION HISTORY:
-{history_text if history_text else "No previous conversation"}
+RECENT CONVERSATION:
+{history_text or "No previous conversation"}
 
-ADVOCATE'S QUESTION: {query}
+QUESTION:
+{query}
 
-Instructions:
-- Answer in the SAME LANGUAGE as the question above
-- Base answer ONLY on document excerpts provided
-- Cite page numbers for every fact stated
-- If asking about a person/date/amount - give exact details from document
-- For legal analysis questions - apply Indian law to the facts found
-
-Provide your detailed answer:""")
-
-            response = self.llm_answer.invoke([system_msg, human_msg])
+Give a clear, useful answer with page references for document facts.
+""")
+            response = self.llm_answer.invoke([system, human])
             return response.content
-
-        except Exception as e:
-            print(f"❌ Chat Error: {e}")
-            return f"Error processing your question: {str(e)}"
+        except Exception as exc:
+            logger.exception("PDF question answering failed")
+            self.last_error = str(exc)
+            return "Could not answer from the PDF. Please try again, and check the server logs if the problem continues."
