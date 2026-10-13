@@ -1,32 +1,4 @@
-// routes/aiChat.js
-// ─────────────────────────────────────────────────────────────────────────────
-// TALKNTYPE — MAIN LEGAL AI CHAT ROUTE
-//
-// Public endpoint:
-// POST /api/chat
-//
-// Flow:
-//
-// Frontend
-//    ↓
-// /api/chat
-//    ↓
-// this route
-//    ↓
-// aiOrchestrator.js
-//    ↓
-// legalContext.js
-//    ↓
-// legalKnowledge.js
-//    ↓
-// AI reasoning
-//    ↓
-// response
-//
-// IMPORTANT:
-// This file should NOT contain the entire legal brain.
-// The actual reasoning belongs in aiOrchestrator.js.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 import express from "express";
 

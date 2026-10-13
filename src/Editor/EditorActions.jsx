@@ -36,7 +36,7 @@ const EditorActions = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [definition, setDefinition] = useState("");
   const [isDictLoading, setIsDictLoading] = useState(false);
-  // 🟢 FIX: removed isNewOcrLoading / showOcrModal / ocrImagePreview / ocrExtractedText —
+  // 🟢 FIX: removed isNewOcrLoading / showOcrModal / ocrImagePreview / ocrExtractedText  —
   // this was an unfinished in-component OCR modal that nothing ever triggered
   // (no setShowOcrModal(true) anywhere) and whose Close/Insert buttons called
   // closeOcrModal(), a function that was never defined — that would have crashed
@@ -201,7 +201,6 @@ const EditorActions = ({
         <AiButton label={isAudioLoading ? "⏳ Detecting..." : "🎵 Audio → Text"} color="green" onClick={() => !isAudioLoading && audioRef.current.click()} />
         <input ref={audioRef} type="file" accept="audio/*" hidden onChange={(e) => handleFileSelect(e, uploadAudio, setIsAudioLoading)} />
         <AiButton label={showChat ? "❌ Close Chat" : "📝 AI Chat"} color="blue" onClick={() => setShowChat(!showChat)} />
-        <AiButton label={isAIGenerating ? "⏳ Generating..." : "🧠 Draft"} color="purple" disabled={isAIGenerating} onClick={() => !isAIGenerating && setShowDraftPopup(true)} />
         <AiButton label="↔️ Expand" color="green" onClick={() => expandText(manualText, setManualText, setIsTranslating)} />
         <AiButton label="📖 Dictionary" color="purple" onClick={() => setShowDictionary(true)} />
 
@@ -210,7 +209,7 @@ const EditorActions = ({
 
 <AiButton 
   label="🖼️ Scan Document" 
-  color="purple" 
+  color="blue" 
   onClick={() => scanRef.current.click()} 
 />
 <input 

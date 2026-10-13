@@ -635,27 +635,72 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   // ==========================================
   // CHAT SUBMIT
   // ==========================================
-  const handleChatSubmit = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const userMsg = chatInput;
-    setChatHistory((prev) => [...prev, { role: "user", text: userMsg }]);
-    setChatInput("");
-    setIsChatLoading(true);
-    try {
-      const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
+
+const handleChatSubmit = async (e) => {
+  e.preventDefault();
+
+  const userMsg = chatInput.trim();
+  if (!userMsg) return;
+
+  setChatHistory((prev) => [
+    ...prev,
+    { role: "user", text: userMsg },
+  ]);
+
+  setChatInput("");
+  setIsChatLoading(true);
+
+  try {
+    const response = await fetch(
+      getApiUrl("/api/chat-with-pdf"),
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMsg, context: caseFacts, history: chatHistory }),
-      });
-      const data = await response.json();
-      setChatHistory((prev) => [...prev, { role: "ai", text: data.answer }]);
-    } catch {
-      setChatHistory((prev) => [...prev, { role: "ai", text: "Brain offline." }]);
-    } finally {
-      setIsChatLoading(false);
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: userMsg,
+          context: caseFacts,
+          history: chatHistory.map((item) => ({
+            role: item.role,
+            content: item.content ?? item.text ?? "",
+          })),
+        }),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+          data.answer ||
+          `Request failed (${response.status})`
+      );
     }
-  };
+
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text: data.answer || "No answer was returned.",
+      },
+    ]);
+  } catch (error) {
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text:
+          error instanceof Error
+            ? error.message
+            : "PDF chat failed. Please analyze the PDF again.",
+      },
+    ]);
+  } finally {
+    setIsChatLoading(false);
+  }
+};
 
   // ==========================================
   // SPINNER OVERLAY

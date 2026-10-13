@@ -116,17 +116,58 @@
     }
 
     // 4. Final Insert into Quill
-    if (range) {
-      editor.insertText(range.index, textToInsert, 'user');
-      editor.setSelection(range.index + textToInsert.length, 0);
-    } else {
-      const length = editor.getLength();
-      editor.insertText(length - 1, textToInsert, 'user');
-    }
+   
+// 4. Final Insert into Quill — SMART SPACING FIX
+if (textToInsert && textToInsert !== "\n" && textToInsert !== "\n\n") {
+  const currentIndex = range
+    ? range.index
+    : editor.getLength() - 1;
 
-    // State update and Ref sync
-    setManualText(editor.root.innerHTML);
-    lastProcessedSpeechRef.current = speechText;
+  const previousChar =
+    currentIndex > 0
+      ? editor.getText(currentIndex - 1, 1)
+      : "";
+
+  const nextChar = editor.getText(currentIndex, 1);
+
+  // Trim only the edges of the newly recognized speech.
+  // Preserve spaces and punctuation inside the speech text.
+  textToInsert = textToInsert.trim();
+
+  // Add a space between existing text and new speech when needed.
+  if (
+    previousChar &&
+    !/\s/.test(previousChar) &&
+    !/[([{/"'“‘\-–—]$/.test(previousChar) &&
+    textToInsert &&
+    !/^[\s.,!?;:)\]}%"'”’\-–—]/.test(textToInsert)
+  ) {
+    textToInsert = " " + textToInsert;
+  }
+
+  // Avoid joining the new speech directly to existing text after it.
+  if (
+    nextChar &&
+    !/\s/.test(nextChar) &&
+    textToInsert &&
+    !/[\s.,!?;:)\]}%"'”’\-–—]$/.test(textToInsert)
+  ) {
+    textToInsert += " ";
+  }
+}
+
+if (range) {
+  editor.insertText(range.index, textToInsert, "user");
+  editor.setSelection(range.index + textToInsert.length, 0);
+} else {
+  const length = editor.getLength();
+  editor.insertText(length - 1, textToInsert, "user");
+}
+
+// Sync editor content and remember the processed speech.
+setManualText(editor.root.innerHTML);
+lastProcessedSpeechRef.current = speechText;
+
 
   }, [speechText, setManualText]);
 
@@ -396,6 +437,45 @@ useEffect(() => {
         setManualText('');
       }
     };
+
+const handleInsertScannedText = (scannedText) => {
+  if (typeof scannedText !== "string" || !scannedText.trim()) {
+    console.warn("No scanned text received.");
+    return;
+  }
+
+  const editor = quillRef.current?.getEditor?.();
+
+  if (!editor) {
+    console.error("Quill editor is not available.");
+    return;
+  }
+
+  // Insert scanned text at the cursor, or at the end.
+  const range = editor.getSelection(true);
+  const index = range
+    ? range.index
+    : editor.getLength() - 1;
+
+  const text = scannedText.trim();
+  const previousChar =
+    index > 0 ? editor.getText(index - 1, 1) : "";
+
+  const textToInsert =
+    previousChar &&
+    !/\s/.test(previousChar) &&
+    !/^[.,!?;:)\]}]/.test(text)
+      ? ` ${text}`
+      : text;
+
+  editor.insertText(index, textToInsert, "user");
+
+  // Move cursor after inserted text.
+  editor.setSelection(index + textToInsert.length, 0, "user");
+
+  // Sync React state with the editor.
+  setManualText(editor.root.innerHTML);
+};
 
     return (
       <div className="flex-1 w-full h-full flex flex-col bg-white relative overflow-hidden">
