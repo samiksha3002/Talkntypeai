@@ -1,4 +1,4 @@
-fastapi
+﻿fastapi
 uvicorn
 python-dotenv
 langchain
@@ -12,4 +12,4 @@ openai
 tiktoken
 pymupdf
 gunicorn
-uvicorn
+langchain-chroma==1.1.0
