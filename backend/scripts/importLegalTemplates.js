@@ -49,21 +49,32 @@ async function importTemplates() {
       );
     }
 
-    let templates;
+   let templates;
 
-    try {
-      templates = JSON.parse(
-        fs.readFileSync(jsonPath, "utf8")
-      );
-    } catch (error) {
-      throw new Error(`Invalid JSON file: ${error.message}`);
-    }
+try {
+  const parsedJSON = JSON.parse(
+    fs.readFileSync(jsonPath, "utf8")
+  );
 
-    if (!Array.isArray(templates) || templates.length === 0) {
-      throw new Error(
-        "The JSON file must contain a non-empty array of templates."
-      );
-    }
+  // Support both a plain array and the new package format.
+  if (Array.isArray(parsedJSON)) {
+    templates = parsedJSON;
+  } else if (Array.isArray(parsedJSON.templates)) {
+    templates = parsedJSON.templates;
+  } else {
+    throw new Error(
+      "JSON must be an array or an object containing a templates array."
+    );
+  }
+} catch (error) {
+  throw new Error(`Invalid template JSON: ${error.message}`);
+}
+
+if (templates.length === 0) {
+  throw new Error("No templates found in the JSON file.");
+}
+
+console.log(`Validated ${templates.length} templates.`);
 
     // Validate all templates before connecting to MongoDB.
     const normalizedTemplates = templates.map(
@@ -107,7 +118,7 @@ async function importTemplates() {
             ? template.placeholders
             : [],
           language: template.language || "English",
-          status: template.status || "published",
+         status: "published",
         };
       }
     );
