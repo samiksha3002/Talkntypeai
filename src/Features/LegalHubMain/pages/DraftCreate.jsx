@@ -5,6 +5,11 @@ import legalTemplates from "../../../../data/legal-draft-templates.json";
 import DOMPurify from "dompurify"
 
   const VITE_API_URL= "https://talkntypeai.onrender.com/api";
+  const legalTemplates = Array.isArray(legalTemplatesData)
+  ? legalTemplatesData
+  : Array.isArray(legalTemplatesData.templates)
+    ? legalTemplatesData.templates
+    : [];
 
   // Converts {{placeholder}} -> a highlighted, editable-looking [PLACEHOLDER]
   // span, so blanks are obvious to the user inside the rendered document.
@@ -145,7 +150,7 @@ setContent(
         setError("");
         setSuccessMessage("");
 
-        const response = await fetch(`${API_URL}/drafts`, {
+        const response = await fetch(`${VITE_API_URL}/drafts`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
