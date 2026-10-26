@@ -4,7 +4,7 @@ import legalTemplates from "../../../../data/legal-draft-templates.json";
   import { marked } from "marked"
 import DOMPurify from "dompurify"
 
-  const API_URL = "http://localhost:5000/api";
+  const VITE_API_URL= "https://talkntypeai.onrender.com/api";
 
   // Converts {{placeholder}} -> a highlighted, editable-looking [PLACEHOLDER]
   // span, so blanks are obvious to the user inside the rendered document.

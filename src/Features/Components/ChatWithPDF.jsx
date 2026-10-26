@@ -4,9 +4,6 @@ import {
   Download, Maximize2, X, MessageSquare, ZoomIn, ZoomOut, RotateCw 
 } from "lucide-react";
 
-// ==========================================
-// URL CONFIGURATION (NODE vs PYTHON)
-// ==========================================
 const NODE_API_URL = "https://talkntypeai.onrender.com"; 
 const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
 
