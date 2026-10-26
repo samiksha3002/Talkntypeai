@@ -1,6 +1,6 @@
   import React, { useEffect, useRef, useState } from "react";
   import { useLocation, useNavigate } from "react-router-dom";
-import legalTemplates from "../../../../data/legal-draft-templates.json";
+import legalTemplatesData from "../../../../data/legal-draft-templates.json";
   import { marked } from "marked"
 import DOMPurify from "dompurify"
 
