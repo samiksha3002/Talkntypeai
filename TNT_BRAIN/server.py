@@ -5,7 +5,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import List, Optional
-
+from fastapi.exceptions import RequestValidationError
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -45,6 +45,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.exception_handler(RequestValidationError)
+async def validation_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for e in exc.errors():
+        errors.append({
+            "loc": e.get("loc"),
+            "msg": e.get("msg"),
+            "type": e.get("type"),
+        })  # raw "input" bytes ko skip kar rahe hain
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 research_ai = ResearchService()
 doc_service = DocumentService()
@@ -193,12 +203,17 @@ async def generate_draft_stream(request: Request):
     uploaded_path = None
     try:
         if "application/json" in content_type:
-            body = await request.json()
-            draft_request = DraftRequest.model_validate(body)
-            facts = draft_request.facts
-            language = draft_request.language or "English"
-            document_type = draft_request.documentType
-        elif "multipart/form-data" in content_type:
+            raw = await request.body()
+        try:
+            body = json.loads(raw.decode("utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        draft_request = DraftRequest.model_validate(body)
+        facts = draft_request.facts
+        language = draft_request.language or "English"
+        document_type = draft_request.documentType
+
+        elif "multipart/form-da ta" in content_type:
             form = await request.form()
             facts = str(form.get("facts") or "")
             language = str(form.get("language") or "English")

@@ -539,7 +539,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
   // ==========================================
   // STREAMING GENERATION
   // ==========================================
-  const generateDraftWithStreaming = async (facts, lang, documentType, uploadedFile) => {
+  const generateDraftWithStreaming = async (facts, lang, documentType, uploadedFile) => {   
     setStreamedText("");
     setRawDraft("");
     setLiveDraft("");
