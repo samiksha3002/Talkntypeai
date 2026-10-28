@@ -204,16 +204,15 @@ async def generate_draft_stream(request: Request):
     try:
         if "application/json" in content_type:
             raw = await request.body()
-        try:
-            body = json.loads(raw.decode("utf-8", errors="replace"))
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON body.")
-        draft_request = DraftRequest.model_validate(body)
-        facts = draft_request.facts
-        language = draft_request.language or "English"
-        document_type = draft_request.documentType
-
-        elif "multipart/form-da ta" in content_type:
+            try:
+                body = json.loads(raw.decode("utf-8", errors="replace"))
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON body.")
+            draft_request = DraftRequest.model_validate(body)
+            facts = draft_request.facts
+            language = draft_request.language or "English"
+            document_type = draft_request.documentType
+        elif "multipart/form-data" in content_type:
             form = await request.form()
             facts = str(form.get("facts") or "")
             language = str(form.get("language") or "English")
