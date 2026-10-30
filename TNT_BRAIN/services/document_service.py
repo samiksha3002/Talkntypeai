@@ -6,7 +6,6 @@ import shutil
 import threading
 import time
 import uuid
-from pathlib import Path
 from typing import List, Optional
 
 import fitz
@@ -25,11 +24,15 @@ class DocumentService:
     Single-active-document service for the current app architecture.
     Note: this is process-local state; for multi-worker/multi-instance production,
     store document/session IDs and vector data in shared storage.
+
+    Layout: self.db_dir is the PARENT folder. Every uploaded PDF gets its own
+    unique sub-folder (self.current_db_dir), so a Chroma path is never reused.
     """
 
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.db_dir = os.getenv("DOCUMENT_DB_DIR", "temp_db")
+        self.current_db_dir = None
         self._db_lock = threading.RLock()
         self._cleanup_timer = None
         self.active_db = None
@@ -38,16 +41,56 @@ class DocumentService:
         self.llm_answer = ChatOpenAI(model="gpt-4o", temperature=0.2, max_tokens=2500)
         self.llm_timeline = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=3000)
 
+    # ------------------------------------------------------------------
+    # Chroma lifecycle helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _reset_chroma_cache():
+        """Clear Chroma's process-wide client cache so no stale handle to a
+        deleted sqlite file survives (cause of 'no such table: tenants')."""
+        try:
+            try:
+                from chromadb.api.shared_system_client import SharedSystemClient
+            except ImportError:
+                from chromadb.api.client import SharedSystemClient
+            SharedSystemClient.clear_system_cache()
+        except Exception:
+            logger.debug("Could not clear Chroma system cache", exc_info=True)
+
     def _close_active_db(self):
         if self.active_db is not None:
             try:
                 client = getattr(self.active_db, "_client", None)
-                if client and hasattr(client, "close"):
-                    client.close()
+                system = getattr(client, "_system", None)
+                if system is not None:
+                    system.stop()
             except Exception:
-                logger.debug("Could not close Chroma client", exc_info=True)
+                logger.debug("Could not stop Chroma system", exc_info=True)
             self.active_db = None
-            gc.collect()
+        self._reset_chroma_cache()
+        gc.collect()
+    def _purge_db_dir(self):
+        """Remove only per-document folders created by this service."""
+        if not os.path.isdir(self.db_dir):
+            return
+        for entry in os.listdir(self.db_dir):
+            path = os.path.join(self.db_dir, entry)
+            if entry.startswith("doc_") and os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+    def _resolve_db_folder(self) -> Optional[str]:
+        """Return current doc folder; after a restart, fall back to the newest doc_* folder."""
+        if self.current_db_dir and os.path.isdir(self.current_db_dir):
+            return self.current_db_dir
+        if not os.path.isdir(self.db_dir):
+            return None
+        candidates = [
+            os.path.join(self.db_dir, d)
+            for d in os.listdir(self.db_dir)
+            if d.startswith("doc_") and os.path.isdir(os.path.join(self.db_dir, d))
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=os.path.getmtime)
 
     def _cleanup_task(self, folder_path: str, delay: int = 7200):
         if self._cleanup_timer is not None:
@@ -56,12 +99,14 @@ class DocumentService:
         def cleanup():
             with self._db_lock:
                 # Do not delete a newer database if this timer belongs to an old one.
-                if os.path.abspath(folder_path) != os.path.abspath(self.db_dir):
+                if not self.current_db_dir or \
+                        os.path.abspath(folder_path) != os.path.abspath(self.current_db_dir):
                     return
                 self._close_active_db()
                 try:
                     if os.path.exists(folder_path):
-                        shutil.rmtree(folder_path, ignore_errors=False)
+                        shutil.rmtree(folder_path, ignore_errors=True)
+                    self.current_db_dir = None
                     logger.info("Temporary document database cleaned up.")
                 except Exception:
                     logger.warning("Database cleanup failed", exc_info=True)
@@ -70,6 +115,9 @@ class DocumentService:
         self._cleanup_timer.daemon = True
         self._cleanup_timer.start()
 
+    # ------------------------------------------------------------------
+    # OCR
+    # ------------------------------------------------------------------
     def _perform_vision_ocr(self, file_path: str) -> List[Document]:
         logger.info("Starting vision OCR for %s", file_path)
         extracted = []
@@ -116,6 +164,9 @@ class DocumentService:
                 time.sleep(0.2)
         return extracted
 
+    # ------------------------------------------------------------------
+    # Indexing
+    # ------------------------------------------------------------------
     def process_pdf(self, file_path: str):
         with self._db_lock:
             self.last_error = None
@@ -147,26 +198,36 @@ class DocumentService:
                 if not chunks:
                     raise ValueError("No text chunks were created from this PDF.")
 
+                # 1) Release every handle to the old DB and clear Chroma's cache FIRST.
                 self._close_active_db()
                 if self._cleanup_timer is not None:
                     self._cleanup_timer.cancel()
 
-                # A clean folder avoids stale collection data.
-                if os.path.exists(self.db_dir):
-                    shutil.rmtree(self.db_dir, ignore_errors=False)
+                # 2) Only now delete old folders (best effort).
+                self._purge_db_dir()
+                self.current_db_dir = None
+
+                # 3) Brand-new unique folder: a path is never reused.
                 os.makedirs(self.db_dir, exist_ok=True)
+                new_dir = os.path.join(self.db_dir, f"doc_{uuid.uuid4().hex}")
+                os.makedirs(new_dir, exist_ok=True)
 
                 collection_name = f"legal_doc_{uuid.uuid4().hex[:10]}"
                 self.active_db = Chroma.from_documents(
                     documents=chunks,
                     embedding=self.embeddings,
-                    persist_directory=self.db_dir,
+                    persist_directory=new_dir,
                     collection_name=collection_name,
                     collection_metadata={"hnsw:space": "cosine"},
                 )
                 # Force a simple DB read to verify that the collection is usable.
                 self.active_db._collection.count()
-                self._cleanup_task(self.db_dir, delay=int(os.getenv("DOCUMENT_DB_TTL_SECONDS", "7200")))
+
+                self.current_db_dir = new_dir
+                self._cleanup_task(
+                    new_dir,
+                    delay=int(os.getenv("DOCUMENT_DB_TTL_SECONDS", "7200")),
+                )
                 logger.info("PDF indexed: %s pages, %s chunks", len(usable_pages), len(chunks))
                 return self.active_db
             except Exception as exc:
@@ -185,22 +246,28 @@ class DocumentService:
                     logger.warning("Active document DB is unavailable", exc_info=True)
                     self._close_active_db()
 
-            if not os.path.isdir(self.db_dir):
+            folder = self._resolve_db_folder()
+            if not folder:
                 return None
             try:
                 import chromadb
-                client = chromadb.PersistentClient(path=self.db_dir)
+
+                client = chromadb.PersistentClient(path=folder)
                 collections = client.list_collections()
                 if not collections:
+                    self._close_active_db()
                     return None
-                # There should be one collection because process_pdf recreates the directory.
-                collection_name = collections[0].name
+                first = collections[0]
+                collection_name = first if isinstance(first, str) else first.name
+
+                # Reuse the SAME client so no extra dangling client is left in the cache.
                 self.active_db = Chroma(
-                    persist_directory=self.db_dir,
+                    client=client,
                     embedding_function=self.embeddings,
                     collection_name=collection_name,
                 )
                 self.active_db._collection.count()
+                self.current_db_dir = folder
                 return self.active_db
             except Exception as exc:
                 self.last_error = str(exc)
@@ -208,6 +275,9 @@ class DocumentService:
                 self._close_active_db()
                 return None
 
+    # ------------------------------------------------------------------
+    # Analysis
+    # ------------------------------------------------------------------
     def get_timeline(self, vector_db):
         if vector_db is None:
             return "Analysis failed. Document could not be read."
