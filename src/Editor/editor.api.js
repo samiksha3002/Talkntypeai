@@ -95,30 +95,70 @@ export const uploadOCR = async (fileOrEvent, setManualText, setLoading) => {
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
 
-export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL) => {
-  // Fix for "e is not defined"
-  const file = (e && e.target && e.target.files) ? e.target.files[0] : e;
+
+export const uploadAudio = async (
+  e,
+  setManualText,
+  setIsAudioLoading,
+  API_URL,
+  language = "hi"
+) => {
+  const file = e?.target?.files?.[0] || e;
+
   if (!file) return;
 
   const formData = new FormData();
+
+  // Attach audio file
   formData.append("audio", file);
 
+  // Attach selected language
+  formData.append("language", language);
+
   setIsAudioLoading(true);
+
   try {
-    const response = await fetch(`${API}/api/audio/transcribe`, {
-      method: "POST",
-      body: formData,
-    });
+    const response = await fetch(
+      `${API_URL}/api/audio/transcribe`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
     const data = await response.json();
-    if (data.success) {
-      setManualText(prev => prev ? `${prev} ${data.transcript}` : data.transcript);
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "Audio transcription failed"
+      );
     }
+
+    // Add transcript to editor
+    setManualText((prev) =>
+      prev
+        ? `${prev} ${data.transcript}`
+        : data.transcript
+    );
+
+    console.log("Transcription successful");
+    console.log("Language:", data.languageName);
+    console.log("Engine:", data.engine);
+
   } catch (error) {
     console.error("Transcription error:", error);
+    alert(error.message || "Transcription failed");
+
   } finally {
     setIsAudioLoading(false);
+
+    // Reset file input
+    if (e?.target) {
+      e.target.value = "";
+    }
   }
 };
+
 // ------------------------------------------------------
 // ✔ PDF → TEXT
 // editor.api.js
