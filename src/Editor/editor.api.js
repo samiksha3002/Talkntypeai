@@ -94,24 +94,23 @@ export const uploadOCR = async (fileOrEvent, setManualText, setLoading) => {
 };
 // ------------------------------------------------------
 // ✔ AUDIO → TEXT
-export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL, language = "") => {
-  const file = (e && e.target && e.target.files) ? e.target.files[0] : e;
+export const uploadAudio = async (e, setManualText, setIsAudioLoading, _unused, language = "") => {
+  const file = e && e.target && e.target.files ? e.target.files[0] : e;
   if (!file) return;
 
   const formData = new FormData();
-  formData.append("audio", file);
-  // Optional: "kn", "mr", "hi", "en" - agar user ko language pata hai to accuracy best milegi
-  if (language) formData.append("language", language);
+  formData.append("audio", file, file.name || "recording.webm");
+  if (language) formData.append("language", language); // "kn" | "mr" | "hi" | "en"
 
   setIsAudioLoading(true);
   try {
-    const response = await fetch(`${API_URL}/api/audio/transcribe`, {
+    const response = await fetch(`${API}/api/audio/transcribe`, {
       method: "POST",
       body: formData,
     });
     const data = await response.json();
     if (data.success) {
-      setManualText(prev => (prev ? `${prev} ${data.transcript}` : data.transcript));
+      setManualText((prev) => (prev ? `${prev} ${data.transcript}` : data.transcript));
     } else {
       console.warn("Transcription failed:", data.error);
     }
@@ -120,8 +119,7 @@ export const uploadAudio = async (e, setManualText, setIsAudioLoading, API_URL, 
   } finally {
     setIsAudioLoading(false);
   }
-};
-// ------------------------------------------------------
+};// ------------------------------------------------------
 // ✔ PDF → TEXT
 // editor.api.js
 
