@@ -44,7 +44,7 @@ test('C4 every actual legacy mount blocks all methods before body parsing or rep
  const app=express();installReleaseContainment(app);let downstream=0;app.use(()=>{downstream++});
  await serve(app,async origin=>{for(const prefix of suspendedPrefixes)for(const method of ['GET','POST','PUT','PATCH','DELETE']){const r=await fetch(origin+prefix.toUpperCase()+'/nested',{method,headers:header(token)});assert.equal(r.status,503);assert.equal(r.headers.get('cache-control'),'no-store');}assert.equal(downstream,0);});
  const server=fs.readFileSync('server.js','utf8');assert(server.indexOf('installReleaseContainment(app)')<server.indexOf('express.json('));
- for(const prefix of ['/api/cases','/api/clients','/api/inquiries','/api/team','/api/payments','/api/reports','/api/csv-manager'])assert(suspendedPrefixes.includes(prefix));
+ for(const prefix of ['/api/inquiries','/api/team','/api/payments','/api/deepgram'])assert(suspendedPrefixes.includes(prefix));
  for(const prefix of ['/api/user-drafts','/api/saved','/api/draft-session','/api/font','/api/ocr'])assert(!suspendedPrefixes.includes(prefix));
 });
 

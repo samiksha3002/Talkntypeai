@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -37,10 +38,11 @@ const Diary = () => {
 
         // 1. Fetch ALL Data (Cases + Inquiries) safely
         const [casesResult, inquiriesResult] = await Promise.allSettled([
-          fetch(`${API_URL}/api/cases/user/${userId}`, { headers: { Authorization: `Bearer ${token}` } }),
+          tenantFetch(`${API_URL}/api/cases/user/${userId}`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/api/inquiries`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
+        if(casesResult.status==='rejected')throw casesResult.reason;
         let allEvents = [];
 
         // 2. Process Cases
@@ -103,6 +105,7 @@ const Diary = () => {
 
       } catch (err) {
         console.error("Error fetching diary data:", err);
+        alert(err.message);
       } finally {
         setLoading(false);
       }
@@ -281,7 +284,7 @@ const Diary = () => {
             </div>
 
             <p className="text-[10px] text-slate-500 mt-4 italic">
-              * Showing hearings and inquiries scheduled for the date selected above.
+              * Case hearings are shown for the selected date. Inquiry, team and payment features are paused for a security update; existing records are retained.
             </p>
           </div>
         </div>

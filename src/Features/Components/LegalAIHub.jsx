@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { PenTool, Search, FileText, ArrowRight, Sparkles, Scale, MessageSquare } from "lucide-react";
 
 // --- FEATURE IMPORTS ---
-import AIDrafting from "./AIDrafting";
+import MaintenanceNotice from "../../components/MaintenanceNotice.jsx";
 import LegalResearch from "./LegalResearch";
-import ChatWithPDF from "./ChatWithPDF";
+
 
 const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
   const [activeFeature, setActiveFeature] = useState("main");
@@ -12,20 +12,13 @@ const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
   // --- NAVIGATION LOGIC ---
   if (activeFeature === "drafting") {
     return (
-      <AIDrafting 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-        setManualText={setManualText} 
-      />
+      <MaintenanceNotice feature="AI document drafting" onBack={() => setActiveFeature("main")} />
     );
   }
 
   if (activeFeature === "pdfChat") {
     return (
-      <ChatWithPDF 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-      />
+      <MaintenanceNotice feature="PDF analysis and chat" onBack={() => setActiveFeature("main")} />
     );
   }
 

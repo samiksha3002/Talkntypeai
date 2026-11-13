@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 // src/pages/AddCasePage.jsx
 import React, { useState } from 'react';
 import { ChevronLeft, Save, Briefcase, Calendar, FileText, AlertCircle } from 'lucide-react';
@@ -35,7 +36,7 @@ const AddCasePage = () => {
     }
 
     try {
-      const response = await fetch('https://talkntypeai.onrender.com/api/cases/add', {
+      const response = await tenantFetch('https://talkntypeai.onrender.com/api/cases/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

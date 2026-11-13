@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, User, Phone, Mail, Trash2, PlusCircle, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -14,11 +15,12 @@ const ManageClientsPage = () => {
       if (!userId) return navigate('/login');
 
       try {
-        const res = await fetch(`https://talkntypeai.onrender.com/api/clients/user/${userId}`);
+        const res = await tenantFetch(`https://talkntypeai.onrender.com/api/clients/user/${userId}`);
         const data = await res.json();
         if (data.success) setClients(data.clients);
       } catch (err) {
         console.error("Fetch error:", err);
+        alert(err.message);
       } finally {
         setLoading(false);
       }
@@ -29,7 +31,7 @@ const ManageClientsPage = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this client?")) return;
     try {
-      const res = await fetch(`https://talkntypeai.onrender.com/api/clients/${id}`, { method: 'DELETE' });
+      const res = await tenantFetch(`https://talkntypeai.onrender.com/api/clients/${id}`, { method: 'DELETE' });
       if (res.ok) setClients(clients.filter(c => c._id !== id));
     } catch (err) {
       alert("Delete failed");

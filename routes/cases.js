@@ -1,18 +1,23 @@
 import express from 'express';
-import Case from '../models/case.js'; 
+import Case from '../models/case.js';
+import { requireDraftAuth, matchingOwner, caseFields } from '../middleware/tenantScope.js';
 
+export function createCaseRouter({cases: repository=Case, auth=requireDraftAuth}={}) {
 const router = express.Router();
+router.use(auth,matchingOwner);
+router.param('userId',(req,res,next)=>matchingOwner(req,res,next));
 
 // 1. ADD NEW CASE
 router.post('/add', async (req, res) => {
   try {
-    const { userId, caseName, caseNumber, courtName, hearingDate, description } = req.body;
+    const userId=req.draftOwnerId;
+    const { caseName, caseNumber, courtName, hearingDate, description } = req.body;
 
     if (!userId || !caseName || !courtName || !hearingDate) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const newCase = new Case({
+    const newCase = new repository({
       userId,
       caseName,
       caseNumber,
@@ -32,10 +37,10 @@ router.post('/add', async (req, res) => {
 // 2. GET USER'S CASES
 router.get('/user/:userId', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId=req.draftOwnerId;
     if (!userId) return res.status(400).json({ success: false, message: "User ID missing" });
 
-    const cases = await Case.find({ userId }).sort({ hearingDate: 1 });
+    const cases = await repository.find({ userId }).sort({ hearingDate: 1 });
     res.status(200).json({ success: true, cases });
   } catch (error) {
     console.error("Error fetching cases:", error);
@@ -47,7 +52,7 @@ router.get('/user/:userId', async (req, res) => {
 router.delete('/:caseId', async (req, res) => {
   try {
     const { caseId } = req.params;
-    const deletedCase = await Case.findByIdAndDelete(caseId);
+    const deletedCase = await repository.findOneAndDelete({_id:caseId,userId:req.draftOwnerId});
 
     if (!deletedCase) {
       return res.status(404).json({ success: false, message: 'Case not found' });
@@ -64,7 +69,7 @@ router.delete('/:caseId', async (req, res) => {
 router.put('/:caseId', async (req, res) => {
   try {
     const { caseId } = req.params;
-    const updatedCase = await Case.findByIdAndUpdate(caseId, req.body, { new: true });
+    const updatedCase = await repository.findOneAndUpdate({_id:caseId,userId:req.draftOwnerId}, {$set:caseFields(req.body)}, {new:true,runValidators:true});
 
     if (!updatedCase) {
       return res.status(404).json({ success: false, message: 'Case not found' });
@@ -80,7 +85,7 @@ router.put('/:caseId', async (req, res) => {
 router.get('/:caseId', async (req, res) => {
   try {
     const { caseId } = req.params;
-    const singleCase = await Case.findById(caseId);
+    const singleCase = await repository.findOne({_id:caseId,userId:req.draftOwnerId});
 
     if (!singleCase) {
       return res.status(404).json({ success: false, message: 'Case not found' });
@@ -97,7 +102,8 @@ router.get('/:caseId', async (req, res) => {
 // ✅ 5. IMPORT CASES FROM ECOURT TEXT DATA
 router.post('/import', async (req, res) => {
   try {
-    const { userId, textData } = req.body;
+    const userId=req.draftOwnerId;
+    const { textData } = req.body;
 
     if (!userId || !textData) {
       return res.status(400).json({ success: false, message: 'User ID or text data missing' });
@@ -133,7 +139,7 @@ router.post('/import', async (req, res) => {
     }
 
     // Database mein ek saath save karna (Efficiency ke liye)
-    const importedCases = await Case.insertMany(casesToInsert);
+    const importedCases = await repository.insertMany(casesToInsert);
 
     res.status(201).json({ 
       success: true, 
@@ -147,4 +153,6 @@ router.post('/import', async (req, res) => {
   }
 });
 
-export default router;
+return router;
+}
+export default createCaseRouter();
