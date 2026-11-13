@@ -1,8 +1,10 @@
-import { resolveDraftApi, readDraftSession } from '../Features/LegalHubMain/draftClient.js';
+import { getNodeApi } from '../nodeApi.js';
+import { readDraftSession } from '../Features/LegalHubMain/draftClient.js';
 export async function tenantFetch(input, options={}) {
   const target=new URL(input,window.location.origin);
   if(!/^\/api\/(cases|clients|reports|csv-manager)(\/|$)/.test(target.pathname))throw new Error('Unsupported authenticated workflow.');
-  const base=resolveDraftApi(import.meta.env?.VITE_DRAFT_API_URL),token=readDraftSession();
+  const token=readDraftSession(),base=await getNodeApi();
+  if(readDraftSession()!==token)throw new Error('Your session changed. Sign in again.');
   if(!token)throw new Error('Sign in again to access your records securely.');
   const controller=new AbortController(),abort=()=>controller.abort();
   const timer=setTimeout(abort,20000);options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();

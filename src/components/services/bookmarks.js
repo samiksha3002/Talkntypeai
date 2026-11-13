@@ -1,3 +1,4 @@
+import { getNodeApi } from '../../nodeApi.js';
 import { readDraftSession, resolveDraftApi } from '../../Features/LegalHubMain/draftClient.js';
 
 export function createBookmarkClient({ base, token = readDraftSession, fetcher = (...args) => fetch(...args) } = {}) {
@@ -23,4 +24,11 @@ export function createBookmarkClient({ base, token = readDraftSession, fetcher =
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', abort); }
   };
 }
-export const bookmarkRequest = (...args) => createBookmarkClient({ base: import.meta.env?.VITE_DRAFT_API_URL })(...args);
+export const bookmarkRequest = async (...args) => {
+  const session = readDraftSession(), base = await getNodeApi();
+  if (readDraftSession() !== session) throw new Error('Your session changed. Reload your bookmarks.');
+  return createBookmarkClient({ base, token: () => {
+    if (readDraftSession() !== session) throw new Error('Your session changed. Reload your bookmarks.');
+    return session;
+  } })(...args);
+};

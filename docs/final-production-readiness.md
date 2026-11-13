@@ -1,5 +1,7 @@
 # Production readiness and customer workflow restoration
 
+> 2026-11-14 incident update: [the customer workflow hotfix](customer-workflow-hotfix.md) corrects frontend Node routing and native English/Hindi fallback on top of d518052. Its shared resolver uses explicit build settings before runtime config, superseding the editor-override behavior described below. Earlier isolated Atlas results are recorded separately at f8a6beb; no database or production service was accessed for this hotfix. Historical security and hosted-release prerequisites remain.
+
 **Decision: NO-GO for a fully enabled production release.** This candidate restores safely scopeable workflows and prepares password compatibility and an isolated Mongo test harness. It does not claim to have verified production, repaired historical ownership, migrated passwords or restored Deepgram/Python PDF access.
 
 Branch: `release/owner-scoped-readiness`; workspace: `C:/Users/hp/Talkntypeai-owner-scoped-readiness`; base: security checkpoint `03d04af`. Combined release `a61714c`, the earlier security branch and all preceding checkpoints remain unchanged. No push, merge, deployment, installation, production database/API access, credential rotation or historical-data migration occurred. Only public Deepgram documentation was consulted remotely.
