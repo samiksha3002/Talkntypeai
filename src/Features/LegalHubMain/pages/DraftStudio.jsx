@@ -1,3 +1,4 @@
+import { draftRequest } from '../draftClient.js';
   import React, { useMemo, useState, useEffect } from "react";
   import { useNavigate } from "react-router-dom";
   import "./DraftStudio.css";
@@ -133,26 +134,13 @@
 
     // Yahan hum Database wale drafts ko store karenge ID match karne ke liye
     const [dbDrafts, setDbDrafts] = useState([]);
+    const [loadError, setLoadError] = useState("");
 
     // API Call to fetch drafts from Database
     useEffect(() => {
     const fetchDrafts = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL;
-
-        if (!API_URL) {
-          throw new Error("VITE_API_URL is not configured");
-        }
-
-        const response = await fetch(
-          `${API_URL.replace(/\/$/, "")}/api/drafts/all`
-        );
-
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status}`);
-        }
-
-        const result = await response.json();
+        const result = await draftRequest('/drafts/all', { publicRequest: true });
 
         if (result.success) {
           setDbDrafts(result.data);
@@ -160,7 +148,7 @@
           console.error("Failed to fetch drafts:", result);
         }
       } catch (error) {
-        console.error("Error fetching drafts from DB:", error);
+        setLoadError(error.message);
       }
     };
 
@@ -199,17 +187,18 @@
       return;
     }
 
-    navigate("/draft/create", {
+    navigate("/draft/create?templateId=" + encodeURIComponent(foundInDb._id), {
       state: {
         documentType: foundInDb.title,
         category: foundInDb.category,
-        draftId: foundInDb._id,
+        templateId: foundInDb._id,
       },
     });
   };
 
     return (
       <div className="draft-page">
+        {loadError && <p role="alert">{loadError} <button onClick={() => window.location.reload()}>Retry</button></p>}
         {/* TOP HEADER */}
         <header className="draft-topbar">
           <button className="draft-back" onClick={() => navigate("/dashboard")}>

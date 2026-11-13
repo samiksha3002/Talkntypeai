@@ -3,10 +3,10 @@ import AiButton from "./AiButton";
 import axios from "axios";
 import { Save, Printer, Mic, Trash2, FileUp, FileText } from "lucide-react"; 
 import { fixGrammar, expandText, uploadOCR, uploadAudio, uploadPDF } from "./editor.api";
-import jsPDF from "jspdf";
-import { saveAs } from "file-saver";
+import { exportDocument } from "./exportDownload.js";
+
 // 🔴 NAYA IMPORT: DOCX library for perfectly formatted Word Export
-import { Document, Packer, Paragraph, TextRun } from "docx"; 
+
 
 const EditorActions = ({
   manualText,
@@ -65,72 +65,18 @@ const EditorActions = ({
   }; 
 
   // --- 📄 Save as PDF ---
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = manualText;
-    const cleanText = tempDiv.textContent || tempDiv.innerText || "";
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-
-    const splitText = doc.splitTextToSize(cleanText, 180);
-    doc.text(splitText, 15, 20);
-
-    doc.save("document.pdf");
-    setShowSaveOptions(false);
+  const [exporting,setExporting]=useState(false);
+  const [exportError,setExportError]=useState('');
+  const exportLock=useRef(false);
+  const download=async format=>{
+    if(exportLock.current)return;
+    exportLock.current=true;setExporting(true);setExportError('');
+    try{await exportDocument(quillRef?.current?.getEditor(),format);setShowSaveOptions(false);}
+    catch(error){setExportError(error.message||'Export failed. Your document has been kept.');}
+    finally{exportLock.current=false;setExporting(false);}
   };
-
-  // --- 📝 Save as Word (🔴 EXACT AS IT IS FROM YOUR EditorTextarea CODE) ---
-  const handleDownloadWord = async () => {
-    if (!quillRef || !quillRef.current) {
-      console.error("Quill Ref is missing!");
-      return;
-    }
-
-    try {
-      const editor = quillRef.current.getEditor();
-      const delta = editor.getContents();
-
-      const children = delta.ops.map(op => {
-        const insert = op.insert;
-        const attrs = op.attributes || {};
-
-        // Skip non-text inserts (like images)
-        if (typeof insert !== "string") return null;
-
-        return new Paragraph({
-          children: [
-            new TextRun({
-              text: insert,
-              bold: attrs.bold || false,
-              italic: attrs.italic || false,
-              underline: attrs.underline ? {} : undefined,
-              size: attrs.size ? parseInt(attrs.size) * 2 : 24, // Quill size → Word half-points
-              font: attrs.font || "Times New Roman",
-            }),
-          ],
-        });
-      }).filter(Boolean);
-
-      const doc = new Document({
-        sections: [{ children }],
-      });
-
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "document.docx";
-      a.click();
-      URL.revokeObjectURL(url);
-      
-      setShowSaveOptions(false); // Dropdown band karne ke liye
-    } catch (error) {
-      console.error("Failed to generate DOCX:", error);
-    }
-  };
+  const handleDownloadPDF=()=>download('pdf');
+  const handleDownloadWord=()=>download('docx');
 
   // --- 🖨️ Handle Print ---
   const handlePrint = () => {
@@ -194,6 +140,8 @@ const EditorActions = ({
   ];
     return (
     <div className="bg-indigo-50 border-b p-2 flex items-center justify-between flex-wrap gap-2 font-sans relative">
+      {exportError && <p role="alert" className="text-red-700 w-full">{exportError}</p>}
+      {exporting && <p role="status">Preparing document export...</p>}
       <div className="flex gap-2 flex-wrap">
         <AiButton label="✨ Fix Grammar" color="blue" onClick={() => fixGrammar(manualText, setManualText, setIsTranslating)} />
         <AiButton label={isOCRLoading ? "⏳ Extracting..." : "🖼️ Image → Text"} color="purple" onClick={() => !isOCRLoading && ocrRef.current.click()} />
@@ -235,9 +183,9 @@ const EditorActions = ({
             </button>
             {showSaveOptions && (
                 <div className="absolute right-0 top-10 bg-white shadow-xl border border-indigo-100 rounded-lg w-40 z-50 overflow-hidden">
-                    <button onClick={handleDownloadPDF} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"><FileText size={16} /> Save as PDF</button>
+                    <button onClick={handleDownloadPDF} disabled={exporting} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"><FileText size={16} /> Save as PDF</button>
                     <div className="border-t border-gray-100"></div>
-                    <button onClick={handleDownloadWord} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"><FileText size={16} /> Save as Word</button>
+                    <button onClick={handleDownloadWord} disabled={exporting} className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2"><FileText size={16} /> Save as Word</button>
                 </div>
             )}
         </div>

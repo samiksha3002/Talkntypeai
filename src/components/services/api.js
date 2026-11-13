@@ -1,3 +1,4 @@
+import { bookmarkRequest } from './bookmarks.js';
 import axios from 'axios';
 
 // Auto-detect: production ya local
@@ -28,8 +29,8 @@ export const getLatestJudgements  = () => api.get('/judgements/latest');
 export const getJudgement         = (docid) => api.get(`/judgements/${docid}`);
 export const getJudgementFragment = (docid, query) =>
   api.get(`/judgements/${docid}/fragment`, { params: { q: query } });
-export const getSaved      = ()      => api.get('/saved');
-export const saveJudgement = (data)  => api.post('/saved', data);
-export const removeSaved   = (docid) => api.delete(`/saved/${docid}`);
+export const getSaved      = ()      => bookmarkRequest();
+export const saveJudgement = (data)  => bookmarkRequest('', { method:'POST', body:data });
+export const removeSaved   = (docid) => bookmarkRequest('/'+encodeURIComponent(docid), { method:'DELETE' });
 
 export default api;

@@ -1,5 +1,6 @@
 import express from 'express';
 import User from '../models/user.js';
+import { issueDraftSession } from '../middleware/draftAuth.js';
 
 const router = express.Router();
 
@@ -72,7 +73,12 @@ router.post('/login', async (req, res) => {
                             ? user.subscription.expiryDate.toISOString() 
                             : null;
     
+    // Sessions are issued only for database-verified accounts, never static bypasses.
+    let draftSession = null;
+    try { draftSession = await issueDraftSession(user._id); } catch { /* Draft access fails closed. */ }
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
+      draftSession,
       message: 'Login successful!',
       user: {
         _id: user._id, 

@@ -1,45 +1,17 @@
-
-import express from "express";
-import multer from "multer";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
-
-// Initialize Gemini with your API Key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-router.post("/upload-pdf", upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: "No file uploaded" });
-    }
-
-    // ✅ Use a valid model name
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-
-    // ✅ Correct field name is inline_data
-    const pdfData = {
-      inline_data: {
-        data: req.file.buffer.toString("base64"),
-        mime_type: "application/pdf",
-      },
-    };
-
-    const prompt = "Extract all the text from this PDF. Maintain the layout as much as possible.";
-    const result = await model.generateContent([prompt, pdfData]);
-    const response = await result.response;
-
-    res.json({
-      success: true,
-      text: response.text(),
-    });
-
-  } catch (error) {
-    console.error("Gemini PDF Error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-export default router;
-  
+import express from 'express';
+import fs from 'node:fs/promises';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { documentBudget, uploadFile, withFile, job, inspectPdf, limits } from '../utils/resourceProtection.js';
+export function createPdfRouter(generate=async(bytes)=>{
+  const genAI=new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model=genAI.getGenerativeModel({model:'gemini-2.5-pro'}, {timeout:limits.timeout});
+  const result=await model.generateContent(['Extract all the text from this PDF. Maintain the layout as much as possible.',{inline_data:{data:bytes.toString('base64'),mime_type:'application/pdf'}}]);
+  return result.response.text();
+}){
+  const router=express.Router();
+  router.post('/upload-pdf',...documentBudget,uploadFile('file','pdf'),job(async(req,res)=>{
+    const text=await withFile(req,async path=>{const bytes=await fs.readFile(path);await inspectPdf(bytes);req.resource.signal.throwIfAborted();return generate(bytes,req.resource.signal);});
+    if(!req.resource.signal.aborted)res.json({success:true,text});
+  }));return router;
+}
+export default createPdfRouter();

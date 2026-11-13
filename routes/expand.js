@@ -1,3 +1,4 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -5,6 +6,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 const router = express.Router();
+router.use(...aiBudget);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,7 +20,7 @@ router.options("/", (req, res) => {
 // ----------------------
 // POST /api/expand
 // ----------------------
-router.post("/", async (req, res) => {
+router.post("/", job(async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -41,6 +43,6 @@ router.post("/", async (req, res) => {
     console.error("❌ EXPAND API ERROR:", error.message);
     res.status(500).json({ error: "Failed to expand text" });
   }
-});
+}));
 
 export default router;

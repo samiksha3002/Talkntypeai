@@ -1,10 +1,12 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 import express from "express";
 import fetch from "node-fetch";
 
 const router = express.Router();
+router.use(...aiBudget);
 
 // --- Generate Legal Draft ---
-router.post("/generate-legal-draft", async (req, res) => {
+router.post("/generate-legal-draft", job(async (req, res) => {
   try {
     const { facts, language, documentType } = req.body;
     let pdfContentPart = null;
@@ -61,10 +63,10 @@ router.post("/generate-legal-draft", async (req, res) => {
     console.error("Critical AI Error:", error.message);
     res.status(500).json({ success: false, error: "AI Error: " + error.message });
   }
-});
+}));
 
 // --- List Available Models ---
-router.get("/list-models", async (req, res) => {
+router.get("/list-models", job(async (req, res) => {
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`
@@ -74,6 +76,6 @@ router.get("/list-models", async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}));
 
 export default router;

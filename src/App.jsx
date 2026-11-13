@@ -36,6 +36,7 @@ import ManageClientsPage from "./pages/ManageClientsPage";
 import EditCasePage from "./pages/EditCasePage";
 import EditInquiryPage from "./pages/EditInquiryPage";
 import Packages from "./components/Packages";
+import MyDrafts from "./Features/LegalHubMain/pages/MyDrafts.jsx";
 import DraftStudio from "./Features/LegalHubMain/pages/DraftStudio";
 import DraftCreate from "../src/Features/LegalHubMain/pages/DraftCreate";
 
@@ -138,6 +139,8 @@ function App() {
                 <Route path="/draft-studio" element={<DraftStudio />}/>
                 <Route
   path="/draft/create" element={<DraftCreate />}/>
+                <Route path="/drafts" element={<MyDrafts />} />
+                <Route path="/draft/edit/:id" element={<DraftCreate />} />
                 {/* ADMIN ROUTE */}
                 <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
                 
