@@ -22,11 +22,12 @@ const UserSchema = new mongoose.Schema({
   // 2. Security
   password: { 
     type: String, 
-    required: [true, "Password is required"] 
-    // Note: We removed 'select: false' for now so your plain-text login logic works easily. 
-    // Once we add hashing later, we can add it back.
+    required: function () { return !this.passwordHash; }
+    // Legacy records remain readable; new registrations store passwordHash only.
   },
   
+  passwordHash: { type: String, validate: value => value === undefined || /^\$2[aby]\$12\$[./A-Za-z0-9]{53}$/.test(value) },
+
   // 3. Roles & Permissions
   role: { 
     type: String, 

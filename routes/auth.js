@@ -1,3 +1,4 @@
+import { hashNewPassword, verifyPassword } from '../utils/passwords.js';
 import express from 'express';
 import User from '../models/user.js';
 import { issueDraftSession } from '../middleware/draftAuth.js';
@@ -13,6 +14,7 @@ router.post('/create-user', async (req, res) => {
       return res.status(400).json({ message: 'This email is reserved for Admin. Use Login page.' });
     }
 
+    if(typeof password!=='string'||!password||Buffer.byteLength(password,'utf8')>72)return res.status(400).json({message:'New passwords must contain 1 to 72 UTF-8 bytes.'});
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
@@ -20,7 +22,7 @@ router.post('/create-user', async (req, res) => {
 
     const newUser = new User({
       fullName, email, state, city, phone, executive,
-      password: password, 
+      passwordHash: await hashNewPassword(password),
       role: 'user',
       subscription: { isActive: false, plan: 'demo', startDate: null, expiryDate: null }
     });
@@ -39,11 +41,12 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if(typeof email!=='string'||email.length>254||typeof password!=='string'||!password)return res.status(400).json({message:'Invalid credentials'});
     // B. NORMAL USER CHECK
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (user.password !== password) {
+    if (!await verifyPassword(user,password)) {
           return res.status(400).json({ message: 'Invalid credentials' });
     }
 
