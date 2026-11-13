@@ -29,8 +29,8 @@ router.post('/create-user', async (req, res) => {
     res.status(201).json({ message: 'Registration successful! Wait for admin approval.' });
 
   } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error("Registration failed.");
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
@@ -38,24 +38,6 @@ router.post('/create-user', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // A. STATIC ADMIN LOGIN
-    if (email === 'admin@talkntype.com' && password === 'TNT2024') {
-        const oneYearFromNow = new Date();
-        oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1); 
-        
-      return res.status(200).json({
-        message: 'Welcome Boss!',
-        user: {
-          id: 'admin-static-id',
-          fullName: 'Super Admin',
-          email: 'admin@talkntype.com',
-          role: 'admin', 
-          subscription: { isActive: true, plan: 'unlimited' }
-        },
-        expiryDate: oneYearFromNow.toISOString() 
-      });
-    }
 
     // B. NORMAL USER CHECK
     const user = await User.findOne({ email });
@@ -91,8 +73,8 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error("Login failed.");
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 

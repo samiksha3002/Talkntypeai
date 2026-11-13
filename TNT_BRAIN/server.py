@@ -1,3 +1,4 @@
+from document_containment import DocumentContainment
 from resource_protection import ResourceProtection, setting
 from starlette.concurrency import run_in_threadpool
 import fitz
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TalkNType AI Python API")
 app.add_middleware(ResourceProtection)
+app.add_middleware(DocumentContainment)
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 USERS_FILE = Path("users.json")
@@ -171,7 +173,8 @@ async def root():
 async def health():
     return {
         "success": True,
-        "document_loaded": doc_service.get_active_db() is not None,
+        "document_loaded": False,
+        "document_features": "security-maintenance",
     }
 
 

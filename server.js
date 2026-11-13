@@ -1,4 +1,5 @@
 import "./env.js";
+import { installReleaseContainment } from './middleware/releaseContainment.js';
 import { setting, createBodyBudget } from "./utils/resourceProtection.js";
 import express from "express";
 import cors from "cors";
@@ -106,6 +107,7 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
+installReleaseContainment(app);
 app.use("/api", apiLimiter);
 app.use(createBodyBudget());
 app.use(
@@ -395,7 +397,7 @@ app.listen(
     console.log(
       `🇮🇳 Indian Kanoon token: ${
         process.env.INDIAN_KANOON_API_TOKEN
-          ? process.env.INDIAN_KANOON_API_TOKEN.slice(0, 8) + "..."
+          ? "configured (redacted)"
           : "❌ NOT SET"
       }`
     );

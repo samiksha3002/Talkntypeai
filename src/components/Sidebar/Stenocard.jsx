@@ -1,3 +1,4 @@
+import { getSpeechCredential } from '../../Editor/speechCredential.js';
 import { createSpeechSession } from '../../Editor/speech.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
@@ -18,8 +19,6 @@ const languageOptions = [
     { code: 'bn-IN', label: 'Bengali (বাংলা) 🌐', provider: 'web' },
 ];
 
-// ⚠️ PASTE YOUR DEEPGRAM API KEY HERE
-const DEEPGRAM_API_KEY = "14f6f72c0669b3d0d2457c4f4b27fd75eabb3414"; 
 
 const StenoCard = ({ onSpeechInput }) => {
     const [isListening, setIsListening] = useState(false);
@@ -37,13 +36,14 @@ const StenoCard = ({ onSpeechInput }) => {
     // --- Deepgram Start/Stop Logic (Kept as is) ---
     const startDeepgram = async () => { /* ... (Your existing startDeepgram logic) ... */
         try {
+            const credential = await getSpeechCredential();
             speechSessionRef.current?.stop();
             const session = createSpeechSession('deepgram', onSpeechInput);
             speechSessionRef.current = session;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
-            const deepgram = createClient(DEEPGRAM_API_KEY);
+            const deepgram = createClient(credential);
 
             const connection = deepgram.listen.live({
                 model: "nova-2",
@@ -81,7 +81,7 @@ const StenoCard = ({ onSpeechInput }) => {
             });
         } catch (error) {
             console.error("Mic Access Error:", error);
-            alert("Could not access microphone.");
+            alert(error.message || "Could not access microphone.");
         }
     };
 

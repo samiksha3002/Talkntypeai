@@ -1,0 +1,14 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter} from 'react-router-dom';
+import StenoCard from '../../src/components/Sidebar/Stenocard.jsx';import AdminPanel from '../../src/components/AdminPanel.jsx';import {adminFetch} from '../../src/components/adminFetch.js';
+const results=[];const check=(name,pass)=>results.push({name,pass:!!pass});const sleep=ms=>new Promise(r=>setTimeout(r,ms));const wait=async fn=>{const end=Date.now()+8000;while(Date.now()<end){if(fn())return;await sleep(30)}throw Error('wait timeout')};
+let mic=0,utterance=null;const alerts=[];window.alert=m=>alerts.push(m);Object.defineProperty(navigator,'mediaDevices',{configurable:true,value:{getUserMedia:async()=>{mic++;throw Error('must not request microphone for disabled provider')}}});
+window.SpeechRecognition=class{start(){this.onstart?.();window.__native=this;}stop(){this.onend?.()}};
+const root=createRoot(document.getElementById('root'));root.render(<StenoCard onSpeechInput={e=>utterance=e}/>);
+(async()=>{try{
+await wait(()=>document.querySelector('button'));document.querySelector('button').click();await wait(()=>alerts.length);check('production Deepgram denies visibly before microphone/provider use',mic===0&&alerts[0].includes('security maintenance'));
+const select=document.querySelector('select');select.value='mr-IN';select.dispatchEvent(new Event('change',{bubbles:true}));await sleep(50);document.querySelector('button').click();await wait(()=>window.__native);window.__native.onresult({resultIndex:0,results:[Object.assign([{transcript:'synthetic native words'}],{isFinal:true})]});check('production native speech still emits identified finals',utterance?.text==='synthetic native words'&&!!utterance.id);window.__native.stop();
+let rejected=false;try{await adminFetch('/users')}catch{rejected=true}check('admin browser client fails closed without session',rejected);
+sessionStorage.setItem('tnt_draft_session','a'.repeat(64));const response=await adminFetch('/users');const users=await response.json();check('verified admin session lists safe user fields',users[0].fullName==='SyntheticCustomer'&&!Object.hasOwn(users[0],'password'));
+sessionStorage.setItem('tnt_draft_session','b'.repeat(64));rejected=false;try{await adminFetch('/users')}catch{rejected=true}check('normal account cannot use admin browser client',rejected);
+sessionStorage.setItem('tnt_draft_session','a'.repeat(64));localStorage.setItem('user',JSON.stringify({_id:'1',role:'admin'}));root.render(<BrowserRouter><AdminPanel/></BrowserRouter>);await wait(()=>document.body.textContent.includes('SyntheticCustomer'));check('real administrator panel loads with verified session',true);
+}catch(e){check('completed: '+e.message,false)}document.body.innerHTML='<pre id="verification-result"></pre>';document.getElementById('verification-result').textContent=JSON.stringify(results)})();
