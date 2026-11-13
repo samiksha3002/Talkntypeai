@@ -1,3 +1,5 @@
+import { readEditorAutosave, writeEditorAutosave } from '../Editor/editorAutosave.js';
+import { speechEvent } from "../Editor/speech.js";
 import React, { useState, useCallback, useEffect } from "react";
 
 // Layout Components
@@ -36,8 +38,11 @@ const LoadingOverlay = ({ message }) => (
 );
 
 const Dashboard = () => {
-  const [editorContent, setEditorContent] = useState("");
-  const [voiceText, setVoiceText] = useState("");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [initialAutosave] = useState(() => readEditorAutosave(localStorage, user._id));
+  const [editorContent, setEditorContent] = useState(initialAutosave.html);
+  const [rootFontFamily, setRootFontFamily] = useState(initialAutosave.fontFamily);
+  const [speechEvents, setSpeechEvents] = useState([]);
   
   // --- ✨ STEP 3: VIEW STATE ✨ ---
   // Controls whether we see the Editor or the new Legal AI Hub
@@ -55,27 +60,15 @@ const Dashboard = () => {
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-
-  // --- AUTO-LOAD ---
-  useEffect(() => {
-    if (user._id) {
-      const savedData = localStorage.getItem(`autosave_${user._id}`);
-      if (savedData) {
-        setEditorContent(savedData);
-      }
-    }
-  }, []); 
-
   // --- AUTO-SAVE ---
   useEffect(() => {
     if (user._id && editorContent) {
       const timer = setTimeout(() => {
-        localStorage.setItem(`autosave_${user._id}`, editorContent);
+        writeEditorAutosave(localStorage, user._id, editorContent, rootFontFamily);
       }, 1000); 
       return () => clearTimeout(timer);
     }
-  }, [editorContent]); 
+  }, [editorContent, rootFontFamily, user._id]);
 
   const isGlobalLoading = isTranslating || isTransliterating || isConverting || isOCRLoading || isAudioLoading || isAIGenerating;
 
@@ -89,8 +82,13 @@ const Dashboard = () => {
     return "Working on it...";
   };
 
-  const handleSpeechInput = useCallback((text) => {
-    setVoiceText(text);
+  const handleSpeechInput = useCallback((input) => {
+    const event = speechEvent(input);
+    if (event) setSpeechEvents(pending => [...pending, event]);
+  }, []);
+  const handleSpeechConsumed = useCallback((ids) => {
+    const consumed = new Set(ids);
+    setSpeechEvents(pending => pending.filter(event => !consumed.has(event.id)));
   }, []);
 
   const handleTransliterateCommand = (scriptCode) => {
@@ -149,8 +147,11 @@ const Dashboard = () => {
         <main className="flex-1 flex flex-col bg-white overflow-hidden">
           {activeView === "editor" ? (
             <Editor
-              speechText={voiceText}
+              speechEvents={speechEvents}
+              onSpeechConsumed={handleSpeechConsumed}
               manualText={editorContent}
+              rootFontFamily={rootFontFamily}
+              onRootFontChange={setRootFontFamily}
               setManualText={updateEditorContent}
               user={user}
               transliterationCommand={transliterationCommand}

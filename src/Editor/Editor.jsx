@@ -1,3 +1,5 @@
+import { insertSpeech } from './speech.js';
+import { convertEditorFont, requestFontConversion } from './fontConversion.js';
   import React, { useState, useEffect, useRef } from "react";
   import EditorActions from "./EditorActions";
   import EditorTextarea from "./EditorTextarea";
@@ -8,8 +10,11 @@
 
   const Editor = ({
     user,
-    speechText,
+    speechEvents,
+    onSpeechConsumed,
     manualText,
+    rootFontFamily,
+    onRootFontChange,
     setManualText,
     translationCommand,
     setTranslationCommand,
@@ -24,7 +29,8 @@
     isAudioLoading, setIsAudioLoading,
     isAIGenerating, setIsAIGenerating
   }) => {
-    const lastProcessedSpeechRef = useRef("");
+    const processedSpeechRef = useRef(new Set());
+    const lastSelectionRef = useRef(null);
     const quillRef = useRef(null);
     const [showChat, setShowChat] = useState(false);
     const [showDraftPopup, setShowDraftPopup] = useState(false);
@@ -48,128 +54,31 @@
 
     // 🎤 Speech Append Logic
   useEffect(() => {
-    if (!speechText || speechText === lastProcessedSpeechRef.current || !quillRef.current) return;
-
-    const editor = quillRef.current.getEditor();
-    const range = editor.getSelection();
-
-    // --- MERGED PROCESSOR FUNCTION ---
-    const processSpeechText = (text) => {
-      let processed = text;
-      const commands = [
-        { phrases: ["comma", "alpviram", "swalpviram"], symbol: "," },
-        { phrases: ["full stop", "purna viram", "purnaviram"], symbol: "." },
-        { phrases: ["question mark", "prashnchin", "prashnvachak"], symbol: "?" },
-        { phrases: ["exclamation", "vismayadibodhak", "aashcharyavachak"], symbol: "!" },
-        { phrases: ["colon", "apurna viram", "apurnaviram"], symbol: ":" },
-        { phrases: ["at the rate", "et da ret"], symbol: "@" },
-      ];
-
-      // 1. Replace phrases with symbols
-      commands.forEach(({ phrases, symbol }) => {
-        phrases.forEach(phrase => {
-          // \s? use karne se phrase ke aage piche ka extra space catch ho jayega
-          const regex = new RegExp(`\\s?${phrase}\\s?`, 'gi');
-          processed = processed.replace(regex, symbol);
-        });
-      });
-
-      // 2. SMART SPACING: Punctuation se pehle ka extra space hatao (e.g. "Hello ," -> "Hello,")
-      processed = processed.replace(/\s+([,.?!:;])/g, '$1');
-
-      // 3. LEGAL FORMATTING: Talk N Type ke liye important terms capitalize karein
-      const legalTerms = ["section", "article", "court", "respondent", "petitioner", "plaintiff"];
-      legalTerms.forEach(term => {
-        const reg = new RegExp(`\\b${term}\\b`, 'gi');
-        processed = processed.replace(reg, (match) => match.charAt(0).toUpperCase() + match.slice(1));
-      });
-
-      return processed;
-    };
-
-    // 1. Diffing Logic: Sirf naya bola hua text nikaalein
-    let newPart = speechText;
-    if (lastProcessedSpeechRef.current && speechText.startsWith(lastProcessedSpeechRef.current)) {
-      newPart = speechText.slice(lastProcessedSpeechRef.current.length);
+    const editor = quillRef.current?.getEditor();
+    if (editor) editor.root.style.fontFamily = rootFontFamily || '';
+  }, [rootFontFamily]);
+  useEffect(() => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+    const rememberSelection = range => { if (range) lastSelectionRef.current = { ...range }; };
+    editor.on('selection-change', rememberSelection);
+    return () => editor.off('selection-change', rememberSelection);
+  }, []);
+  useEffect(() => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor || !speechEvents?.length) return;
+    const consumed = [];
+    for (const event of speechEvents) {
+      if (!processedSpeechRef.current.has(event.id)) {
+        const range = insertSpeech(editor, event, lastSelectionRef.current);
+        if (range) lastSelectionRef.current = range;
+        processedSpeechRef.current.add(event.id);
+      }
+      consumed.push(event.id);
     }
-
-    // Naye part ko process karein
-    let cleanText = processSpeechText(newPart);
-    
-    // 2. DUPLICATE CHECK: Agar Deepgram ne pehle hi punctuation de diya hai
-    const currentIndex = range ? range.index : editor.getLength() - 1;
-    const lastChar = editor.getText(currentIndex - 1, 1);
-
-    if ((lastChar === "," && cleanText.trim().startsWith(",")) || 
-        (lastChar === "." && cleanText.trim().startsWith("."))) {
-      cleanText = cleanText.trim().substring(1); 
-    }
-
-    let textToInsert = cleanText;
-
-    // 3. New Line / Paragraph Commands (Case Insensitive)
-    const lowerClean = cleanText.toLowerCase();
-    if (["new paragraph", "naya paragraph", "navin pariched"].some(cmd => lowerClean.includes(cmd))) {
-      textToInsert = "\n\n";
-    } else if (["new line", "nai line", "navin line"].some(cmd => lowerClean.includes(cmd))) {
-      textToInsert = "\n";
-    }
-
-    // 4. Final Insert into Quill
-   
-// 4. Final Insert into Quill — SMART SPACING FIX
-if (textToInsert && textToInsert !== "\n" && textToInsert !== "\n\n") {
-  const currentIndex = range
-    ? range.index
-    : editor.getLength() - 1;
-
-  const previousChar =
-    currentIndex > 0
-      ? editor.getText(currentIndex - 1, 1)
-      : "";
-
-  const nextChar = editor.getText(currentIndex, 1);
-
-  // Trim only the edges of the newly recognized speech.
-  // Preserve spaces and punctuation inside the speech text.
-  textToInsert = textToInsert.trim();
-
-  // Add a space between existing text and new speech when needed.
-  if (
-    previousChar &&
-    !/\s/.test(previousChar) &&
-    !/[([{/"'“‘\-–—]$/.test(previousChar) &&
-    textToInsert &&
-    !/^[\s.,!?;:)\]}%"'”’\-–—]/.test(textToInsert)
-  ) {
-    textToInsert = " " + textToInsert;
-  }
-
-  // Avoid joining the new speech directly to existing text after it.
-  if (
-    nextChar &&
-    !/\s/.test(nextChar) &&
-    textToInsert &&
-    !/[\s.,!?;:)\]}%"'”’\-–—]$/.test(textToInsert)
-  ) {
-    textToInsert += " ";
-  }
-}
-
-if (range) {
-  editor.insertText(range.index, textToInsert, "user");
-  editor.setSelection(range.index + textToInsert.length, 0);
-} else {
-  const length = editor.getLength();
-  editor.insertText(length - 1, textToInsert, "user");
-}
-
-// Sync editor content and remember the processed speech.
-setManualText(editor.root.innerHTML);
-lastProcessedSpeechRef.current = speechText;
-
-
-  }, [speechText, setManualText]);
+    setManualText(editor.root.innerHTML);
+    onSpeechConsumed(consumed);
+  }, [speechEvents, onSpeechConsumed, setManualText]);
 
     // 🌐 Translation Effect
     useEffect(() => {
@@ -242,198 +151,32 @@ lastProcessedSpeechRef.current = speechText;
       runTransliteration();
     }, [transliterationCommand, API_BASE_URL, setManualText, setIsTransliterating, setTransliterationCommand]);
 
-    // 🔠 Font Conversion Effect
-  // ─────────────────────────────────────────────────────────────────────────────
-  // REPLACE ONLY the Font Conversion useEffect in your Editor.js
-  // Find the existing useEffect that has "runFontConversion" and replace it
-  // with this entire block.
-  //
-  // ALSO: Remove this old import at the top of Editor.js:
-  //   import { convertToKrutiDev, convertToShivaji } from "../../utils/fontConverter";
-  // It is no longer needed — all conversions now go through the API.
-  // ─────────────────────────────────────────────────────────────────────────────
-
- 
-  // 🔠 Font Conversion Effect
+    // H3: whitespace-safe, atomic Delta conversion.
 useEffect(() => {
-  const runFontConversion = async () => {
-    if (
-      !fontConvertCommand?.textToConvert ||
-      !fontConvertCommand?.font ||
-      !quillRef.current
-    ) {
-      return;
-    }
-
-    try {
-      setIsConverting(true);
-
-      const editor = quillRef.current.getEditor();
-
-      /*
-       * IMPORTANT:
-       * Work with Quill Delta instead of stripping HTML.
-       *
-       * This preserves:
-       * - bold
-       * - italic
-       * - underline
-       * - alignment
-       * - indentation
-       * - paragraph structure
-       * - links
-       * - other Quill attributes
-       */
-      const delta = editor.getContents();
-
-      const conversionType = fontConvertCommand.font;
-
-      /*
-       * Convert every text operation individually.
-       * Newline operations are preserved.
-       */
-      const convertedOps = [];
-
-      for (const op of delta.ops || []) {
-        if (typeof op.insert !== "string") {
-          convertedOps.push(op);
-          continue;
-        }
-
-        const originalText = op.insert;
-
-        /*
-         * Don't send an empty string to the API.
-         */
-        if (!originalText) {
-          convertedOps.push(op);
-          continue;
-        }
-
-        const res = await fetch(
-          `${API_BASE_URL}/api/font/convert`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: originalText,
-              conversionType,
-            }),
-          }
-        );
-
-        const contentType =
-          res.headers.get("content-type") || "";
-
-        if (!contentType.includes("application/json")) {
-          throw new Error(
-            `Font conversion route not found (${res.status}). ` +
-            `Check server.js: app.use("/api/font", fontConvertRouter)`
-          );
-        }
-
-        const data = await res.json();
-
-        if (!res.ok || !data.success) {
-          throw new Error(
-            data.error || `Server error: ${res.status}`
-          );
-        }
-
-        /*
-         * Preserve the original Quill attributes.
-         */
-        convertedOps.push({
-          insert: data.convertedText,
-          ...(op.attributes
-            ? { attributes: { ...op.attributes } }
-            : {}),
-        });
-      }
-
-      /*
-       * Build the converted Delta.
-       */
-      const convertedDelta = {
-        ops: convertedOps,
-      };
-
-      /*
-       * Replace the editor contents while keeping formatting.
-       */
-      editor.setContents(convertedDelta, "api");
-
-      /*
-       * Apply the correct legacy font to the whole editor.
-       *
-       * The encoding and the font are separate things:
-       *
-       * Unicode:
-       *     महोदय
-       *
-       * KrutiDev encoded:
-       *     egksn;
-       *
-       * The KrutiDev font makes that encoded text visually
-       * appear as महोदय.
-       */
-      if (conversionType === "unicode-to-krutidev") {
-        editor.root.style.fontFamily = '"KrutiDev", sans-serif';
-      }
-
-      if (conversionType === "mangal-to-krutidev") {
-        editor.root.style.fontFamily = '"KrutiDev", sans-serif';
-      }
-
-      if (conversionType === "unicode-to-shivaji") {
-        editor.root.style.fontFamily = '"Shivaji01", sans-serif';
-      }
-
-      /*
-       * Preeti support.
-       * Keep normal browser font if Preeti isn't registered.
-       */
-      if (conversionType === "unicode-to-preeti") {
-        editor.root.style.fontFamily = "Preeti, sans-serif";
-      }
-
-      /*
-       * Update React state from the actual Quill editor.
-       */
+  if (!fontConvertCommand?.font || !quillRef.current) return;
+  let active = true;
+  const controller = new AbortController();
+  const editor = quillRef.current.getEditor();
+  setIsConverting(true);
+  convertEditorFont(editor, fontConvertCommand.font,
+    (text, type) => requestFontConversion(API_BASE_URL, text, type, { signal: controller.signal }),
+    { isCurrent: () => active, fallbackRange: lastSelectionRef.current })
+    .then(applied => { if (applied && active) {
+      onRootFontChange(editor.root.style.fontFamily);
+      lastSelectionRef.current = editor.getSelection() || lastSelectionRef.current;
       setManualText(editor.root.innerHTML);
-
-    } catch (err) {
-      console.error(
-        "Font conversion error:",
-        err
-      );
-
-      alert(
-        `Font conversion failed:\n${err.message}`
-      );
-
-    } finally {
-      setIsConverting(false);
-      setFontConvertCommand(null);
-    }
-  };
-
-  runFontConversion();
-
-}, [
-  fontConvertCommand,
-  API_BASE_URL,
-  setManualText,
-  setIsConverting,
-  setFontConvertCommand,
-]);
+    } })
+    .catch(error => { if (active) alert('Font conversion failed: ' + error.message); })
+    .finally(() => { if (active) { setIsConverting(false); setFontConvertCommand(null); } });
+  return () => { active = false; controller.abort(); };
+}, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand, onRootFontChange]);
 
     // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
     const clearAutoSave = () => {
       if (user?._id) {
         localStorage.removeItem(`autosave_${user._id}`);
+        localStorage.removeItem(`autosave_font_${user._id}`);
+        onRootFontChange('');
         setManualText('');
       }
     };
@@ -520,7 +263,7 @@ const handleInsertScannedText = (scannedText) => {
           {/* Status Bar - Shows status indicators */}
           <EditorStatusBar
             manualText={manualText}
-            speechText={speechText}
+            speechText={speechEvents?.length ? "receiving" : ""}
             isTranslating={isTranslating}
             isTransliterating={isTransliterating}
             isConverting={isConverting}
