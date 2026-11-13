@@ -1,3 +1,4 @@
+import { adminFetch } from './adminFetch.js';
 import { logoutDraftSession } from '../Features/LegalHubMain/draftLogout.js';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -44,7 +45,7 @@ const AdminDashboard = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('https://talkntypeai.onrender.com/api/admin/users');
+      const response = await adminFetch('/users');
       const data = await response.json();
       setUsers(data);
       setLoading(false);
@@ -65,7 +66,7 @@ const AdminDashboard = () => {
   const toggleStatus = async (id, currentStatus) => {
     setUsers(users.map(u => u._id === id ? { ...u, subscription: { ...u.subscription, isActive: !currentStatus } } : u));
     try {
-      await fetch(`https://talkntypeai.onrender.com/api/admin/update-status/${id}`, {
+      await adminFetch(`/update-status/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
@@ -80,7 +81,7 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm("ARE YOU SURE? \n\nThis will permanently delete the user and all their data.")) {
       try {
-        const response = await fetch(`https://talkntypeai.onrender.com/api/admin/delete-user/${userId}`, {
+        const response = await adminFetch(`/delete-user/${userId}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -120,7 +121,7 @@ const AdminDashboard = () => {
   const saveSubscription = async () => {
     if (!selectedUser) return;
     try {
-      const response = await fetch(`https://talkntypeai.onrender.com/api/admin/update-subscription/${selectedUser._id}`, {
+      const response = await adminFetch(`/update-subscription/${selectedUser._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(planDates),

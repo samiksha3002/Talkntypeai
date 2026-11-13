@@ -21,6 +21,7 @@ export function createDraftAuth({ sessions = DraftSession, users = User } = {}) 
         return res.status(403).json({ success: false, error: 'Your account does not currently have draft access.' });
       }
       req.draftOwnerId = user._id;
+      req.draftRole = user.role;
       req.draftTokenHash = session.tokenHash;
       next();
     } catch {
