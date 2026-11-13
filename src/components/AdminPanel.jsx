@@ -1,3 +1,4 @@
+import { logoutDraftSession } from '../Features/LegalHubMain/draftLogout.js';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas'; // 1. Import html2canvas
@@ -54,6 +55,7 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
+    void logoutDraftSession();
     localStorage.removeItem('user');
     localStorage.removeItem('expiryDate');
     navigate('/login');

@@ -1,3 +1,4 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -5,13 +6,14 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 const router = express.Router();
+router.use(...aiBudget);
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 // POST /api/fix-grammar
-router.post("/", async (req, res) => {
+router.post("/", job(async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -37,6 +39,6 @@ router.post("/", async (req, res) => {
     console.error("FIX GRAMMAR ERROR:", err.message);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 export default router;

@@ -1,3 +1,4 @@
+import { createSpeechSession } from '../../Editor/speech.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
 
@@ -31,10 +32,14 @@ const StenoCard = ({ onSpeechInput }) => {
     
     // Refs for Web Speech API
     const recognitionRef = useRef(null);
+    const speechSessionRef = useRef(null);
 
     // --- Deepgram Start/Stop Logic (Kept as is) ---
     const startDeepgram = async () => { /* ... (Your existing startDeepgram logic) ... */
         try {
+            speechSessionRef.current?.stop();
+            const session = createSpeechSession('deepgram', onSpeechInput);
+            speechSessionRef.current = session;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
@@ -67,13 +72,9 @@ const StenoCard = ({ onSpeechInput }) => {
                 mediaRecorder.start(250);
             });
 
-            connection.on(LiveTranscriptionEvents.Transcript, (data) => {
-                const transcript = data.channel.alternatives[0]?.transcript;
-                if (transcript && onSpeechInput) {
-                    onSpeechInput(transcript); 
-                }
-            });
+            connection.on(LiveTranscriptionEvents.Transcript, data => session.deepgram(data));
 
+            connection.on(LiveTranscriptionEvents.Close, () => { session.stop(); setIsListening(false); });
             connection.on(LiveTranscriptionEvents.Error, (err) => {
                 console.error("Deepgram Error:", err);
                 stopSteno();
@@ -102,12 +103,11 @@ const StenoCard = ({ onSpeechInput }) => {
             setIsListening(true);
         };
 
+        speechSessionRef.current?.stop();
+        const session = createSpeechSession('web', onSpeechInput);
+        speechSessionRef.current = session;
         recognition.onresult = (event) => {
-            const current = event.resultIndex;
-            const transcript = event.results[current][0].transcript;
-            if (onSpeechInput) {
-                onSpeechInput(transcript);
-            }
+            session.web(event);
         };
 
         recognition.onerror = (event) => {
@@ -119,6 +119,7 @@ const StenoCard = ({ onSpeechInput }) => {
         };
 
         recognition.onend = () => {
+            session.stop();
             setIsListening(false);
         };
 
@@ -127,23 +128,22 @@ const StenoCard = ({ onSpeechInput }) => {
     };
 
     // --- Combined Stop Logic (Kept as is) ---
-    const stopSteno = () => { /* ... (Your existing stopSteno logic) ... */
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            mediaRecorderRef.current.stop();
+    const stopSteno = (discardPending = false) => {
+        if (discardPending) speechSessionRef.current?.stop();
+        const recorder = mediaRecorderRef.current;
+        const connection = connectionRef.current;
+        if (recorder && recorder.state !== 'inactive') {
+            // MediaRecorder emits its last dataavailable before the stop event.
+            recorder.addEventListener('stop', () => connection?.requestClose(), { once: true });
+            recorder.stop();
+        } else {
+            connection?.requestClose();
         }
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        if (connectionRef.current) {
-            connectionRef.current.requestClose();
-            connectionRef.current = null;
-        }
-
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-            recognitionRef.current = null;
-        }
-
+        streamRef.current?.getTracks().forEach(track => track.stop());
+        connectionRef.current = null;
+        // Native stop may still emit a final result; onend retires its session.
+        recognitionRef.current?.stop();
+        recognitionRef.current = null;
         setIsListening(false);
     };
 
@@ -172,7 +172,7 @@ const StenoCard = ({ onSpeechInput }) => {
     }, [language]); 
 
     useEffect(() => {
-        return () => stopSteno();
+        return () => stopSteno(true);
     }, []);
 
     const currentProvider = languageOptions.find(opt => opt.code === language)?.provider === 'deepgram' ? 'Deepgram ⚡' : 'Browser 🌐';

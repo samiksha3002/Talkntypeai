@@ -1,10 +1,12 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 import express from "express";
 import OpenAI from "openai";
 
 const router = express.Router();
+router.use(...aiBudget);
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-router.post("/", async (req, res) => {
+router.post("/", job(async (req, res) => {
   const { text, sourceLang, targetScript } = req.body;
   if (!text || !targetScript) {
     return res.status(400).json({ error: "Text and targetScript are required." });
@@ -28,6 +30,6 @@ router.post("/", async (req, res) => {
     console.error("Backend Transliteration Error:", error.message);
     res.status(500).json({ error: "Transliteration failed", details: error.message });
   }
-});
+}));
 
 export default router;

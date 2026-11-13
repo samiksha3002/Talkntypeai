@@ -1,3 +1,6 @@
+from resource_protection import ResourceProtection, setting
+from starlette.concurrency import run_in_threadpool
+import fitz
 import hashlib
 import json
 import logging
@@ -27,6 +30,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TalkNType AI Python API")
+app.add_middleware(ResourceProtection)
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 USERS_FILE = Path("users.json")
@@ -132,12 +136,29 @@ async def save_pdf_upload(file: UploadFile) -> Path:
     if not filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Please upload a PDF file.")
     path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{filename}"
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
-    if not data.startswith(b"%PDF"):
-        raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
-    path.write_bytes(data)
+    try:
+        total = 0
+        with path.open("wb") as output:
+            while chunk := await file.read(1024 * 1024):
+                if total == 0 and not chunk.startswith(b"%PDF-"):
+                    raise HTTPException(status_code=415, detail="Invalid PDF content.")
+                total += len(chunk)
+                if total > setting("DOCUMENT_UPLOAD_MB", 100) * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail="PDF exceeds the upload limit.")
+                output.write(chunk)
+        if not total:
+            raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
+        with fitz.open(path) as pdf:
+            if not pdf.page_count or pdf.page_count > setting("DOCUMENT_MAX_PAGES", 500):
+                raise HTTPException(status_code=413, detail="PDF page limit exceeded.")
+            pixels = [page.rect.width * page.rect.height * (200/72)**2 for page in pdf]
+            if max(pixels) > setting("DOCUMENT_MAX_IMAGE_PIXELS", 40000000) or sum(pixels) > setting("DOCUMENT_MAX_RASTER_PIXELS", 2000000000):
+                raise HTTPException(status_code=413, detail="PDF rasterization budget exceeded.")
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
     return path
 
 
@@ -229,13 +250,13 @@ async def generate_draft_stream(request: Request):
         final_facts = facts or ""
         if uploaded_file is not None:
             uploaded_path = await save_pdf_upload(uploaded_file)
-            vector_db = doc_service.process_pdf(str(uploaded_path))
+            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
             if vector_db is None:
                 raise HTTPException(
                     status_code=422,
                     detail=doc_service.last_error or "The uploaded PDF could not be analyzed.",
                 )
-            pdf_summary = doc_service.ask_question(
+            pdf_summary = await run_in_threadpool(doc_service.ask_question,
                 vector_db,
                 "Summarize the document's key facts, parties, dates, case numbers, legal provisions, and procedural history. Clearly flag anything uncertain.",
                 [],
@@ -288,13 +309,13 @@ async def analyze_doc(file: UploadFile = File(...)):
     uploaded_path = None
     try:
         uploaded_path = await save_pdf_upload(file)
-        vector_db = doc_service.process_pdf(str(uploaded_path))
+        vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
         if vector_db is None:
             raise HTTPException(
                 status_code=422,
                 detail=doc_service.last_error or "PDF analysis failed. Please try another PDF.",
             )
-        timeline = doc_service.get_timeline(vector_db)
+        timeline = await run_in_threadpool(doc_service.get_timeline, vector_db)
         if not timeline or timeline.startswith("Analysis failed.") or timeline.startswith("Timeline generation failed:"):
             # The PDF may still be loaded, so return the timeline diagnostic without
             # falsely claiming that timeline generation succeeded.
@@ -325,7 +346,7 @@ async def chat_with_pdf(request: ChatRequest):
     try:
         vector_db = doc_service.get_active_db()
         if vector_db is not None:
-            answer = doc_service.ask_question(vector_db, query, request.history)
+            answer = await run_in_threadpool(doc_service.ask_question,vector_db, query, request.history)
             if answer:
                 return {"answer": answer, "source": "document"}
         # A short generic error context must never be treated as document evidence.
@@ -341,7 +362,7 @@ async def chat_with_pdf(request: ChatRequest):
                 f"{item.get('content') or item.get('text') or ''}"
                 for item in request.history[-6:]
             )
-            response = llm.invoke([
+            response = await run_in_threadpool(llm.invoke, [
                 ("system", "You are a careful Indian legal document assistant. Answer only from the provided document context. If the context does not contain the answer, say so. Do not invent facts or legal citations."),
                 ("human", f"DOCUMENT CONTEXT:\n{fallback_context}\n\nRECENT CHAT:\n{history_text}\n\nQUESTION:\n{query}"),
             ])
@@ -369,13 +390,13 @@ async def generate_draft(
         final_facts = facts or ""
         if file is not None:
             uploaded_path = await save_pdf_upload(file)
-            vector_db = doc_service.process_pdf(str(uploaded_path))
+            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
             if vector_db is None:
                 raise HTTPException(
                     status_code=422,
                     detail=doc_service.last_error or "The uploaded PDF could not be analyzed.",
                 )
-            pdf_summary = doc_service.ask_question(
+            pdf_summary = await run_in_threadpool(doc_service.ask_question,
                 vector_db,
                 "Summarize the legal facts, party names, dates, case numbers, legal provisions, and procedural history.",
                 [],
@@ -383,7 +404,7 @@ async def generate_draft(
             final_facts = f"CONTEXT FROM PDF:\n{pdf_summary}\n\nUSER INSTRUCTIONS:\n{final_facts}"
         if not final_facts.strip():
             raise HTTPException(status_code=400, detail="Please provide case facts or upload a PDF.")
-        result = research_and_draft(final_facts, documentType, language or "English")
+        result = await run_in_threadpool(research_and_draft, final_facts, documentType, language or "English")
         return list(result)
     except HTTPException:
         raise
@@ -401,7 +422,7 @@ async def generate_draft(
 @app.post("/api/ai-command")
 async def handle_ai_command(request: AICommandRequest):
     try:
-        response = llm.invoke([
+        response = await run_in_threadpool(llm.invoke, [
             ("system", "You are a senior legal draftsman. Modify only the selected text according to the command. Preserve the legal meaning, facts, names, dates, and citations. Do not invent authorities."),
             ("human", f"CONTEXT:\n{request.context}\n\nCOMMAND:\n{request.command}\n\nSELECTED TEXT:\n{request.text}"),
         ])
@@ -414,7 +435,7 @@ async def handle_ai_command(request: AICommandRequest):
 @app.post("/api/legal-research")
 async def legal_research(request: ResearchRequest):
     try:
-        return research_ai.perform_research(request.query)
+        return await run_in_threadpool(research_ai.perform_research, request.query)
     except Exception as exc:
         logger.exception("Legal research failed")
         raise HTTPException(status_code=500, detail="Legal research failed.") from exc
@@ -423,7 +444,7 @@ async def legal_research(request: ResearchRequest):
 @app.post("/api/translate-research-marathi")
 async def translate_research(request: MarathiRequest):
     try:
-        return {"success": True, "marathi_summary": research_ai.get_marathi_summary(request.english_text)}
+        return {"success": True, "marathi_summary": await run_in_threadpool(research_ai.get_marathi_summary, request.english_text)}
     except Exception as exc:
         logger.exception("Marathi translation failed")
         raise HTTPException(status_code=500, detail="Translation failed.") from exc

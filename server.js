@@ -1,4 +1,5 @@
 import "./env.js";
+import { setting, createBodyBudget } from "./utils/resourceProtection.js";
 import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
@@ -36,6 +37,8 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
 import draftsRouter        from "./routes/draft.ready.js";
+import draftSessionRouter from "./routes/draftSession.js";
+import userDraftsRouter from "./routes/userDrafts.js";
 
 connectDB();
 
@@ -103,13 +106,15 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
+app.use("/api", apiLimiter);
+app.use(createBodyBudget());
 app.use(
   express.json({
-    limit: "100mb",
+    limit: setting("API_BODY_MB",100) * 1024 * 1024,
   })
 );
 
-app.use(express.urlencoded({extended: true,limit: "100mb",}));
+app.use(express.urlencoded({extended: true,limit: setting("API_BODY_MB",100) * 1024 * 1024,}));
 
 app.use((req, res, next) => {
 
@@ -131,11 +136,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-app.use(
-  "/api",
-  apiLimiter
-);
 
 app.get(
   "/",
@@ -286,6 +286,8 @@ app.use(
   "/api/drafts",
   draftsRouter
 );
+app.use("/api/draft-session", draftSessionRouter);
+app.use("/api/user-drafts", userDraftsRouter);
 app.use("/api/judgements",judgementsRouter);
 app.use("/api/saved",savedRouter);
 app.use("/api/judgement-ai",judgementAiRouter);
@@ -312,6 +314,8 @@ app.use(
       err?.stack || err?.message || err
     );
 
+
+    if (err?.type === "entity.too.large") return res.status(413).json({success:false,error:"Request exceeds the configured size limit."});
 
     // CORS error
     if (

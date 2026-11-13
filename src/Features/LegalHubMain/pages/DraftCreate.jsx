@@ -1,16 +1,11 @@
-  import React, { useEffect, useRef, useState } from "react";
-  import { useLocation, useNavigate } from "react-router-dom";
-import legalTemplatesData from "../../../../data/legal-draft-templates.json";
-  import { marked } from "marked"
-import DOMPurify from "dompurify"
-
-  const VITE_API_URL= "https://talkntypeai.onrender.com/api";
-  const legalTemplates = Array.isArray(legalTemplatesData)
-  ? legalTemplatesData
-  : Array.isArray(legalTemplatesData.templates)
-    ? legalTemplatesData.templates
-    : [];
-
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import DraftSignIn from '../DraftSignIn.jsx';
+import { recoveryKey, rememberDraft, recoverDraft, recoverSaver, forgetDraft } from '../draftRecovery.js';
+import { draftRequest, DraftSaver, validDocument, getDraftSession } from '../draftClient.js';
+import { sanitizeDraftHtml } from '../../../../utils/draftHtml.js';
   // Converts {{placeholder}} -> a highlighted, editable-looking [PLACEHOLDER]
   // span, so blanks are obvious to the user inside the rendered document.
   function highlightPlaceholders(html) {
@@ -43,149 +38,90 @@ import DOMPurify from "dompurify"
   )
 }
 
-  export default function DraftCreate() {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const editorRef = useRef(null);
 
-    // Extract data from DraftStudio
-    const documentType = location.state?.documentType || "Untitled Document";
-    const category = location.state?.category || "General";
-    const draftId = location.state?.draftId || null;
-
-    const [template, setTemplate] = useState(null);
-    const [content, setContent] = useState(""); // always kept as raw HTML string
-
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-    const [successMessage, setSuccessMessage] = useState("");
-
-    useEffect(() => {
-      const loadTemplate = async () => {
-        setLoading(true);
-        setError("");
-        setSuccessMessage("");
-
-        // 1. If a saved draft id was passed, load that exact saved draft from the DB.
-        if (draftId) {
-          try {
-            const response = await fetch(`${API_URL}/drafts/${draftId}`);
-            const result = await response.json();
-
-            if (response.ok && result.data) {
-              setTemplate(result.data);
-             setContent(
-  prepareTemplateContent(
-    result.data.templateBody || result.data.content || ""
-  )
-)
-              setLoading(false);
-              return; // Stop here if DB fetch was successful
-            }
-          } catch (err) {
-            console.error("Failed to load saved draft, falling back to template library...", err);
-          }
-        }
-
-        // 2. No draft id (or DB fetch failed) — load the actual legal template
-        //    that matches the selected document type, from the template library.
-        const matchedTemplate = legalTemplates.find(
-          (t) => t.title.trim().toLowerCase() === documentType.trim().toLowerCase()
-        );
-
-        if (matchedTemplate) {
-          setTemplate(matchedTemplate);
-        
-setContent(
-  prepareTemplateContent(
-    matchedTemplate.templateBody || matchedTemplate.content || ""
-  )
-);
-
-        } else {
-          // 3. Only as a last resort (title truly not found anywhere) — blank skeleton.
-          setTemplate({ title: documentType, category });
-          setContent(`<p><b>${documentType}</b></p><p>Start typing your draft here...</p>`);
-        }
-
-        setLoading(false);
-      };
-
-      loadTemplate();
-    }, [draftId, documentType, category]);
-
-    // Push the loaded template HTML into the editable area whenever it changes.
-    // We intentionally do NOT re-sync on every keystroke (that would reset the
-    // cursor position) — the editor is uncontrolled after this initial paint.
-    useEffect(() => {
-      if (editorRef.current && !loading) {
-        editorRef.current.innerHTML = content;
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loading, template]);
-
-    const handleEditorInput = () => {
-      if (editorRef.current) {
-        setContent(editorRef.current.innerHTML);
-        setSuccessMessage("");
-      }
-    };
-
-    const applyFormat = (command) => {
-      editorRef.current?.focus();
-      document.execCommand(command, false, null);
-      handleEditorInput();
-    };
-
-    const handleSaveDraft = async () => {
-      const plainTextCheck = editorRef.current?.innerText?.trim() || "";
-      if (!plainTextCheck) {
-        setError("Template content cannot be empty.");
-        return;
-      }
-
+export default function DraftCreate() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: savedId } = useParams();
+  const templateId = new URLSearchParams(location.search).get('templateId') || location.state?.templateId || location.state?.draftId;
+  const editorRef = useRef(null);
+  const saver = useRef(null);
+  const dirty = useRef(false);
+  const loadedHtml = useRef('');
+  const currentHtml = useRef('');
+  const loadedTemplateId = useRef(null);
+  const bufferKey = recoveryKey(getDraftSession(), location.pathname + location.search);
+  const [template, setTemplate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [retry, setRetry] = useState(0);
+  const documentType = template?.title || 'Document';
+  const category = template?.category || '';
+  useEffect(() => {
+    if (dirty.current && (savedId ? saver.current?.document?._id === savedId : loadedTemplateId.current === templateId)) return;
+    if (savedId && saver.current?.document?._id === savedId) return;
+    const controller = new AbortController();
+    let active = true;
+    setLoading(true); setError(''); setSuccessMessage(''); setTemplate(null);
+    saver.current = null;
+    (async () => {
       try {
-        setSaving(true);
-        setError("");
-        setSuccessMessage("");
-
-        const response = await fetch(`${VITE_API_URL}/drafts`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: template?.title || documentType,
-            documentType,
-            category: template?.category || category,
-            templateId: template?._id || draftId, // null if it came from the local template library
-            content,
-            status: "saved",
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || `Server error: ${response.status}`);
-        }
-
-        setSuccessMessage("Draft saved successfully.");
-
-        setTimeout(() => {
-          navigate("/drafts", {
-            state: { message: "Draft saved successfully." },
-          });
-        }, 700);
-      } catch (err) {
-        console.error("Draft save error:", err);
-        setError(err.message || "Failed to save draft.");
-      } finally {
-        setSaving(false);
-      }
-    };
-
+        if (!savedId && !templateId) throw new Error('Select a template from Draft Studio to start a document.');
+        const result = await draftRequest(savedId ? '/user-drafts/' + savedId : '/drafts/' + templateId,
+          { signal: controller.signal, publicRequest: !savedId });
+        const data = result.data;
+        if (savedId ? !validDocument(data) || data._id !== savedId : !data || data._id !== templateId || typeof (data.templateBody || data.content) !== 'string') throw new Error('Invalid document response. Nothing has been substituted.');
+        if (!active) return;
+        loadedTemplateId.current = templateId;
+        setTemplate(data);
+        loadedHtml.current = savedId ? DOMPurify.sanitize(sanitizeDraftHtml(data.content)) : prepareTemplateContent(data.templateBody || data.content);
+        saver.current = recoverSaver(bufferKey) || new DraftSaver(draftRequest, savedId ? data : null);
+        const recovered = recoverDraft(bufferKey);
+        if (recovered !== undefined) { loadedHtml.current = DOMPurify.sanitize(sanitizeDraftHtml(recovered)); setSuccessMessage('Unsaved text recovered from this tab. Review and save it.'); }
+        currentHtml.current = loadedHtml.current;
+        dirty.current = recovered !== undefined;
+      } catch (e) { if (active) setError(e.message || 'Could not load document.'); }
+      finally { if (active) setLoading(false); }
+    })();
+    return () => { active = false; controller.abort(); };
+  }, [savedId, templateId, retry, bufferKey]);
+  useEffect(() => {
+    if (!loading && editorRef.current && template) editorRef.current.innerHTML = loadedHtml.current;
+  }, [loading, template]);
+  useEffect(() => {
+    const warn = event => { if (dirty.current || saver.current?.busy) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
+  useEffect(() => () => {
+    if (dirty.current) rememberDraft(bufferKey, currentHtml.current, saver.current);
+    else forgetDraft(bufferKey);
+  }, [bufferKey]);
+  const leave = path => {
+    if ((dirty.current || saver.current?.busy) && !window.confirm('Leave this document? Unsaved changes will be lost.')) return;
+    navigate(path);
+  };
+  const handleEditorInput = () => { currentHtml.current = editorRef.current?.innerHTML || ''; dirty.current = true; rememberDraft(bufferKey, currentHtml.current, saver.current); setSuccessMessage(''); };
+  const applyFormat = command => { editorRef.current?.focus(); document.execCommand(command, false, null); handleEditorInput(); };
+  const handleSaveDraft = async () => {
+    if (!saver.current || saver.current.busy) return;
+    if (!editorRef.current?.innerText?.trim()) { setError('Document cannot be empty.'); return; }
+    const snapshot = DOMPurify.sanitize(sanitizeDraftHtml(editorRef.current.innerHTML));
+    setSaving(true); setError(''); setSuccessMessage('');
+    try {
+      const result = await saver.current.save({ title: template.title, category, templateId: saver.current.document?.templateId || templateId, content: snapshot });
+      const current = DOMPurify.sanitize(sanitizeDraftHtml(editorRef.current.innerHTML));
+      dirty.current = current !== snapshot;
+      currentHtml.current = current;
+      if (!dirty.current) forgetDraft(bufferKey);
+      setSuccessMessage(dirty.current ? 'Submitted version saved. You have newer unsaved changes.' : 'Draft saved successfully.');
+      // The load effect recognizes this already-loaded identity and preserves newer typing.
+      if (!savedId) navigate('/draft/edit/' + result._id, { replace: true });
+    } catch (e) { setError(e.message || 'Save failed. Your unsaved text has been kept.'); }
+    finally { setSaving(false); }
+  };
     if (loading) {
       return (
         <div className="min-h-screen bg-slate-50 px-4 py-12">
@@ -200,13 +136,15 @@ setContent(
       );
     }
 
+    if (!template) return <main className="p-8"><p role="alert">{error}</p><DraftSignIn onSuccess={() => setRetry(n => n + 1)} /><button onClick={() => setRetry(n => n + 1)}>Retry</button> <button onClick={() => leave('/draft-studio')}>Draft Studio</button></main>;
     return (
       <div className="min-h-screen bg-slate-50 px-4 py-8 md:px-8">
         <div className="mx-auto max-w-6xl">
+          <button onClick={() => leave("/drafts")}>My Drafts</button>
           <header className="mb-8">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => leave(-1)}
               className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-800"
             >
               <span className="text-lg">←</span> Back
@@ -222,13 +160,15 @@ setContent(
           </header>
 
           {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
+              <DraftSignIn onSuccess={() => { setError('Session renewed. Click Save Draft to retry.'); }} />
+              <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(editorRef.current?.innerText || ''); setSuccessMessage('Unsaved text copied.'); } catch { setError('Select and copy the document text manually.'); } }}>Copy unsaved text</button>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <div role="status" className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {successMessage}
             </div>
           )}
@@ -305,13 +245,13 @@ setContent(
 
             <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">
-                Your changes will be saved as a separate draft. The original template will remain unchanged.
+                Your document is saved separately from the original template. Keep this page open if a save fails.
               </p>
 
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
+                  onClick={() => leave(-1)}
                   className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 >
                   Cancel

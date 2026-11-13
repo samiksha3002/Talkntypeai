@@ -1,3 +1,4 @@
+import { logoutDraftSession } from '../Features/LegalHubMain/draftLogout.js';
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -12,6 +13,7 @@ const DashboardNavbar = () => {
   // --- 1. LOGOUT FUNCTION ---
   const handleLogout = () => {
     // Clear all stored data so the next user starts fresh
+    void logoutDraftSession();
     localStorage.removeItem('user');
     localStorage.removeItem('expiryDate');
     navigate('/login');

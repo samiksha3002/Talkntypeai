@@ -1,3 +1,4 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 
 
 import express from "express";
@@ -8,6 +9,7 @@ import {
 
 
 const router = express.Router();
+router.use(...aiBudget);
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -30,7 +32,7 @@ function createRequestId() {
 // POST /
 // ═════════════════════════════════════════════════════════════════════════════
 
-router.post("/", async (req, res) => {
+router.post("/", job(async (req, res) => {
 
   const requestId = createRequestId();
 
@@ -619,7 +621,7 @@ router.post("/", async (req, res) => {
 
   }
 
-});
+}));
 
 
 // ═════════════════════════════════════════════════════════════════════════════

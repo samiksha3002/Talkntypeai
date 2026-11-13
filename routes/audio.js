@@ -1,3 +1,4 @@
+import { aiBudget, job, setting, inspectAudio } from '../utils/resourceProtection.js';
 
 import express from "express";
 import multer from "multer";
@@ -8,17 +9,18 @@ import path from "path";
 dotenv.config();
 
 const router = express.Router();
+router.use(...aiBudget);
 
 // ---------------- CONFIGURATION ----------------
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY, timeout: 180000, maxRetries: 0,
 });
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB
+    fileSize: setting("AUDIO_UPLOAD_MB",10) * 1024 * 1024, files:1, fields:20, fieldSize:1024*1024, parts:21, // 10 MB
   },
 });
 
@@ -114,19 +116,22 @@ function normalizeDetectedLanguage(language) {
 // ---------------- MULTER ERROR HANDLING ----------------
 
 const uploadAudioFile = (req, res, next) => {
+  req.resource?.begin();
   upload.single("audio")(req, res, (err) => {
     if (err) {
+      req.resource?.release();
       const message =
         err.code === "LIMIT_FILE_SIZE"
-          ? "Audio file 10MB se badi hai. Please upload a smaller file."
+          ? "Audio exceeds the configured upload size limit."
           : "Audio upload failed.";
 
-      return res.status(400).json({
+      return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
         success: false,
         error: message,
       });
     }
 
+    if(req.resource?.signal.aborted){req.resource.release();return;}
     next();
   });
 };
@@ -180,7 +185,7 @@ async function transcribeWithWhisper(file, language) {
 router.post(
   "/transcribe",
   uploadAudioFile,
-  async (req, res) => {
+  job(async (req, res) => {
     try {
       // Check API key
       if (!process.env.OPENAI_API_KEY) {
@@ -215,6 +220,8 @@ router.post(
       }
 
       // Transcribe audio
+      if (!/^(audio\/|video\/(webm|mp4)|application\/ogg)/i.test(req.file.mimetype)) return res.status(415).json({success:false,error:"Unsupported audio type."});
+      inspectAudio(req.file.buffer);
       const transcription = await transcribeWithWhisper(
         req.file,
         language
@@ -243,13 +250,13 @@ router.post(
         error.message
       );
 
-      return res.status(500).json({
+      return res.status(error.resourceProtection ? error.status : 500).json({
         success: false,
-        error:
+        error: error.resourceProtection ? error.message :
           "Audio transcription failed. Please try again.",
       });
     }
-  }
+  })
 );
 
 export default router;

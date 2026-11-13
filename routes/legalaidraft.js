@@ -1,11 +1,13 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 import express from 'express';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from 'dotenv';
 
 dotenv.config();
 const router = express.Router();
+router.use(...aiBudget);
 
-router.post('/search', async (req, res) => {
+router.post('/search', job(async (req, res) => {
     try {
         const { query } = req.body;
         console.log("🔍 Search query received:", query);
@@ -45,6 +47,6 @@ router.post('/search', async (req, res) => {
         console.error("🔥 AI SEARCH ERROR:", error.message);
         res.status(500).json({ error: error.message || "Legal AI failed to process" });
     }
-});
+}));
 
 export default router;

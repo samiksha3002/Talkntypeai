@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react'; 
+import { Eye, EyeOff } from 'lucide-react';
+import { resolveDraftApi, storeDraftSession, SESSION_STORAGE_MESSAGE } from '../Features/LegalHubMain/draftClient.js';
 
 const Login = () => {
   // 1. State to capture user input
@@ -20,10 +21,14 @@ const Login = () => {
   // 3. Handle Login Logic
   const handleSubmit = async (e) => {
     e.preventDefault();
+    storeDraftSession(null);
     setStatus({ type: 'loading', message: 'Verifying credentials...' });
 
     try {
-      const response = await fetch('https://talkntypeai.onrender.com/api/login', {
+      const loginUrl = import.meta.env.VITE_DRAFT_API_URL
+        ? resolveDraftApi(import.meta.env.VITE_DRAFT_API_URL) + '/login'
+        : 'https://talkntypeai.onrender.com/api/login'; // Preserve existing legacy configuration.
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -47,7 +52,10 @@ const Login = () => {
         }
         // -----------------------------------
 
-        setStatus({ type: 'success', message: 'Login Successful! Redirecting...' });
+        const draftStorageReady = storeDraftSession(data.draftSession);
+        setStatus({ type: 'success', message: draftStorageReady
+          ? 'Login Successful! Redirecting...'
+          : 'Login successful. ' + SESSION_STORAGE_MESSAGE });
         
         // 1. Save full user object (keep this for other needs)
         localStorage.setItem('user', JSON.stringify(user));

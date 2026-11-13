@@ -1,3 +1,4 @@
+import { aiBudget, job } from '../utils/resourceProtection.js';
 // routes/judgementAi.js
 // Same Gemini pattern as your existing pdf.js route
 
@@ -5,6 +6,7 @@ import express from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = express.Router();
+router.use(...aiBudget);
 
 // ── Same as your pdf.js ───────────────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -13,7 +15,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // POST /api/judgement-ai/headnote
 // Body: { title, court, date, snippet, fulltext }
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/headnote", async (req, res) => {
+router.post("/headnote", job(async (req, res) => {
   try {
     const { title, court, date, snippet, fulltext } = req.body;
 
@@ -56,12 +58,12 @@ Use formal legal language. Be accurate and concise.`;
     }
     res.status(500).json({ error: err.message || "Failed to generate headnote." });
   }
-});
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/judgement-ai/simplify
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/simplify", async (req, res) => {
+router.post("/simplify", job(async (req, res) => {
   try {
     const { text, title } = req.body;
     if (!text) return res.status(400).json({ error: "Text is required." });
@@ -81,12 +83,12 @@ Write simplified version directly, no preamble.`;
     console.error("[judgement-ai/simplify]", err.message);
     res.status(500).json({ error: "Failed to simplify." });
   }
-});
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/judgement-ai/keypoints
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/keypoints", async (req, res) => {
+router.post("/keypoints", job(async (req, res) => {
   try {
     const { text, title } = req.body;
     if (!text) return res.status(400).json({ error: "Text is required." });
@@ -113,6 +115,6 @@ Only the list, nothing else.`;
     console.error("[judgement-ai/keypoints]", err.message);
     res.status(500).json({ error: "Failed to extract key points." });
   }
-});
+}));
 
 export default router;

@@ -1,3 +1,4 @@
+import { sanitizeJudgementHtml, escapeJudgementText } from './judgementHtml.js';
 // frontend/src/pages/JudgementsPage.jsx — Light theme, all fixes applied
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -224,7 +225,9 @@ function AdvancedFilters({ onSearch, onClose }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Print / Save PDF (Updated with Chamber, Email, Contact, Case Type & Letterhead)
 // ─────────────────────────────────────────────────────────────────────────────
-function printJudgement(doc, printDetails = {}) {
+export function printJudgement(doc, printDetails = {}) {
+  doc = {...doc, title:escapeJudgementText(doc.title), citation:escapeJudgementText(doc.citation), court:escapeJudgementText(doc.court), fulltext:sanitizeJudgementHtml(doc.fulltext), snippet:sanitizeJudgementHtml(doc.snippet)};
+  printDetails = Object.fromEntries(Object.entries(printDetails).map(([key,value])=>[key,key==='letterhead'?value:escapeJudgementText(value)]));
   const win = window.open('', '_blank');
   if (!win) { alert('Allow popups to print/save as PDF'); return; }
   
@@ -271,7 +274,7 @@ function printJudgement(doc, printDetails = {}) {
     `;
   }
 
-  win.document.write(`<!DOCTYPE html><html><head><title>${doc.title}</title>
+  win.document.write(`<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>${doc.title}</title>
     <style>
       body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#111;line-height:1.9;padding:0 24px}
       h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:16px}
@@ -285,7 +288,7 @@ function printJudgement(doc, printDetails = {}) {
     <div class="meta">
       ${doc.citation ? `<strong>${doc.citation}</strong><br>` : ''}
       <strong>Court:</strong> ${doc.court || 'N/A'} &nbsp;|&nbsp;
-      <strong>Date:</strong> ${formatDate(doc.date) || 'N/A'}
+      <strong>Date:</strong> ${escapeJudgementText(formatDate(doc.date)) || 'N/A'}
     </div>
     ${doc.fulltext
       ? `<div class="label">Full Judgement</div><div class="content">${doc.fulltext}</div>`
@@ -400,7 +403,8 @@ const JudgementsPage = () => {
     page: searchPage,
   } = useSearch();
   const { data: docDetail, loading: docLoading } = useJudgement(selectedDocid);
-  const { save, remove, isSaved } = useSaved();
+  const { saved = [], loading: bookmarksLoading, error: bookmarksError, busy: bookmarksBusy, refresh: refreshBookmarks, save, remove, isSaved } = useSaved();
+  const [showBookmarks,setShowBookmarks]=useState(false);
 
   const isSearching = !!queryText;
   const listLoading = isSearching ? searchLoading : latestLoading;
@@ -435,7 +439,8 @@ const JudgementsPage = () => {
   };
 
   const handleSaveToggle = async () => {
-    if (!docDetail) return;
+    if (!docDetail || bookmarksBusy) return;
+    try {
     if (isSaved(docDetail.id)) {
       await remove(docDetail.id);
       showToast('Removed from saved');
@@ -443,6 +448,7 @@ const JudgementsPage = () => {
       await save({ docid: docDetail.id, title: docDetail.title, citation: docDetail.citation, court: docDetail.court, date: docDetail.date });
       showToast('Saved to library ✓');
     }
+    } catch(error) { showToast(error.message || "Bookmark request failed."); }
   };
 
   const copyCitation = () => {
@@ -482,6 +488,12 @@ const JudgementsPage = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.pageBg, fontFamily: "'Inter', 'DM Sans', sans-serif", overflow: 'hidden' }}>
 
+      {bookmarksError && <div role="alert" style={{padding:10,background:'#fff3cd'}}>{bookmarksError} <button onClick={()=>refreshBookmarks?.().catch(()=>{})}>Retry bookmarks</button> <button onClick={()=>navigate('/login')}>Sign in again</button></div>}
+      {showBookmarks && <section aria-label="Saved judgements" style={{padding:12,maxHeight:250,overflowY:'auto',background:'white'}}>
+        <h2>Saved judgements</h2>
+        {bookmarksLoading ? <p>Loading bookmarks...</p> : !bookmarksError && !saved.length ? <p>No saved judgements.</p> : null}
+        <ul>{saved.map(entry=><li key={entry.docid}><button onClick={()=>{setSelectedDocid(String(entry.docid));setShowBookmarks(false);}}>{entry.title||entry.docid}</button> <span>{entry.citation}</span></li>)}</ul>
+      </section>}
       {/* ── TOPBAR ────────────────────────────────────────────── */}
       <div style={{ height: 52, background: C.topbar, borderBottom: `1px solid ${C.topbarBor}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -501,6 +513,7 @@ const JudgementsPage = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => setShowBookmarks(value=>!value)} style={{color:'white'}}>Saved judgements</button>
           <button onClick={() => navigate('/dashboard')} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #475569', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer' }}>
             Back
           </button>
@@ -701,7 +714,7 @@ const JudgementsPage = () => {
                           Summary / Excerpt
                         </div>
                         <div style={{ fontSize: 13, lineHeight: 1.85, color: C.text2 }}
-                          dangerouslySetInnerHTML={{ __html: docDetail.snippet }} />
+                          dangerouslySetInnerHTML={{ __html: sanitizeJudgementHtml(docDetail.snippet) }} />
                       </div>
                     )}
 
@@ -712,7 +725,7 @@ const JudgementsPage = () => {
                           Full Judgement
                         </div>
                         <div style={{ fontSize: 13, lineHeight: 1.95, color: C.text2 }}
-                          dangerouslySetInnerHTML={{ __html: docDetail.fulltext }} />
+                          dangerouslySetInnerHTML={{ __html: sanitizeJudgementHtml(docDetail.fulltext) }} />
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 0', gap: 8, color: C.text4 }}>
@@ -756,7 +769,7 @@ const JudgementsPage = () => {
                     <button onClick={copyCitation} style={{ ...btnBase, background: C.white, borderColor: C.borderMid, color: copied ? '#16A34A' : C.text2 }}>
                       <Copy size={13} /> {copied ? '✓ Copied!' : 'Copy Citation'}
                     </button>
-                    <button onClick={handleSaveToggle} style={{
+                    <button onClick={handleSaveToggle} disabled={bookmarksBusy || bookmarksLoading} style={{
                       ...btnBase,
                       background: isSaved(docDetail.id) ? C.goldLight : C.white,
                       borderColor: isSaved(docDetail.id) ? C.gold : C.borderMid,

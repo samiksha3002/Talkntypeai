@@ -1,3 +1,4 @@
+import { speechEvent } from "../Editor/speech.js";
 import React, { useState, useCallback, useEffect } from "react";
 
 // Layout Components
@@ -37,7 +38,7 @@ const LoadingOverlay = ({ message }) => (
 
 const Dashboard = () => {
   const [editorContent, setEditorContent] = useState("");
-  const [voiceText, setVoiceText] = useState("");
+  const [speechEvents, setSpeechEvents] = useState([]);
   
   // --- ✨ STEP 3: VIEW STATE ✨ ---
   // Controls whether we see the Editor or the new Legal AI Hub
@@ -89,8 +90,13 @@ const Dashboard = () => {
     return "Working on it...";
   };
 
-  const handleSpeechInput = useCallback((text) => {
-    setVoiceText(text);
+  const handleSpeechInput = useCallback((input) => {
+    const event = speechEvent(input);
+    if (event) setSpeechEvents(pending => [...pending, event]);
+  }, []);
+  const handleSpeechConsumed = useCallback((ids) => {
+    const consumed = new Set(ids);
+    setSpeechEvents(pending => pending.filter(event => !consumed.has(event.id)));
   }, []);
 
   const handleTransliterateCommand = (scriptCode) => {
@@ -149,7 +155,8 @@ const Dashboard = () => {
         <main className="flex-1 flex flex-col bg-white overflow-hidden">
           {activeView === "editor" ? (
             <Editor
-              speechText={voiceText}
+              speechEvents={speechEvents}
+              onSpeechConsumed={handleSpeechConsumed}
               manualText={editorContent}
               setManualText={updateEditorContent}
               user={user}

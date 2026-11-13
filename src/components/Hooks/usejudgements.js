@@ -5,7 +5,8 @@
 //   (App.jsx shows JudgementsPage is at src/components/ so services is at src/services/)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { getDraftSession } from '../../Features/LegalHubMain/draftClient.js';
 import {
   searchJudgements,
   getLatestJudgements,
@@ -109,31 +110,28 @@ export function useJudgement(docid) {
 // useSaved  — bookmark management
 // ─────────────────────────────────────────────────────────────────────────────
 export function useSaved() {
-  const [saved,   setSaved]   = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(() => {
-    getSaved()
-      .then((d) => { setSaved(d?.saved || []); setLoading(false); })
-      .catch(()  => setLoading(false));
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  const save = useCallback(async (doc) => {
-    await saveJudgement(doc);
-    refresh();
-  }, [refresh]);
-
-  const remove = useCallback(async (docid) => {
-    await removeSaved(docid);
-    refresh();
-  }, [refresh]);
-
-  const isSaved = useCallback(
-    (docid) => saved.some((s) => String(s.docid) === String(docid)),
-    [saved]
-  );
-
-  return { saved, loading, save, remove, isSaved };
+  const identity=getDraftSession();
+  const [records,setRecords]=useState({owner:null,rows:[]}),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  const [busy,setBusy]=useState(false);const generation=useRef(0);
+  const saved=useMemo(()=>identity&&records.owner===identity?records.rows:[],[identity,records]);
+  const invalidate=useCallback(()=>{generation.current++;},[]);
+  const refresh=useCallback(async()=>{
+    const ticket=++generation.current;setLoading(true);setError('');
+    try{const data=await getSaved();if(!Array.isArray(data?.saved))throw Error('Invalid bookmark response.');if(ticket===generation.current&&getDraftSession()===identity)setRecords({owner:identity,rows:data.saved});return data.saved;}
+    catch(e){if(ticket===generation.current){setRecords({owner:null,rows:[]});setError(e.message||'Could not load bookmarks.');}throw e;}
+    finally{if(ticket===generation.current){setLoading(false);setBusy(false);}}
+  },[identity]);
+  useEffect(()=>{setBusy(false);refresh().catch(()=>{});return invalidate;},[refresh,invalidate]);
+  const save=useCallback(async doc=>{
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{const entry=await saveJudgement(doc);if(String(entry?.docid)!==String(doc.docid))throw Error('Bookmark save was not confirmed.');if(ticket===generation.current&&getDraftSession()===identity)setRecords(current=>({owner:identity,rows:[entry,...(current.owner===identity?current.rows:[]).filter(row=>String(row.docid)!==String(entry.docid))]}));}
+    catch(e){if(ticket===generation.current){setRecords({owner:null,rows:[]});setError(e.message);}throw e;}finally{if(ticket===generation.current){setBusy(false);setLoading(false);}}
+  },[identity]);
+  const remove=useCallback(async docid=>{
+    const ticket=++generation.current;setBusy(true);setError('');
+    try{await removeSaved(docid);if(ticket===generation.current&&getDraftSession()===identity)setRecords(current=>({owner:identity,rows:current.owner===identity?current.rows.filter(row=>String(row.docid)!==String(docid)):[]}));}
+    catch(e){if(ticket===generation.current){setRecords({owner:null,rows:[]});setError(e.message);}throw e;}finally{if(ticket===generation.current){setBusy(false);setLoading(false);}}
+  },[identity]);
+  const isSaved=useCallback(docid=>saved.some(row=>String(row.docid)===String(docid)),[saved]);
+  return {saved,loading,error,busy,refresh,save,remove,isSaved};
 }
