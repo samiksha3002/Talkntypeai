@@ -14,7 +14,7 @@ def docker(*args):
     return subprocess.check_output(['docker',*args],text=True).strip()
 
 def verdict(harness, state, peak, oom, cap, timed_out):
-    return bool(harness and state.get('ExitCode')==0 and not state.get('OOMKilled') and not timed_out and oom==0 and cap and peak and peak<=SAFE and harness.get('memory_acceptance') is True and harness.get('completed_flows')==1 and harness.get('corpus_chunks')==6804 and harness.get('retrieved_reference_chunks')==12)
+    return bool(harness and state.get('ExitCode')==0 and not state.get('OOMKilled') and not timed_out and oom==0 and cap and peak and peak<=SAFE and harness.get('memory_acceptance') is True and harness.get('completed_flows')==13 and harness.get('corpus_chunks')==6804 and harness.get('retrieved_reference_chunks')==12)
 
 def main():
     if sys.platform!='linux': raise SystemExit('Requires the GitHub Ubuntu host.')
@@ -54,10 +54,11 @@ def main():
             harness=json.loads(evidence.read_text())
             peak=max(peak,int(harness.get('peak_bytes',0)))
             oom=max(oom,int(harness.get('oom_kills',0)))
+        progress=json.loads((RESULTS/'progress.json').read_text()) if (RESULTS/'progress.json').exists() else {}
         passed=verdict(harness,state,peak,oom,verified,timed_out)
-        report={'status':'PASS' if passed else 'FAIL','peak_bytes':peak or None,'peak_MiB':round(peak/1048576,2) if peak else None,'limit_MiB':512,'safety_threshold_MiB':448,'headroom_MiB':round((LIMIT-peak)/1048576,2) if peak else None,'hard_cap_and_no_swap_verified':verified,'oom_kills_observed':oom,'container_oom_killed':state.get('OOMKilled'),'exit_code':state.get('ExitCode'),'timed_out':timed_out,'completed_flows':harness.get('completed_flows',0),'corpus_chunks':harness.get('corpus_chunks'),'retrieved_reference_chunks':harness.get('retrieved_reference_chunks'),'providers':'loopback synthetic only; real corpus, SDK serialization and PDF processing','observer_errors':sample_errors}
+        report={'status':'PASS' if passed else 'FAIL','peak_bytes':peak or None,'peak_MiB':round(peak/1048576,2) if peak else None,'limit_MiB':512,'safety_threshold_MiB':448,'headroom_MiB':round((LIMIT-peak)/1048576,2) if peak else None,'hard_cap_and_no_swap_verified':verified,'oom_kills_observed':oom,'container_oom_killed':state.get('OOMKilled'),'exit_code':state.get('ExitCode'),'timed_out':timed_out,'completed_flows':harness.get('completed_flows',len(progress.get('passed',[]))),'failed_test':progress.get('current_test'),'corpus_chunks':harness.get('corpus_chunks'),'retrieved_reference_chunks':harness.get('retrieved_reference_chunks'),'providers':'loopback synthetic only; real corpus, SDK serialization and PDF processing','observer_errors':sample_errors}
         (RESULTS/'result.json').write_text(json.dumps(report,indent=2))
-        summary=f"## Legal AI memory test: {report['status']}\n\nPeak: {report['peak_MiB']} MiB; hard limit: 512 MiB; safety threshold: 448 MiB.\n\nCompleted flows: {report['completed_flows']}/1; corpus chunks: {report['corpus_chunks']}; OOM kills: {oom}; container exit: {report['exit_code']}.\n\nSynthetic documents and loopback provider responses only. No production services or credentials used. Full evidence is attached as a three-day artifact.\n"
+        summary=f"## Legal AI memory test: {report['status']}\n\nPeak: {report['peak_MiB']} MiB; hard limit: 512 MiB; safety threshold: 448 MiB.\n\nCompleted flows: {report['completed_flows']}/13; corpus chunks: {report['corpus_chunks']}; OOM kills: {oom}; container exit: {report['exit_code']}.\n\nSynthetic documents and loopback provider responses only. No production services or credentials used. Full evidence is attached as a three-day artifact.\n"
         (RESULTS/'summary.md').write_text(summary)
         print(json.dumps(report,indent=2),flush=True)
         return 0 if passed else 1

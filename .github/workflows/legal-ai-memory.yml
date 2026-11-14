@@ -1,4 +1,4 @@
-name: Temporary Legal AI first PDF 512 MiB diagnosis
+name: Temporary Legal AI remaining flows 512 MiB test
 on:
   push:
     branches: [test/legal-ai-memory-20261114]

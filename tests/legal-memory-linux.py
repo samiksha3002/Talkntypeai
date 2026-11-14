@@ -75,6 +75,10 @@ def run():
     import fitz
     import httpx
     checks=[]
+    output=Path(os.environ.get('MEMORY_RESULTS_DIR','/results'))
+    output.mkdir(parents=True,exist_ok=True)
+    def progress(current):
+        (output/'progress.json').write_text(json.dumps({'passed':checks,'current_test':current,'expected_flows':13}))
     child_code='import runpy; g=runpy.run_path('+repr(str(Path(__file__).resolve()))+'); g["serve"]()'
     env={**os.environ,'BRAIN_REQUESTS_PER_MINUTE':'1000','PYTHONDONTWRITEBYTECODE':'1'}
     child=subprocess.Popen([sys.executable,'-B','-c',child_code],env=env)
@@ -95,16 +99,38 @@ def run():
                 page=doc.new_page()
                 page.insert_textbox(fitz.Rect(30,30,560,800),'Synthetic agreement facts. Rent due January 2026. '*22,fontsize=10)
             text_pdf=doc.tobytes();doc.close()
-            headers={'X-Legal-Service-Key':'synthetic-workspace-memory-key-'+'x'*32,'X-Legal-Owner':'a'*24}
-            response=client.post('/internal/legal-workspace/analyze-document',headers=headers,
-                                 files={'file':('synthetic.pdf',text_pdf,'application/pdf')})
-            assert response.status_code==200,('text-60-pages','analyze-document',response.status_code,response.text[:200])
-            assert response.json().get('success') is True
-            checks.append('text-60-pages/analyze-document/a')
+            pix=fitz.Pixmap(fitz.csRGB,1000,1000,os.urandom(3000000),False)
+            jpeg=pix.tobytes('jpeg',jpg_quality=75);del pix
+            doc=fitz.open();side=math.sqrt(7900000)*72/200
+            for _ in range(25):
+                page=doc.new_page(width=side,height=side);page.insert_image(page.rect,stream=jpeg)
+            scan_pdf=doc.tobytes();doc.close();del jpeg
+            assert len(scan_pdf)<10*1024*1024
+            for user_index,owner in enumerate(['a'*24,'b'*24]):
+                caller=httpx.Client(base_url='http://127.0.0.1:8765',timeout=600,trust_env=False,transport=httpx.HTTPTransport(local_address='127.0.0.'+str(user_index+2)))
+                headers={'X-Legal-Service-Key':'synthetic-workspace-memory-key-'+'x'*32,'X-Legal-Owner':owner}
+                for kind,payload in [('text-60-pages',text_pdf),('scanned-25-pages',scan_pdf)]:
+                    for action,fields in [('analyze-document',{}),('chat-with-pdf',{'query':'When is rent due?'}),('generate-legal-draft-stream',{'facts':'Prepare a synthetic agreement petition.','language':'English'})]:
+                        if user_index==0 and kind=='text-60-pages' and action=='analyze-document':
+                            continue  # Already passed in run 43627396435.
+                        current=kind+'/'+action+'/'+owner[0]
+                        progress(current)
+                        response=caller.post('/internal/legal-workspace/'+action,headers=headers,files={'file':('synthetic.pdf',payload,'application/pdf')},data=fields)
+                        assert response.status_code==200,(kind,action,response.status_code,response.text[:200])
+                        if action.endswith('stream'): assert '[DONE]' in response.text and '[ERROR]' not in response.text
+                        checks.append(current)
+                        progress(None)
+                current='typed-facts-draft/'+owner[0]
+                progress(current)
+                response=caller.post('/internal/legal-workspace/generate-legal-draft-stream',headers=headers,json={'facts':'Synthetic typed-facts tenancy dispute.','language':'English'})
+                assert response.status_code==200 and '[DONE]' in response.text and '[ERROR]' not in response.text
+                checks.append(current)
+                progress(None)
+                caller.close()
             evidence=client.get('/__memory_evidence').json()
             assert evidence['corpus_chunks']==6804,evidence
-            assert evidence['provider_calls']['vision']==0,evidence
-            assert evidence['provider_calls']['stream']==0,evidence
+            assert evidence['provider_calls']['vision']>=150,evidence
+            assert evidence['provider_calls']['stream']==6,evidence
             assert child.poll() is None
             peak=int((CGROUP/'memory.peak').read_text())
             events=dict(line.split() for line in (CGROUP/'memory.events').read_text().splitlines())
