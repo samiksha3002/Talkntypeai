@@ -1,0 +1,55 @@
+name: Temporary Legal AI 512 MiB memory test
+on:
+  push:
+    branches: [test/legal-ai-memory-20261114]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: legal-ai-memory-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  memory:
+    if: github.ref == 'refs/heads/test/legal-ai-memory-20261114'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out only Python memory-test inputs
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /TNT_BRAIN/*.py
+            /TNT_BRAIN/requirements.txt
+            /TNT_BRAIN/services/*.py
+            /TNT_BRAIN/legal_db/
+            /tests/legal-memory-linux.py
+            /tests/legal-memory.Dockerfile
+            /tests/run-legal-memory-ci.py
+      - name: Prepare result directory
+        run: mkdir -p memory-results
+      - name: Build disposable test image
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --file tests/legal-memory.Dockerfile --tag tnt-legal-memory . 2>&1 | tee memory-results/build.log
+      - name: Run hard-capped single-worker acceptance
+        run: python3 tests/run-legal-memory-ci.py
+      - name: Write PASS or FAIL and peak memory to summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f memory-results/summary.md ]; then
+            cat memory-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'FAIL: test did not produce memory evidence. See build and job logs.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain isolated test evidence for three days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legal-ai-memory-${{ github.run_id }}
+          path: memory-results/
+          retention-days: 3
+          if-no-files-found: error
