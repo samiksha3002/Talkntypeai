@@ -1,5 +1,7 @@
 """Authenticated, stateless workspace routes. Legacy document endpoints stay contained."""
 import json
+import logging
+import traceback
 import os
 import tempfile
 from pathlib import Path
@@ -9,6 +11,22 @@ from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 MAX_FILE = 10 * 1024 * 1024
+logger = logging.getLogger(__name__)
+
+def log_workspace_failure(action, error):
+    # Deliberately omit exception messages, source lines, locals and request data.
+    # Log each chained exception's type, numeric OS errno and traceback frames.
+    chain, seen = [], set()
+    while error is not None and id(error) not in seen and len(chain) < 10:
+        seen.add(id(error))
+        chain.append({
+            'type': type(error).__module__ + '.' + type(error).__name__,
+            'errno': error.errno if isinstance(error, OSError) and isinstance(error.errno, int) else None,
+            'frames': [{'file': Path(f.filename).name, 'line': f.lineno, 'function': f.name}
+                       for f in traceback.extract_tb(error.__traceback__)],
+        })
+        error = error.__cause__ or error.__context__
+    logger.error('Workspace failure action=%s sanitized_traceback=%s', action, json.dumps(chain))
 
 def text(value, maximum, name):
     if value is None: return ''
@@ -120,7 +138,9 @@ def create_workspace_router(service_factory, draft_stream):
                     yield 'data: [ERROR] Draft generation failed.\n\n'
             return StreamingResponse(tokens(),media_type='text/event-stream',headers={'Cache-Control':'no-store','X-Accel-Buffering':'no'})
         except HTTPException: raise
-        except Exception: raise HTTPException(502,'AI processing failed. Retry shortly.')
+        except Exception as error:
+            log_workspace_failure(action, error)
+            raise HTTPException(502,'AI processing failed. Retry shortly.') from None
         finally:
             if form is not None: await form.close()
     return router

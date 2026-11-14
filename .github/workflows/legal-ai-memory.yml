@@ -1,4 +1,4 @@
-name: Temporary Legal AI 512 MiB memory test
+name: Temporary Legal AI first PDF 512 MiB diagnosis
 on:
   push:
     branches: [test/legal-ai-memory-20261114]
