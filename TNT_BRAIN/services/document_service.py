@@ -127,7 +127,9 @@ class DocumentService:
                 page = pdf.load_page(page_index)
                 pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), alpha=False)
                 image_bytes = pix.tobytes("png")
+                del pix  # Release decoded RGB pixels before base64/SDK serialization.
                 encoded = base64.b64encode(image_bytes).decode("ascii")
+                del image_bytes
                 prompt = HumanMessage(content=[
                     {
                         "type": "text",
@@ -147,6 +149,7 @@ class DocumentService:
                         },
                     },
                 ])
+                del encoded  # The prompt now owns the only required image string.
                 try:
                     result = self.llm_vision.invoke([prompt])
                     content = result.content if isinstance(result.content, str) else str(result.content)
@@ -161,6 +164,8 @@ class DocumentService:
                         page_content=f"[OCR failed on page {page_index + 1}: {exc}]",
                         metadata={"page": page_index + 1, "source": "OCR-Failed"},
                     ))
+                finally:
+                    del prompt  # Do not retain the previous page during the next raster.
                 time.sleep(0.2)
         return extracted
 

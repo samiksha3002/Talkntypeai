@@ -78,7 +78,7 @@ def run():
     output=Path(os.environ.get('MEMORY_RESULTS_DIR','/results'))
     output.mkdir(parents=True,exist_ok=True)
     def progress(current):
-        (output/'progress.json').write_text(json.dumps({'passed':checks,'current_test':current,'expected_flows':13}))
+        (output/'progress.json').write_text(json.dumps({'passed':checks,'current_test':current,'expected_flows':14}))
     child_code='import runpy; g=runpy.run_path('+repr(str(Path(__file__).resolve()))+'); g["serve"]()'
     env={**os.environ,'BRAIN_REQUESTS_PER_MINUTE':'1000','PYTHONDONTWRITEBYTECODE':'1'}
     child=subprocess.Popen([sys.executable,'-B','-c',child_code],env=env)
@@ -111,8 +111,6 @@ def run():
                 headers={'X-Legal-Service-Key':'synthetic-workspace-memory-key-'+'x'*32,'X-Legal-Owner':owner}
                 for kind,payload in [('text-60-pages',text_pdf),('scanned-25-pages',scan_pdf)]:
                     for action,fields in [('analyze-document',{}),('chat-with-pdf',{'query':'When is rent due?'}),('generate-legal-draft-stream',{'facts':'Prepare a synthetic agreement petition.','language':'English'})]:
-                        if user_index==0 and kind=='text-60-pages' and action=='analyze-document':
-                            continue  # Already passed in run 43627396435.
                         current=kind+'/'+action+'/'+owner[0]
                         progress(current)
                         response=caller.post('/internal/legal-workspace/'+action,headers=headers,files={'file':('synthetic.pdf',payload,'application/pdf')},data=fields)
