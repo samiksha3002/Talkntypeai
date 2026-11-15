@@ -150,7 +150,7 @@ class DocumentService:
             page_count = min(len(pdf), int(os.getenv("OCR_MAX_PAGES", "25")))
             for page_index in range(page_count):
                 page = pdf.load_page(page_index)
-                pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), alpha=False)
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), colorspace=fitz.csGRAY, alpha=False)
                 image_bytes = pix.tobytes("png")
                 del pix  # Release decoded RGB pixels before base64/SDK serialization.
                 encoded = base64.b64encode(image_bytes).decode("ascii")
