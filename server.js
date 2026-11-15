@@ -41,6 +41,8 @@ import draftsRouter        from "./routes/draft.ready.js";
 import draftSessionRouter from "./routes/draftSession.js";
 import userDraftsRouter from "./routes/userDrafts.js";
 
+import legalWorkspaceRouter from './routes/legalWorkspace.js';
+
 connectDB();
 
 const app = express();
@@ -109,6 +111,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 installReleaseContainment(app);
 app.use("/api", apiLimiter);
+app.use("/api/legal-workspace", legalWorkspaceRouter);
 app.use(createBodyBudget());
 app.use(
   express.json({

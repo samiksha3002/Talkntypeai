@@ -4,25 +4,9 @@ import {
   Download, Maximize2, X, MessageSquare, ZoomIn, ZoomOut, RotateCw 
 } from "lucide-react";
 
-const NODE_API_URL = "https://talkntypeai.onrender.com"; 
-const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
+import { workspaceFetch } from "./workspaceClient.js";
 
-const getApiUrl = (endpoint) => {
-  const isLocal = window.location.hostname === "localhost";
-  const pythonEndpoints = [
-    "/api/generate-legal-draft",
-    "/api/ai-command",
-    "/api/chat-with-pdf",
-    "/api/analyze-document"
-  ];
-
-  if (pythonEndpoints.includes(endpoint)) {
-    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
-  }
-  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
-};
-
-const ChatWithPDF = () => {
+const ChatWithPDF = ({ onBack }) => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -32,6 +16,17 @@ const ChatWithPDF = () => {
   const [timeline, setTimeline] = useState(null);
   const [activeTab, setActiveTab] = useState("chat"); // 'chat' or 'timeline'
   const [zoom, setZoom] = useState(100);
+
+  const generation = useRef(0);
+  const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
+  useEffect(() => () => { generation.current++; }, []);
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -57,36 +52,42 @@ const ChatWithPDF = () => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
       setFile(uploadedFile);
-      setPreviewUrl(URL.createObjectURL(uploadedFile));
+      generation.current++;
+      setMessages([]); setTimeline(null); setReady(false); setError("");
       analyzeDocument(uploadedFile);
     }
   };
 
   const analyzeDocument = async (uploadedFile) => {
+    const current = generation.current;
     setIsAnalyzing(true);
     const formData = new FormData();
     formData.append("file", uploadedFile);
 
     try {
-      const response = await fetch(getApiUrl("/api/analyze-document"), {
+      const response = await workspaceFetch("/api/analyze-document", {
         method: "POST",
         body: formData,
       });
       const data = await response.json();
+      if (current !== generation.current) return;
+      if (!response.ok || !data.success) throw Error(data.detail || "PDF analysis failed.");
       if (data.success) {
+        setReady(true);
         setTimeline(data.timeline);
         setMessages([{ role: "ai", text: "Document analyzed. I've prepared a chronology in the Timeline tab." }]);
       }
     } catch (err) {
-      console.error("Analysis failed", err);
+      if (current === generation.current) setError(err.message);
     } finally {
-      setIsAnalyzing(false);
+      if (current === generation.current) setIsAnalyzing(false);
     }
   };
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !file || isLoading) return;
+    if (!input.trim() || !file || !ready || isLoading) return;
+    const current = generation.current;
 
     const userMsg = input;
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
@@ -94,31 +95,28 @@ const ChatWithPDF = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(getApiUrl("/api/chat-with-pdf"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          query: userMsg, 
-          context: timeline || "User has uploaded a document named " + file.name, 
-          history: messages.slice(-5) 
-        }),
-      });
+      const body = new FormData();
+      body.append("file", file);
+      body.append("query", userMsg);
+      body.append("history", JSON.stringify(messages.filter(m => m.role === 'user').slice(-5)));
+      const response = await workspaceFetch("/api/chat-with-pdf", { method: "POST", body });
 
       if (!response.ok) throw new Error("Backend connection failed");
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
+      if (current === generation.current) setMessages((prev) => [...prev, { role: "ai", text: data.answer }]);
     } catch (err) {
       console.error("Chat error:", err);
-      setMessages((prev) => [...prev, { role: "ai", text: "Error connecting to Legal Brain. Please ensure backend is active." }]);
+      if (current === generation.current) setError(err.message);
     } finally {
-      setIsLoading(false);
+      if (current === generation.current) setIsLoading(false);
     }
   };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
       
+      <div className="absolute top-0 left-0 z-50 bg-white"><button onClick={onBack}>Back to Legal AI Hub</button>{error && <span role="alert">{error}</span>}</div>
       {/* LEFT: PROFESSIONAL PDF VIEWPORT */}
       <div className="w-1/2 flex flex-col bg-slate-900 border-r border-slate-700 relative">
         <div className="h-14 bg-slate-800 flex items-center justify-between px-4 border-b border-slate-700">
@@ -287,11 +285,11 @@ const ChatWithPDF = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={!file ? "Please upload a document first..." : "Ask in English, हिंदी या मराठी..."}
-                  disabled={!file || isLoading}
+                  disabled={!ready || isLoading}
                   className="w-full bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 focus:bg-white py-4 pl-6 pr-14 rounded-2xl text-sm transition-all outline-none"
                 />
                 <button 
-                  disabled={!file || isLoading || !input.trim()}
+                  disabled={!ready || isLoading || !input.trim()}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:bg-slate-300 transition-all"
                 >
                   {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}

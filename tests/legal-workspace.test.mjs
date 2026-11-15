@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import { createLegalWorkspaceRouter } from '../routes/legalWorkspace.js';
+import { createDraftAuth, tokenHash } from '../middleware/draftAuth.js';
+const users=[{_id:'a'.repeat(24),role:'user',subscription:{isActive:true}},{_id:'b'.repeat(24),role:'user',subscription:{isActive:true}}];
+const tokens=['1'.repeat(64),'2'.repeat(64)];
+const sessions=tokens.map((token,i)=>({tokenHash:tokenHash(token),ownerId:users[i]._id,expiresAt:new Date(Date.now()+600000)}));
+const auth=createDraftAuth({sessions:{findOne:async q=>sessions.find(s=>s.tokenHash===q.tokenHash&&s.expiresAt>q.expiresAt.$gt)},users:{findById:async id=>users.find(u=>u._id===id)}});
+const calls=[];
+const app=express();app.use('/api/legal-workspace',createLegalWorkspaceRouter({auth,config:()=>({url:'http://127.0.0.1:8000',key:'synthetic-only-key-'.repeat(3)}),fetcher:async(url,options)=>{calls.push({url,...options});return new Response('data: synthetic draft\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})}}));app.use((err,req,res,next)=>res.status(err.status||500).json({error:'Request failed'}));
+const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base='http://127.0.0.1:'+server.address().port+'/api/legal-workspace';
+test.after(()=>server.close());
+const post=(token,body={facts:'Synthetic lease dispute'},action='generate-legal-draft-stream')=>fetch(base+'/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Legal-Owner':'f'.repeat(24),'X-Legal-Service-Key':'forged',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
+test('anonymous and forged sessions never reach Python',async()=>{for(const token of [null,'3'.repeat(64),'invalid'])assert.equal((await post(token)).status,401);assert.equal(calls.length,0)});
+test('two verified owners overwrite client-controlled upstream headers',async()=>{for(let i=0;i<2;i++){const r=await post(tokens[i]);assert.equal(r.status,200);assert.match(await r.text(),/\[DONE\]/);assert.equal(calls.at(-1).headers['X-Legal-Owner'],users[i]._id);assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(calls.at(-1).redirect,'error')}});
+test('expired session and inactive subscription are denied',async()=>{sessions[0].expiresAt=new Date(0);assert.equal((await post(tokens[0])).status,401);sessions[0].expiresAt=new Date(Date.now()+600000);users[0].subscription.isActive=false;assert.equal((await post(tokens[0])).status,403);users[0].subscription.isActive=true});
+test('only allowlisted actions can be proxied',async()=>{assert.equal((await post(tokens[0],{},'login')).status,404);assert.equal((await post(tokens[0],{facts:'x'.repeat(70000)})).status,413);assert.equal((await post(tokens[0])).status,200)});
