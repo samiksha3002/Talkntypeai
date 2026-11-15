@@ -3,7 +3,7 @@
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {pathToFileURL} from 'node:url';import {createRequire} from 'node:module';import {spawn} from 'node:child_process';
 const root=process.cwd();const require=createRequire(path.join(root,'package.json'));const express=require('express');const esbuild=require('esbuild');
 const imp=p=>import(pathToFileURL(path.join(root,p)).href);
-const {createUserDraftRouter}=await imp('routes/userDrafts.js');const {createDraftAuth,tokenHash}=await imp('middleware/draftAuth.js');const {createDraftSessionRouter}=await imp('routes/draftSession.js');
+const {createUserDraftRouter}=await imp('routes/userDrafts.js');const {createDraftAuth}=await imp('middleware/draftAuth.js');const {createDraftSessionRouter}=await imp('routes/draftSession.js');
 const {default:User}=await imp('models/user.js');const {default:Session}=await imp('models/DraftSession.js');const {default:authRoutes}=await imp('routes/auth.js');const {default:templateRouter}=await imp('routes/draft.ready.js');const {default:Template}=await imp('models/DraftTemplate.js');
 const A='000000000000000000000001',B='000000000000000000000002',T='000000000000000000000003';
 const people=[{_id:A,email:'a@example.test',password:'synthetic-password',role:'user',fullName:'Synthetic A',subscription:{isActive:true,expiryDate:new Date(Date.now()+86400000)}},{_id:B,email:'b@example.test',password:'synthetic-password',role:'user',fullName:'Synthetic B',subscription:{isActive:true,expiryDate:new Date(Date.now()+86400000)}}];
@@ -69,7 +69,7 @@ for (const method of ['getItem','setItem']) {
 
 }catch(e){record('browser harness completed: '+e.message,false)}report()})();
 `;
-const built=await esbuild.build({stdin:{contents:entry,loader:'jsx',resolveDir:root},bundle:true,write:false,format:'iife',define:{'import.meta.env.VITE_DRAFT_API_URL':JSON.stringify(origin),'process.env.NODE_ENV':JSON.stringify('production')},logLevel:'silent'});bundle=built.outputFiles[0].text;
+const built=await esbuild.build({stdin:{contents:entry,loader:'jsx',resolveDir:root},bundle:true,write:false,format:'iife',define:{'import.meta.env.VITE_DRAFT_API_URL':JSON.stringify(process.argv.includes('--general-api-only')?'':origin),'import.meta.env.VITE_API_URL':JSON.stringify(origin),'process.env.NODE_ENV':JSON.stringify('production')},logLevel:'silent'});bundle=built.outputFiles[0].text;
 const chrome='C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const args=['--headless=new','--disable-gpu','--disable-background-networking','--disable-component-update','--disable-sync','--no-first-run','--no-default-browser-check','--proxy-server=http://127.0.0.1:9','--proxy-bypass-list=127.0.0.1;localhost','--user-data-dir='+fs.mkdtempSync(path.join(os.tmpdir(),'h1-browser-profile-')),'--dump-dom','--virtual-time-budget=30000',origin+'/login'];
 const child=spawn(chrome,args,{windowsHide:true,stdio:['ignore','pipe','pipe']});let out='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',()=>{});const timer=setTimeout(()=>child.kill(),60000);await new Promise(resolve=>child.once('exit',resolve));clearTimeout(timer);server.close();

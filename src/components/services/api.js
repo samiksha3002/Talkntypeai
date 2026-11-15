@@ -1,20 +1,14 @@
 import { bookmarkRequest } from './bookmarks.js';
 import axios from 'axios';
 
-// Auto-detect: production ya local
-// Koi env var ki zaroorat nahi — window.location se pata chalta hai
-const isProduction = typeof window !== 'undefined' 
-  && !window.location.hostname.includes('localhost');
-
-const BASE_URL = isProduction
-  ? 'https://talkntypeai.onrender.com/api'
-  : 'http://localhost:5000/api';
+import { getNodeApi } from '../../nodeApi.js';
 
 const api = axios.create({
-  baseURL : BASE_URL,
   timeout : 20000,
   headers : { 'Content-Type': 'application/json' },
 });
+
+api.interceptors.request.use(async config => { config.baseURL = await getNodeApi(); return config; });
 
 api.interceptors.response.use(
   (res) => res.data,

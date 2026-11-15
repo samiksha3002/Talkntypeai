@@ -1,3 +1,4 @@
+import { findCatalogTemplate, templateTitleKey } from '../templateCatalog.js';
 import { draftRequest } from '../draftClient.js';
   import React, { useMemo, useState, useEffect } from "react";
   import { useNavigate } from "react-router-dom";
@@ -135,6 +136,7 @@ import { draftRequest } from '../draftClient.js';
     // Yahan hum Database wale drafts ko store karenge ID match karne ke liye
     const [dbDrafts, setDbDrafts] = useState([]);
     const [loadError, setLoadError] = useState("");
+    const [loading, setLoading] = useState(true);
 
     // API Call to fetch drafts from Database
     useEffect(() => {
@@ -143,26 +145,31 @@ import { draftRequest } from '../draftClient.js';
         const result = await draftRequest('/drafts/all', { publicRequest: true });
 
         if (result.success) {
+          if (!Array.isArray(result.data)) throw new Error('Template catalog returned an invalid response.');
           setDbDrafts(result.data);
         } else {
           console.error("Failed to fetch drafts:", result);
         }
       } catch (error) {
         setLoadError(error.message);
-      }
+      } finally { setLoading(false); }
     };
 
     fetchDrafts();
   }, []);
 
     const allDocuments = useMemo(() => {
-      return draftingSections.flatMap((section) =>
+      const documents = draftingSections.flatMap((section) =>
         section.documents.map((document) => ({
           document,
           section: section.title,
         }))
       );
-    }, []);
+      return [
+        ...dbDrafts.map(template => ({ document: template.title, section: template.category, template })),
+        ...documents.filter(item => !dbDrafts.some(template => templateTitleKey(template.title) === templateTitleKey(item.document))),
+      ];
+    }, [dbDrafts]);
 
     const searchResults = useMemo(() => {
       if (!search.trim()) return [];
@@ -174,19 +181,14 @@ import { draftRequest } from '../draftClient.js';
 
     // Click handler me hum title ko DB drafts se match karenge taaki _id mil sake
     const handleDocumentClick = (documentTitle) => {
-    const foundInDb = dbDrafts.find(
-      (draft) =>
-        draft.title.trim().toLowerCase() ===
-        documentTitle.trim().toLowerCase()
-    );
+    if (loading || loadError) return;
+    const foundInDb = findCatalogTemplate(dbDrafts, documentTitle);
+    if (!foundInDb) return;
 
-    if (!foundInDb) {
-      alert(
-        `"${documentTitle}" ka template abhi database mein available nahi hai.`
-      );
-      return;
-    }
+    openTemplate(foundInDb);
+  };
 
+    const openTemplate = foundInDb => {
     navigate("/draft/create?templateId=" + encodeURIComponent(foundInDb._id), {
       state: {
         documentType: foundInDb.title,
@@ -196,8 +198,14 @@ import { draftRequest } from '../draftClient.js';
     });
   };
 
+    const cardState = document => ({
+      available: !loading && !loadError && !!findCatalogTemplate(dbDrafts, document),
+      availability: loading ? 'Loading templates...' : loadError ? 'Catalog unavailable' : dbDrafts.some(template => templateTitleKey(template.title) === templateTitleKey(document)) ? 'Choose from Available Templates' : 'Template unavailable',
+    });
     return (
       <div className="draft-page">
+        {loading && <p role="status">Loading available templates...</p>}
+        {!loading && !loadError && !dbDrafts.length && <p role="status">No templates are currently available. Your saved drafts are still accessible in My Drafts.</p>}
         {loadError && <p role="alert">{loadError} <button onClick={() => window.location.reload()}>Retry</button></p>}
         {/* TOP HEADER */}
         <header className="draft-topbar">
@@ -228,6 +236,11 @@ import { draftRequest } from '../draftClient.js';
           </div>
         </section>
 
+        {!loading && !loadError && dbDrafts.length > 0 && <section className="draft-section">
+          <h3>Available Templates</h3>
+          <div className="document-grid">{dbDrafts.map(template => <DocumentCard key={template._id}
+            available={/^[a-f0-9]{24}$/i.test(template._id || '')} availability="Template unavailable" document={template.title} section={template.category} onClick={() => openTemplate(template)} />)}</div>
+        </section>}
         {/* SEARCH */}
         <div className="draft-search">
           <span className="search-icon">⌕</span>
@@ -259,9 +272,11 @@ import { draftRequest } from '../draftClient.js';
                 {searchResults.map((item, index) => (
                   <DocumentCard
                     key={`${item.document}-${index}`}
+                    {...cardState(item.document)}
+                    available={item.template ? /^[a-f0-9]{24}$/i.test(item.template._id || '') : cardState(item.document).available}
                     document={item.document}
                     section={item.section}
-                    onClick={handleDocumentClick}
+                    onClick={item.template ? () => openTemplate(item.template) : handleDocumentClick}
                   />
                 ))}
               </div>
@@ -291,6 +306,7 @@ import { draftRequest } from '../draftClient.js';
                   return (
                     <DocumentCard
                       key={`${document}-${index}`}
+                      {...cardState(document)}
                       document={document}
                       section={section?.title}
                       mostUsed
@@ -332,6 +348,7 @@ import { draftRequest } from '../draftClient.js';
                       .map((document, index) => (
                         <DocumentCard
                           key={`${document}-${index}`}
+                          {...cardState(document)}
                           document={document}
                           section={section.title}
                           onClick={handleDocumentClick}
@@ -347,10 +364,12 @@ import { draftRequest } from '../draftClient.js';
     );
   }
 
-  function DocumentCard({ document, section, mostUsed, onClick }) {
+  function DocumentCard({ document, section, mostUsed, onClick, available, availability }) {
     return (
       <button
         className="draft-document-card"
+        disabled={!available}
+        title={available ? 'Open template' : availability}
         onClick={() => onClick(document, section)}
       >
         <div className="document-left">
@@ -359,6 +378,7 @@ import { draftRequest } from '../draftClient.js';
           </div>
           <div className="document-content">
             <h4>{document}</h4>
+            {!available && <span>{availability}</span>}
             <div className="document-meta">
               {mostUsed && <span className="most-used-badge">Most Used</span>}
               {!mostUsed && <span>{section || "Legal Document"}</span>}

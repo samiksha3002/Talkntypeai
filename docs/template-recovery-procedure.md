@@ -1,0 +1,16 @@
+# Missing legal template recovery - operator procedure, not executed
+
+This procedure is separate from the frontend hotfix. No database was contacted or changed. Repository evidence cannot establish production template presence: old routing could have prevented the catalog from loading at all.
+
+`routes/draft.ready.js` lists every DraftTemplate regardless of status and retrieves one by Mongo _id. `seedTemplates.js` loads .env, connects using generic URI variables and upserts/overwrites records by slug. Its four entries are Rent Agreement, Payment Legal Notice, Regular Bail Application and Civil Suit. It has no anticipatory bail content. **Do not run seedTemplates.js or npm run seed:templates as this repair:** it cannot create the missing template and can overwrite customized templates. Status draft does not hide a record from the current public list.
+
+After explicit production-data approval and a verified backup/restore checkpoint, an authorized database operator may follow this separately reviewed procedure:
+
+1. Verify the corrected catalog at the intended Node origin. Distinguish outage, empty catalog and a genuinely missing/ambiguous title. Existing user drafts do not require a replacement template to list/load.
+2. Privately verify the intended database and preserve a template snapshot/export with original _ids, slugs, titles and bodies. Do not send credentials or exports to chat. Inspect only relevant metadata within the approved scope. If the correct record exists, preserve it and investigate listing/title/duplicates instead of inserting another.
+3. Obtain professionally reviewed, approved Anticipatory Bail Application content for the applicable jurisdiction/court/language. Prepare one versioned record with title, stable slug `anticipatory-bail-application`, correct category and nonempty templateBody/content. Never substitute Regular Bail Application or generate unreviewed legal text. Treat insertion as immediately visible because current listing ignores publication status.
+4. Validate the approved record against the current model in the already isolated test database, using fresh synthetic records only. Review placeholders, formatting, ID-based load and authenticated draft save/reload. Record the expected slug/title/body checksum and rollback dependencies separately. This task supplies no legal content and authorizes no production seed.
+5. During the separately authorized production operation, recheck that neither the approved slug nor normalized title exists. Stop on a match, duplicate, identity ambiguity, content mismatch or missing backup. Insert exactly one new record with approved operator tooling. Do not use an upsert, replacement, bulk operation or blanket seed. Retain its assigned _id and redacted operation evidence.
+6. Run approved synthetic catalog/create/save/load smoke checks against that ID. Preserve existing template IDs and drafts. If new drafts reference the inserted ID, do not delete it blindly during rollback; obtain a reviewed content/availability correction preserving references and newer writes.
+
+If existing content needs modification instead, stop and obtain a separate exact-_id review and backup. Historical ownership/password migrations and provider restoration must not be bundled into template recovery.

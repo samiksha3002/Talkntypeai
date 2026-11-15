@@ -402,3 +402,4 @@
     grid-template-columns: 1fr;
   }
 }
+.draft-document-card:disabled { opacity: .6; cursor: not-allowed; }

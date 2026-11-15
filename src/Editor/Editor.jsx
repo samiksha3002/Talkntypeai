@@ -1,3 +1,4 @@
+import { getNodeOrigin } from '../nodeApi.js';
 import { insertSpeech } from './speech.js';
 import { convertEditorFont, requestFontConversion } from './fontConversion.js';
   import React, { useState, useEffect, useRef } from "react";
@@ -37,19 +38,13 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     const [scannerFile, setScannerFile] = useState(null);
     
 
-    // 🌐 API Base URL
-    const [API_BASE_URL, setApiBaseUrl] = useState(
-      import.meta.env.VITE_API_URL || "http://localhost:5000"
-    );
-
-    // Load Config
+    const [API_BASE_URL, setApiBaseUrl] = useState(null);
+    const [apiError, setApiError] = useState('');
     useEffect(() => {
-      fetch("/config.json")
-        .then((res) => res.json())
-        .then((cfg) => {
-          if (cfg.API_URL) setApiBaseUrl(cfg.API_URL);
-        })
-        .catch((err) => console.error("Failed to load config.json", err));
+      let active = true;
+      getNodeOrigin().then(base => { if (active) setApiBaseUrl(base); })
+        .catch(error => { if (active) setApiError(error.message); });
+      return () => { active = false; };
     }, []);
 
     // 🎤 Speech Append Logic
@@ -83,7 +78,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     // 🌐 Translation Effect
     useEffect(() => {
       const runTranslation = async () => {
-        if (!translationCommand?.textToTranslate || !translationCommand?.lang) return;
+        if (!translationCommand?.textToTranslate || !translationCommand?.lang || !API_BASE_URL) return;
         
         try {
           setIsTranslating(true); // Triggers Global Loading
@@ -118,7 +113,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     // ✍️ Transliteration Effect
     useEffect(() => {
       const runTransliteration = async () => {
-        if (!transliterationCommand) return;
+        if (!transliterationCommand || !API_BASE_URL) return;
         
         try {
           setIsTransliterating(true); // Triggers Global Loading
@@ -153,7 +148,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
 
     // H3: whitespace-safe, atomic Delta conversion.
 useEffect(() => {
-  if (!fontConvertCommand?.font || !quillRef.current) return;
+  if (!fontConvertCommand?.font || !quillRef.current || !API_BASE_URL) return;
   let active = true;
   const controller = new AbortController();
   const editor = quillRef.current.getEditor();
@@ -227,6 +222,7 @@ const handleInsertScannedText = (scannedText) => {
         <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden min-h-0">
           
           {/* Editor Toolbar - Passes Setters to Buttons */}
+          {apiError && <p role="alert">{apiError}</p>}
           <EditorActions
             manualText={manualText}
             setManualText={setManualText}

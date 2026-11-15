@@ -1,8 +1,10 @@
 import { clearDraftRecovery } from './draftRecovery.js';
-import { draftRequest, storeDraftSession } from './draftClient.js';
+import { createDraftClient, getDraftSession, storeDraftSession } from './draftClient.js';
+import { getNodeApi } from '../../nodeApi.js';
 export function logoutDraftSession() {
-  // Start revocation with the current token, then clear it locally immediately.
-  const request = draftRequest('/user-drafts/logout', { method: 'POST' });
+  // Capture before async API resolution; clear local access immediately.
+  const token = getDraftSession();
+  const request = token ? getNodeApi().then(base => createDraftClient({ base, token: () => token })('/user-drafts/logout', { method: 'POST' })) : Promise.resolve();
   clearDraftRecovery();
   storeDraftSession(null);
   return request.catch(() => {});

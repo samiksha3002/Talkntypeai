@@ -1,11 +1,6 @@
 import { clearDraftRecovery } from './draftRecovery.js';
-export function resolveDraftApi(base) {
-  if (!base) throw new Error('Configure VITE_DRAFT_API_URL for the Express API before using drafts.');
-  const url = new URL(base);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Draft API requires HTTPS (except local development).');
-  if (url.username || url.password || url.search || url.hash) throw new Error('Invalid draft API configuration.');
-  return url.href.replace(/\/$/, '').replace(/\/api$/, '') + '/api';
-}
+import { getNodeApi, normalizeNodeApi } from '../../nodeApi.js';
+export const resolveDraftApi = normalizeNodeApi;
 export const SESSION_KEY = 'tnt_draft_session';
 export const SESSION_STORAGE_MESSAGE = 'Secure draft session storage is unavailable. Enable session storage and sign in again. Your unsaved text has been kept.';
 let storageUnavailable = false;
@@ -54,7 +49,12 @@ export function createDraftClient({ base, fetcher = (...args) => fetch(...args),
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', abort); }
   };
 }
-export const draftRequest = (...args) => createDraftClient({ base: import.meta.env?.VITE_DRAFT_API_URL })(...args);
+export const draftRequest = async (path, options = {}) => {
+  const session = options.publicRequest ? null : readDraftSession();
+  const base = await getNodeApi();
+  if (!options.publicRequest && readDraftSession() !== session) throw new Error('Your session changed. Sign in again. Your unsaved text has been kept.');
+  return createDraftClient({ base, token: () => session })(path, options);
+};
 export function validDocument(d) {
   return d && /^[a-f0-9]{24}$/i.test(d._id) && /^[a-f0-9]{24}$/i.test(d.templateId) &&
     typeof d.title === 'string' && typeof d.content === 'string' && Number.isSafeInteger(d.revision) && d.revision > 0;
