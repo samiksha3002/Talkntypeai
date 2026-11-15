@@ -1,8 +1,10 @@
 import base64
+import ctypes
 import gc
 import logging
 import os
 import shutil
+import sys
 import threading
 import time
 import uuid
@@ -17,6 +19,29 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
+
+
+def _release_raster_memory():
+    """Return disposable OCR/raster buffers to the OS, without lowering image quality.
+
+    OCR is the dominant transient allocation on 512-MiB Linux instances. MuPDF
+    caches and glibc freed arenas can accumulate across scanned pages even after
+    a Pixmap has been deleted. This runs only after the page/prompt are released.
+    """
+    try:
+        fitz.TOOLS.store_shrink(100)
+    except (AttributeError, RuntimeError):
+        logger.debug('MuPDF cache shrink unavailable', exc_info=True)
+    gc.collect()
+    if sys.platform == 'linux':
+        try:
+            malloc_trim = ctypes.CDLL(None).malloc_trim
+            malloc_trim.argtypes = [ctypes.c_size_t]
+            malloc_trim.restype = ctypes.c_int
+            malloc_trim(0)
+        except (AttributeError, OSError):
+            # Works without glibc, including non-Linux developer machines.
+            pass
 
 
 class DocumentService:
@@ -166,6 +191,12 @@ class DocumentService:
                     ))
                 finally:
                     del prompt  # Do not retain the previous page during the next raster.
+                    del page
+                    # Keep the *same* lossless PNG and OCR resolution; reclaim
+                    # native raster caches before processing the next page.
+                    if 'result' in locals():
+                        del result
+                    _release_raster_memory()
                 time.sleep(0.2)
         return extracted
 

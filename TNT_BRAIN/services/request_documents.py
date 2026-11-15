@@ -8,7 +8,7 @@ from services.document_service import DocumentService
 
 class RequestDocuments(DocumentService):
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(model='text-embedding-3-small',request_timeout=45,max_retries=0)
+        self.embeddings = OpenAIEmbeddings(model='text-embedding-3-small',request_timeout=45,max_retries=0,chunk_size=32)
         self.llm_vision = ChatOpenAI(model='gpt-4o-mini',temperature=0,max_tokens=3000,timeout=45,max_retries=0)
         self.llm_answer = ChatOpenAI(model='gpt-4o',temperature=0.2,max_tokens=2500,timeout=45,max_retries=0)
         self.llm_timeline = ChatOpenAI(model='gpt-4o',temperature=0,max_tokens=3000,timeout=45,max_retries=0)
