@@ -1,4 +1,5 @@
 // H3: convert text only; Quill owns whitespace, embeds and block attributes.
+import { conversionUnavailable } from '../../utils/legacyFontSupport.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 export async function convertFontDelta(delta, conversionType, request) {
   // Never convert halves of a Unicode character independently across style runs.
@@ -71,6 +72,11 @@ export async function requestFontConversion(baseUrl, text, conversionType, { fet
   return result.convertedText;
 }
 export async function convertEditorFont(editor, conversionType, request, { isCurrent = () => true, fallbackRange } = {}) {
+  const unavailable = conversionUnavailable(conversionType);
+  if (unavailable) throw new Error(unavailable);
+  if (['unicode-to-krutidev', 'mangal-to-krutidev'].includes(conversionType)) {
+    return convertKrutiSelection(editor, conversionType, request, { isCurrent, fallbackRange });
+  }
   const original = copy(editor.getContents());
   const result = await convertFontDelta(original, conversionType, request);
   if (!isCurrent()) return false;
@@ -86,5 +92,77 @@ export async function convertEditorFont(editor, conversionType, request, { isCur
     'unicode-to-shivaji': '"Shivaji01", sans-serif', 'unicode-to-preeti': 'Preeti, sans-serif' };
   if (fonts[conversionType]) editor.root.style.fontFamily = fonts[conversionType];
   else if (['krutidev-to-unicode','shivaji-to-unicode','mangal-to-unicode'].includes(conversionType)) editor.root.style.fontFamily = '';
+  return true;
+}
+
+// The placeholder is CSS, not a Delta operation. Never change the root font:
+// KrutiDev reinterprets Latin letters, including English and Quill's hint.
+async function convertKrutiSelection(editor, type, request, { isCurrent, fallbackRange }) {
+  const document = editor.getContents();
+  const original = copy(document);
+  const range = copy(editor.getSelection() || fallbackRange || { index: 0, length: 0 });
+  const text = original.ops.map(op => typeof op.insert === 'string' ? op.insert : '\ufffc').join('');
+  const start = range.length ? range.index : 0;
+  const end = range.length ? range.index + range.length : text.length;
+  const boundaries = new Set([0, text.length]);
+  if (typeof Intl.Segmenter === 'function') {
+    for (const part of new Intl.Segmenter('hi', { granularity: 'grapheme' }).segment(text)) boundaries.add(part.index);
+  } else {
+    for (let index = 1; index < text.length; index++) {
+      if (!/[\p{M}\u200c\u200d]/u.test(text[index]) && text[index - 1] !== '\u094d') boundaries.add(index);
+    }
+  }
+  let position = 0;
+  for (const op of original.ops) {
+    position += typeof op.insert === 'string' ? op.insert.length : 1;
+    if (!boundaries.has(position)) throw new Error('Formatting splits a character cluster. Keep each character together and retry; your document was kept.');
+  }
+  if (!range.length) {
+    if (/[\u0900-\u097f\ua8e0-\ua8ff]/u.test(text)) throw new Error('Select the text you want to convert to KrutiDev. Your document was kept.');
+    return false;
+  }
+  if (!boundaries.has(start) || !boundaries.has(end)) throw new Error('Selection splits a character cluster. Select the whole character and retry; your document was kept.');
+  const ops = [], changes = [], cache = new Map();
+  position = 0;
+  for (const op of original.ops) {
+    const length = typeof op.insert === 'string' ? op.insert.length : 1;
+    if (typeof op.insert !== 'string' || position >= end || position + length <= start) {
+      ops.push(copy(op)); position += length; continue;
+    }
+    const left = Math.max(0, start - position), right = Math.min(length, end - position);
+    const append = (insert, attributes = op.attributes) => { if (insert) ops.push({ insert, ...(attributes ? { attributes: copy(attributes) } : {}) }); };
+    append(op.insert.slice(0, left));
+    const selected = op.insert.slice(left, right);
+    let cursor = 0;
+    for (const match of selected.matchAll(/[\u0900-\u097f\ua8e0-\ua8ff]+(?:[\u200c\u200d][\u0900-\u097f\ua8e0-\ua8ff]+)*/gu)) {
+      append(selected.slice(cursor, match.index));
+      if (!cache.has(match[0])) cache.set(match[0], convertFontDelta({ ops: [{ insert: match[0] }] }, type, request));
+      const result = await cache.get(match[0]);
+      const converted = result.delta.ops.map(part => part.insert).join('');
+      append(converted, { ...op.attributes, font: 'krutidev' });
+      changes.push({ index: position + left + match.index, before: match[0].length, after: converted.length });
+      cursor = match.index + match[0].length;
+    }
+    append(selected.slice(cursor)); append(op.insert.slice(right));
+    position += length;
+  }
+  if (!isCurrent() || !changes.length) return false;
+  if (JSON.stringify(editor.getContents()) !== JSON.stringify(original)) throw new Error('The document changed during conversion. Your edits were kept. Please retry.');
+  const Delta = document.constructor;
+  const patch = document.diff(new Delta(ops));
+  editor.history.cutoff();
+  editor.updateContents(patch, 'user');
+  editor.history.cutoff();
+  const mapIndex = index => {
+    let shift = 0;
+    for (const change of changes) {
+      if (index < change.index) break;
+      if (index <= change.index + change.before) return change.index + shift + Math.round((index - change.index) * change.after / change.before);
+      shift += change.after - change.before;
+    }
+    return index + shift;
+  };
+  const mappedStart = Math.min(mapIndex(range.index), editor.getLength() - 1);
+  editor.setSelection(mappedStart, Math.max(0, Math.min(mapIndex(range.index + range.length), editor.getLength() - 1) - mappedStart), 'silent');
   return true;
 }

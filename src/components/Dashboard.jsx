@@ -1,6 +1,6 @@
-import { readEditorAutosave, writeEditorAutosave } from '../Editor/editorAutosave.js';
+import { restoreEditorAutosave, createEditorAutosave, bindEditorAutosaveLifecycle } from '../Editor/editorAutosave.js';
 import { speechEvent } from "../Editor/speech.js";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 // Layout Components
 import DashboardNavbar from "../components/DashboardNavbar";
@@ -39,9 +39,17 @@ const LoadingOverlay = ({ message }) => (
 
 const Dashboard = () => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const [initialAutosave] = useState(() => readEditorAutosave(localStorage, user._id));
+  const [ownerId] = useState(user._id);
+  const [initialAutosave] = useState(() => restoreEditorAutosave({ storage: () => localStorage, recoveryStorage: () => sessionStorage, ownerId }));
   const [editorContent, setEditorContent] = useState(initialAutosave.html);
   const [rootFontFamily, setRootFontFamily] = useState(initialAutosave.fontFamily);
+  const [saveStatus, setSaveStatus] = useState(initialAutosave.readError ? 'read-error' : initialAutosave.recovered ? 'error' : 'idle');
+  const mounted = useRef(true), autosave = useRef(null);
+  if (!autosave.current) autosave.current = createEditorAutosave({
+    storage: () => localStorage, recoveryStorage: () => sessionStorage, ownerId, initial: initialAutosave,
+    canWrite: () => JSON.parse(localStorage.getItem('user') || '{}')._id === ownerId,
+    onStatus: status => { if (mounted.current) setSaveStatus(status); },
+  });
   const [speechEvents, setSpeechEvents] = useState([]);
   
   // --- ✨ STEP 3: VIEW STATE ✨ ---
@@ -62,13 +70,26 @@ const Dashboard = () => {
 
   // --- AUTO-SAVE ---
   useEffect(() => {
-    if (user._id && editorContent) {
-      const timer = setTimeout(() => {
-        writeEditorAutosave(localStorage, user._id, editorContent, rootFontFamily);
-      }, 1000); 
-      return () => clearTimeout(timer);
+    mounted.current = true;
+    const unbind = bindEditorAutosaveLifecycle(autosave.current, window, document);
+    return () => { mounted.current = false; unbind(); };
+  }, []);
+
+  const updateRootFont = useCallback(font => {
+    autosave.current.stage(autosave.current.snapshot.html, font); setRootFontFamily(font);
+  }, []);
+  const flushNavigation = event => {
+    if (event.target.closest('footer button, a[href]') && !autosave.current.flush()) {
+      event.preventDefault(); event.stopPropagation();
+      setSaveStatus(initialAutosave.readError ? 'read-error' : 'error');
     }
-  }, [editorContent, rootFontFamily, user._id]);
+  };
+  const downloadRecovery = () => {
+    const { html, fontFamily } = autosave.current.snapshot;
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ version: 1, ownerId, html, fontFamily })], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'TalknType-editor-recovery.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const isGlobalLoading = isTranslating || isTransliterating || isConverting || isOCRLoading || isAudioLoading || isAIGenerating;
 
@@ -112,11 +133,12 @@ const Dashboard = () => {
   };
 
   const updateEditorContent = useCallback((newContent) => {
-    setEditorContent(newContent);
+    const html = typeof newContent === 'function' ? newContent(autosave.current.snapshot.html) : newContent;
+    autosave.current.stage(html); setEditorContent(html);
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden font-sans relative">
+    <div className="h-screen flex flex-col bg-white overflow-hidden font-sans relative" onClickCapture={flushNavigation}>
       
       {isGlobalLoading && <LoadingOverlay message={getLoadingMessage()} />}
 
@@ -124,6 +146,12 @@ const Dashboard = () => {
       <header className="flex-none h-16 shadow-sm z-50 bg-white border-b border-gray-200">
         <DashboardNavbar />
       </header>
+
+      {(saveStatus === 'error' || saveStatus === 'read-error') ? <div role="alert" className="bg-amber-50 p-3 text-amber-900">
+        {saveStatus === 'read-error' ? 'Saved work could not be read. Saving is paused to protect it. Download your recent work before reloading.' : 'Recent work has NOT been saved to this browser. Keep this page open, retry saving, or download a recovery copy.'}
+        <button type="button" onClick={() => autosave.current.flush()} className="underline mx-3">Retry saving</button>
+        <button type="button" onClick={downloadRecovery} className="underline">Download recovery copy</button>
+      </div> : <div role="status" data-editor-autosave className="text-xs px-3">{saveStatus === 'saved' ? 'Saved to this browser' : saveStatus === 'pending' ? 'Unsaved changes — saving…' : 'Autosave ready'}</div>}
 
       {/* ---------- MAIN CONTENT ---------- */}
       <div className="flex flex-1 overflow-hidden">
@@ -151,7 +179,7 @@ const Dashboard = () => {
               onSpeechConsumed={handleSpeechConsumed}
               manualText={editorContent}
               rootFontFamily={rootFontFamily}
-              onRootFontChange={setRootFontFamily}
+              onRootFontChange={updateRootFont}
               setManualText={updateEditorContent}
               user={user}
               transliterationCommand={transliterationCommand}

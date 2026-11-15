@@ -623,6 +623,8 @@ const EditorTextarea = ({
 
           value={manualText}
 
+          useSemanticHTML={false}
+
           onChange={setManualText}
 
           modules={modules}

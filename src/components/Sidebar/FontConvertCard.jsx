@@ -9,8 +9,8 @@ import React, { useState } from "react";
 // Sirf ye 3 options — as requested
 const FONT_OPTIONS = [
   { id: "unicode-to-krutidev", label: "KrutiDev" },
-  { id: "unicode-to-shivaji",  label: "Shivaji"  },
-  { id: "unicode-to-preeti",   label: "Preeti"   },
+  { id: "unicode-to-shivaji", label: "Shivaji01 (unavailable)", disabled: true },
+  { id: "unicode-to-preeti", label: "Preeti (unavailable)", disabled: true },
 ];
 
 export default function FontConvertCard({ editorText = "", onFontConvert, isConverting }) {
@@ -57,9 +57,11 @@ export default function FontConvertCard({ editorText = "", onFontConvert, isConv
         }}
       >
         {FONT_OPTIONS.map(o => (
-          <option key={o.id} value={o.id}>Unicode → {o.label}</option>
+          <option key={o.id} value={o.id} disabled={o.disabled}>Mangal / Unicode → {o.label}</option>
         ))}
       </select>
+
+      <p className="text-xs text-gray-500 mb-2">Preeti and Shivaji01 need verified mappings and font-use rights. Those conversions are paused; existing saved text is retained.</p>
 
       {plainLen > 0 && (
         <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>

@@ -41,6 +41,16 @@ const commandPairs = [
   ['at the rate', '@'], ['et da ret', '@'],
   ['comma', ','], ['alpviram', ','], ['swalpviram', ','],
   ['colon', ':'], ['apurna viram', ':'], ['apurnaviram', ':'],
+  ['नया पैराग्राफ', '\n\n'], ['नया अनुच्छेद', '\n\n'], ['नवीन परिच्छेद', '\n\n'], ['नवा परिच्छेद', '\n\n'],
+  ['नई पंक्ति', '\n'], ['नई लाइन', '\n'], ['नवीन ओळ', '\n'], ['नवी ओळ', '\n'],
+  ['पूर्ण विराम', '.'], ['पूर्णविराम', '.'],
+  ['अल्प विराम', ','], ['अल्पविराम', ','], ['स्वल्प विराम', ','], ['स्वल्पविराम', ','],
+  ['प्रश्नवाचक चिन्ह', '?'], ['प्रश्नवाचक चिह्न', '?'], ['प्रश्नचिन्ह', '?'], ['प्रश्न चिन्ह', '?'],
+  ['विस्मयादिबोधक', '!'], ['विस्मयादिबोधक चिन्ह', '!'], ['विस्मयादिबोधक चिह्न', '!'],
+  ['विस्मयबोधक चिन्ह', '!'], ['आश्चर्यवाचक', '!'], ['आश्चर्यवाचक चिन्ह', '!'], ['उद्गारवाचक चिन्ह', '!'],
+  ['अपूर्ण विराम', ':'], ['अपूर्णविराम', ':'], ['कोलन', ':'],
+  ['अर्ध विराम', ';'], ['अर्धविराम', ';'],
+  ['डैश', '-'], ['डॅश', '-'], ['स्लैश', '/'], ['स्लॅश', '/'],
 ];
 const commands = new Map(commandPairs);
 const phrasePattern = [...commands.keys()].sort((a,b)=>b.length-a.length)
@@ -50,11 +60,14 @@ export function processSpeech(text) {
   let output = '', cursor = 0, trimNext = false;
   const append = value => { output += trimNext ? value.replace(/^[ \t]+/g, '') : value; trimNext = false; };
   text.replace(commandPattern, (match, boundary, phrase, offset) => {
+    // Quoted command names are ordinary dictated text, not instructions.
+    const next = text[offset + match.length];
+    if (/^["'“‘]$/.test(boundary) && /^["'”’]$/.test(next || '')) return match;
     append(text.slice(cursor, offset) + boundary);
     const symbol = commands.get(phrase.toLowerCase().replace(/[ \t]+/g, ' '));
-    if (/^[\n,.?!:@]/.test(symbol)) output = output.replace(/[ \t]+$/g, '');
+    if (/^[\n,.?!:;@/\-]/.test(symbol)) output = output.replace(/[ \t]+$/g, '');
     // Providers may punctuate the command itself ("full stop."). Keep that mark once.
-    if (!(symbol.length === 1 && /[,.?!:@]/.test(symbol) && text[offset + match.length] === symbol)) output += symbol;
+    if (!(symbol.length === 1 && /[,.?!:;@/\-]/.test(symbol) && (next === symbol || (symbol === '.' && next === '।')))) output += symbol;
     trimNext = symbol.startsWith('\n');
     cursor = offset + match.length;
     return match;

@@ -8,6 +8,19 @@ test('M8 ordered and bulleted list numbering and indentation remain paragraph pr
 test('M8 empty and explicit blank paragraphs retained, terminal Quill newline not duplicated',async()=>{assert.equal(deltaBlocks({ops:[{insert:'\n'}]}).length,1);const {doc}=await xml(deltaBlocks({ops:[{insert:'A\n\nB\n'}]}));assert.equal((doc.match(/<w:p>/g)||[]).length,3);assert.equal(deltaBlocks({ops:[]}).length,1);});
 test('M8 long DOCX has every paragraph once and A4 pagination configuration',async()=>{const text=Array.from({length:300},(_,i)=>'Unique paragraph '+i+' '+unicode);const {doc}=await xml(deltaBlocks({ops:[{insert:text.join('\n')+'\n'}]}));for(const value of text)assert.equal(doc.split('>'+value+'<').length-1,1);assert.equal((doc.match(/<w:p>/g)||[]).length,300);assert.ok(doc.includes('w:w="11906"'));assert.ok(doc.includes('w:h="16838"'));});
 test('M8 font names and pixel sizes map without touching conversion mappings',()=>{assert.equal(fontName('krutidev'),'KrutiDev');assert.equal(fontName('times-new-roman'),'Times New Roman');assert.equal(fontPoints('16px'),12);assert.equal(fontPoints('large'),18);assert.equal(fontPoints('bad'),12);});
+
+test('KrutiDev and Unicode runs retain distinct fonts and formatting in exported Word',async()=>{
+  const blocks=deltaBlocks({ops:[{insert:'English '},{insert:'ueLrs',attributes:{font:'krutidev',bold:true}},{insert:' '+unicode},{insert:'\n',attributes:{align:'center'}}]});
+  const before=JSON.stringify(blocks),{doc}=await xml(blocks);
+  assert.ok(doc.includes('w:ascii="KrutiDev"'));assert.ok(doc.includes('w:hAnsi="KrutiDev"'));assert.ok(doc.includes('ueLrs'));assert.ok(doc.includes(unicode));assert.ok(doc.includes('w:val="center"'));assert.equal(JSON.stringify(blocks),before);
+});
+
+test('unavailable Preeti export fails explicitly without replacing or erasing saved text',async()=>{
+  const blocks=deltaBlocks({ops:[{insert:'Existing Preeti text\n',attributes:{font:'Preeti'}}]});const before=JSON.stringify(blocks);
+  await assert.rejects(wordBlob(blocks),/Preeti is unavailable/);
+  await assert.rejects(wordBlob(deltaBlocks({ops:[{insert:'Retained text\n'}]}),{font:'Preeti'}),/Preeti is unavailable/);
+  assert.equal(JSON.stringify(blocks),before);
+});
 test('M8 unsupported embeds fail explicitly rather than dropping content',()=>{assert.throws(()=>deltaBlocks({ops:[{insert:'Text'},{insert:{image:'data:image/png;base64,synthetic'}}]}),/unsupported embeds/);});
 test('M8 snapshot does not mutate editor Delta and fails safely when missing',()=>{const delta={ops:[{insert:'Text\n'}]};const snapshot=exportSnapshot({getContents:()=>delta});snapshot.blocks[0].runs[0].attributes.bold=true;assert.equal(delta.ops[0].attributes,undefined);assert.throws(()=>exportSnapshot(null),/not ready/);});
 test('M8 PDF ToUnicode text layer extracts exact English and Devanagari without embedded proprietary font',async()=>{const text='English '+unicode;const pdf=await PDFDocument.create();pdf.addPage([595,842]);addPdfTextLayer(pdf,[{glyphs:[...new Intl.Segmenter('hi',{granularity:'grapheme'}).segment(text)].map((part,index)=>({text:part.segment,x:20+index*12,y:30,width:12,height:18}))}]);const loader=getDocument({data:Uint8Array.from(await pdf.save()),isEvalSupported:false});try{const parsed=await loader.promise;const extracted=(await(await parsed.getPage(1)).getTextContent()).items.map(item=>item.str).join('');assert.equal(extracted,text);}finally{await loader.destroy();}});

@@ -23,7 +23,7 @@ let phase='main';
 const reloadStage=sessionStorage.getItem('release-reload');
 if(reloadStage){
  await wait(()=>document.querySelector('.ql-editor')&&q().getText()==='ueLrs\n');
- record('Release','real page reload '+reloadStage+' restores KrutiDev text and root font',q().root.style.fontFamily==='KrutiDev, sans-serif');
+ record('Release','real page reload '+reloadStage+' restores KrutiDev text and inline font',!q().root.style.fontFamily&&q().getFormat(0,1).font==='krutidev');
  if(reloadStage==='1'){sessionStorage.setItem('release-reload','2');location.reload();return;}
  for(const [name,html,text] of [
   ['English','<p><strong>English document</strong></p><p><br></p><p>Second paragraph</p>','English document\n\nSecond paragraph\n'],
@@ -51,7 +51,7 @@ rec.onresult({resultIndex:0,results:[webResult('unfinished',false)]});await slee
 const finals=[webResult('yes'),webResult('yes'),webResult('new line finished')];rec.onresult({resultIndex:0,results:finals});rec.onresult({resultIndex:0,results:finals});await wait(()=>q().getText().includes('finished'));record('H2','web batches and repeated finals preserve words without replay',q().getText()==='yes yes\nfinished\n');
 rec.pendingFinal={resultIndex:3,results:[...finals,webResult('stop final')]};click('Stop Speaking');await wait(()=>q().getText().includes('stop final'));record('H2','native stop-time final transcript is retained',q().getText().includes('stop final'));
 await setText('typed text');q().formatText(0,5,{bold:true},'user');await sleep(40);record('Editor','ordinary user typing and toolbar-equivalent formatting still work',q().getText()==='typed text\n'&&q().getFormat(0,5).bold===true);
-const word='\u0928\u092e\u0938\u094d\u0924\u0947';q().setContents({ops:[{insert:word,attributes:{bold:true}},{insert:'\n',attributes:{header:2}},{insert:'\n'},{insert:word,attributes:{italic:true}},{insert:'\n',attributes:{align:'center'}}]},'user');await sleep(50);click('Convert Font');await wait(()=>q().getText().includes('ueLrs'));await sleep(50);
+const word='\u0928\u092e\u0938\u094d\u0924\u0947';q().setContents({ops:[{insert:word,attributes:{bold:true}},{insert:'\n',attributes:{header:2}},{insert:'\n'},{insert:word,attributes:{italic:true}},{insert:'\n',attributes:{align:'center'}}]},'user');await sleep(50);q().setSelection(0,q().getLength()-1);q().blur();click('Convert Font');await wait(()=>q().getText().includes('ueLrs'));await sleep(50);
 record('H3','conversion preserves blank paragraphs and text order',q().getText()==='ueLrs\n\nueLrs\n');const ops=q().getContents().ops;record('H3','real Quill retains bold italic heading and alignment',ops.some(op=>op.attributes?.bold)&&ops.some(op=>op.attributes?.italic)&&ops.some(op=>op.attributes?.header===2)&&ops.some(op=>op.attributes?.align==='center'));
 const requests=await api('/__requests');record('H3','API receives no whitespace-only or newline requests',requests.length>0&&requests.every(r=>r.text.trim()&&!/[\r\n]/.test(r.text)));record('H3','repeated identical styled text shares one conversion request',requests.length===1);
 q().insertText(q().getLength()-1,' ordinary typing','user');q().formatText(0,5,{underline:true},'user');await sleep(30);record('Editor','typing and formatting remain usable after conversion',q().getText().includes('ordinary typing')&&q().getFormat(0,5).underline===true);
@@ -64,16 +64,16 @@ fixtureRoot.unmount();
 fixtureRoot=createRoot(document.getElementById('root'));mountDashboard();
 await wait(()=>document.querySelector('.ql-editor')&&q().getText()===convertedText);
 record('Release','dashboard remount restores converted text and inline formatting',q().getFormat(0,5).underline===true);
-record('Release','dashboard remount retains converted legacy root font',!!convertedFont&&q().root.style.fontFamily===convertedFont);
+record('Release','dashboard remount retains converted inline font without changing root',q().root.style.fontFamily===convertedFont&&q().getFormat(0,1).font==='krutidev');
 await setText(word);
 let release;const gate=new Promise(resolve=>{release=resolve});
-const running=convertEditorFont(q(),'unicode-to-krutidev',async()=>{await gate;return 'ueLrs'});
+q().setSelection(0,word.length);const running=convertEditorFont(q(),'unicode-to-krutidev',async()=>{await gate;return 'ueLrs'});
 q().insertText(0,'new typing ','user');const newer=JSON.stringify(q().getContents());release();
 let rejected=false;try{await running}catch(error){rejected=error.message.includes('document changed')}
 record('H3','async conversion refuses to overwrite newer Quill edits',rejected&&JSON.stringify(q().getContents())===newer);
 // Exercise two actual document reloads, not just component remounts.
-phase='convert before reload';await setText(word);click('Convert Font');await wait(()=>q().getText()==='ueLrs\n'&&q().root.style.fontFamily==='KrutiDev, sans-serif');
-phase='persist before reload';await wait(()=>{const meta=JSON.parse(localStorage.getItem('autosave_font_000000000000000000000001')||'null');return meta?.html===localStorage.getItem('autosave_000000000000000000000001')&&meta?.fontFamily==='KrutiDev, sans-serif'&&(()=>{const saved=document.createElement('div');saved.innerHTML=meta.html;return saved.textContent==='ueLrs'})()});
+phase='convert before reload';await setText(word);q().setSelection(0,word.length);q().blur();click('Convert Font');await wait(()=>q().getText()==='ueLrs\n'&&!q().root.style.fontFamily&&q().getFormat(0,1).font==='krutidev');
+phase='persist before reload';await wait(()=>{const html=localStorage.getItem('autosave_000000000000000000000001')||'';const saved=document.createElement('div');saved.innerHTML=html;return saved.textContent==='ueLrs'&&!!saved.querySelector('.ql-font-krutidev')});
 sessionStorage.setItem('release-reload','1');location.reload();return;
 
 

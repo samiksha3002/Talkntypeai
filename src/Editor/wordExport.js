@@ -2,7 +2,7 @@ import {Document,Packer,Paragraph,TextRun,HeadingLevel,AlignmentType,LevelFormat
 import {fontName,fontPoints,validateBlocks} from './exportModel.js';
 
 export async function wordBlob(blocks,{font='Times New Roman',size=12}={}){
-  validateBlocks(blocks);
+  validateBlocks(blocks,{font});
   let sequence=0,previousOrdered=false;const config=[];
   const children=blocks.map(block=>{
     const attrs=block.attributes||{},heading=Number(attrs.header)||0;

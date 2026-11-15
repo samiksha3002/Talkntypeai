@@ -22,6 +22,7 @@
   import express from "express";
 
   import { convert, SUPPORTED_CONVERSIONS } from "../utils/fontConverterUtils.js";
+  import { conversionUnavailable } from '../utils/legacyFontSupport.js';
 
   const router = express.Router();
 
@@ -30,6 +31,8 @@
   /* ------------------------------------------------------------------ */
 
   function runConversion(conversionType, req, res) {
+    const unavailable = conversionUnavailable(conversionType);
+    if (unavailable) return res.status(503).json({ success: false, error: unavailable });
     const { text } = req.body;
 
     // Validate input
@@ -84,7 +87,7 @@
   /* ------------------------------------------------------------------ */
 
   router.get("/supported", (_req, res) => {
-    const supported = Object.entries(SUPPORTED_CONVERSIONS).map(([key, val]) => ({
+    const supported = Object.entries(SUPPORTED_CONVERSIONS).filter(([key]) => !conversionUnavailable(key)).map(([key, val]) => ({
       id: key,
       label: val.label,
     }));
@@ -106,6 +109,7 @@
       });
     }
 
+    if (conversionUnavailable(conversionType)) return runConversion(conversionType, req, res);
     if (!SUPPORTED_CONVERSIONS[conversionType]) {
       return res.status(400).json({
         success: false,

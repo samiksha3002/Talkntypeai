@@ -4,6 +4,8 @@ import axios from "axios";
 import { Save, Printer, Mic, Trash2, FileUp, FileText } from "lucide-react"; 
 import { fixGrammar, expandText, uploadOCR, uploadAudio, uploadPDF } from "./editor.api";
 import { exportDocument } from "./exportDownload.js";
+import { exportSnapshot } from './exportDownload.js';
+import { validateBlocks } from './exportModel.js';
 
 // 🔴 NAYA IMPORT: DOCX library for perfectly formatted Word Export
 
@@ -80,6 +82,8 @@ const EditorActions = ({
 
   // --- 🖨️ Handle Print ---
   const handlePrint = () => {
+    try { const { blocks, defaults } = exportSnapshot(quillRef?.current?.getEditor()); validateBlocks(blocks, defaults); }
+    catch (error) { setExportError(error.message); return; }
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <html>

@@ -1,3 +1,4 @@
+import { legacyFontUnavailable } from '../../utils/legacyFontSupport.js';
 export const exportFonts = {
   'times-new-roman':'Times New Roman', 'courier-new':'Courier New', arial:'Arial',
   georgia:'Georgia', verdana:'Verdana', devanagari:'Nirmala UI', krutidev:'KrutiDev',
@@ -27,7 +28,10 @@ export function deltaBlocks(delta) {
   return blocks;
 }
 export const blockText=block=>block.runs.map(run=>run.text).join('');
-export function validateBlocks(blocks){
+export function validateBlocks(blocks,{font}={}){
   if(!Array.isArray(blocks)||!blocks.length)throw Error('The document is empty or unavailable.');
+  for (const family of [font, ...blocks.flatMap(block => block.runs.map(run => run.attributes?.font))]) {
+    const unavailable = legacyFontUnavailable(family); if (unavailable) throw Error(unavailable);
+  }
   for(const block of blocks){if(block.attributes?.['code-block']||block.attributes?.blockquote)throw Error('Code blocks and quotations require a reviewed export template. Convert them to paragraphs in a copy before exporting.');}
 }

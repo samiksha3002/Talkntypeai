@@ -50,12 +50,14 @@ export function measureExportLines(element){
   });
 }
 export async function pdfBlob(blocks,{font='Times New Roman',size=12,signal,onPage}={}){
-  validateBlocks(blocks);
+  validateBlocks(blocks,{font});
   if(typeof Intl.Segmenter!=='function')throw Error('This browser needs an update to safely export Unicode PDF text.');
   const host=document.createElement('div');Object.assign(host.style,{position:'fixed',left:'-100000px',top:'0',width:WIDTH+'px',background:'white',color:'black',zIndex:'-1'});
   const measure=document.createElement('div');measure.style.width=WIDTH-2*MARGIN+'px';host.appendChild(measure);document.body.appendChild(host);
   try{
     const counters=[];for(const block of blocks)measure.appendChild(paragraph(block,{font,size},counters));
+    // Force layout/font discovery before measuring or rasterizing legacy glyphs.
+    measure.getBoundingClientRect();
     await document.fonts.ready;signal?.throwIfAborted();
     const units=[...measure.children].flatMap(measureExportLines),left=measure.getBoundingClientRect().left;
     const records=[];let record={units:[],glyphs:[],height:0};records.push(record);
