@@ -62,6 +62,7 @@ const allowedOrigins = [
   // Existing typo/alternate domain kept intentionally
   "https://talkntpe.pro",
   "https://www.talkntpe.pro",
+  "https://talkntypeai-az58un8no-samikshas-projects-5c4b8930.vercel.app",
 ];
 
 const corsOptions = {
