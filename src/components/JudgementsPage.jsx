@@ -136,7 +136,7 @@ const SUBJECTS = [
   'Administrative Law','Service Law','Insurance','Arbitration',
   'Consumer Protection','Land Acquisition',
 ];
-const YEARS = Array.from({ length: 40 }, (_, i) => String(2025 - i));
+const FIRST_YEAR = 1986;
 const QUICK_TAGS = [
   'anticipatory bail','section 498A','fundamental rights','article 21',
   'divorce maintenance','property dispute','income tax refund','habeas corpus',
@@ -147,6 +147,8 @@ function AdvancedFilters({ onSearch, onClose }) {
   const [q, setQ]           = useState('');
   const [court, setCourt]   = useState('');
   const [year, setYear]     = useState('');
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: Math.max(0, currentYear - FIRST_YEAR + 1) }, (_, i) => String(currentYear - i));
   const [subject, setSubject] = useState('');
   const [bench, setBench]   = useState('');
 
@@ -184,7 +186,7 @@ function AdvancedFilters({ onSearch, onClose }) {
           </select>],
           ['Year', <select style={sel} value={year} onChange={e => setYear(e.target.value)}>
             <option value="">All Years</option>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>],
           ['Subject', <select style={sel} value={subject} onChange={e => setSubject(e.target.value)}>
             <option value="">All Subjects</option>

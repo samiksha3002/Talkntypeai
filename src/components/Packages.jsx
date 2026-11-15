@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 
 const PLANS = [
@@ -305,13 +306,14 @@ const Packages = () => {
                 Full access for {plan.duration} {plan.unit.toLowerCase()}
               </div>
 
-              <button
+              <Link
+                to={`/register?plan=${encodeURIComponent(plan.id)}`}
                 className="pkg-btn"
                 aria-label={`Get started with the ${plan.duration} ${plan.unit} plan`}
               >
                 Get Started
                 <ArrowUpRight size={16} strokeWidth={2} />
-              </button>
+              </Link>
             </div>
           </div>
         ))}

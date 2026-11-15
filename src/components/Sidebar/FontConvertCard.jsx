@@ -5,6 +5,9 @@
  */
 
 import React, { useState } from "react";
+import { legacyFontPreviewEnabled } from '../../Editor/legacyFontPreview.js';
+import { conversionUnavailable } from '../../../utils/legacyFontSupport.js';
+const previewEnabled = legacyFontPreviewEnabled(import.meta.env);
 
 // Sirf ye 3 options — as requested
 const FONT_OPTIONS = [
@@ -23,6 +26,8 @@ export default function FontConvertCard({ editorText = "", onFontConvert, isConv
       setError("⚠️ Editor mein pehle kuch text likhiye.");
       return;
     }
+    const unavailable = conversionUnavailable(selected);
+    if (unavailable) { setError(unavailable); return; }
     setError("");
     if (typeof onFontConvert === "function") onFontConvert(selected);
   };
@@ -56,12 +61,18 @@ export default function FontConvertCard({ editorText = "", onFontConvert, isConv
           cursor: isConverting ? "not-allowed" : "pointer",
         }}
       >
-        {FONT_OPTIONS.map(o => (
+        {FONT_OPTIONS.filter(o => !o.disabled || previewEnabled).map(o => (
           <option key={o.id} value={o.id} disabled={o.disabled}>Mangal / Unicode → {o.label}</option>
         ))}
       </select>
 
       <p className="text-xs text-gray-500 mb-2">Preeti and Shivaji01 need verified mappings and font-use rights. Those conversions are paused; existing saved text is retained.</p>
+
+      {previewEnabled && <div role="note" className="text-xs text-amber-800 mb-2">
+        Private preview readiness only: conversion and export remain blocked.
+        {FONT_OPTIONS.filter(o => o.disabled).map(o => <p key={o.id}>{conversionUnavailable(o.id)}</p>)}
+        Use disposable sample documents. This flag does not validate mappings or grant font rights.
+      </div>}
 
       {plainLen > 0 && (
         <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>

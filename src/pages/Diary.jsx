@@ -142,8 +142,8 @@ const Diary = () => {
       },
       {
         id: 3,
-        title: "Import Cases from eCourt",
-        desc: "Redirect to eCourt website.",
+        title: "Open eCourts Website",
+        desc: "Open the external eCourts portal in a new tab.",
         icon: <RefreshCw className="w-6 h-6 text-purple-400" />,
         path: "https://ecourts.gov.in/ecourts_home/",
         isExternal: true, 

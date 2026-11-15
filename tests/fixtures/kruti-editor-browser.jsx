@@ -43,8 +43,8 @@ mount();
     const loaded=await document.fonts.load('16px KrutiDev');
     check('bundled KrutiDev font actually loads for rendering',loaded.length>0&&loaded.every(font=>font.status==='loaded'));
     const option=document.querySelector('option[value="unicode-to-preeti"]');
-    check('unavailable Preeti is visibly disabled',option?.disabled&&option.textContent.includes('unavailable'));
-    check('unverified Shivaji01 is visibly disabled',document.querySelector('option[value="unicode-to-shivaji"]')?.disabled);
+    check('unavailable Preeti is not offered outside private preview',!option);
+    check('unverified Shivaji01 is not offered outside private preview',!document.querySelector('option[value="unicode-to-shivaji"]'));
     const snapshot=exportSnapshot(q()),beforeExport=JSON.stringify(q().getContents());
     for(const [name,blob] of [['font.pdf',await pdfBlob(snapshot.blocks,snapshot.defaults)],['font.docx',await wordBlob(snapshot.blocks,snapshot.defaults)]]){
       const response=await fetch('/font-artifacts/'+name,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:blob});
