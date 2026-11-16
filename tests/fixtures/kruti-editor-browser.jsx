@@ -90,9 +90,10 @@ mount();
   check('legitimate saved Start Typing text is preserved',q().getText()==='Start Typing\n'&&!q().root.style.fontFamily);
   q().setContents({ops:[{insert:'Start Typing ',attributes:{italic:true}},{insert:word,attributes:{bold:true}},{insert:' English '+word},{insert:'\n',attributes:{align:'center'}}]},'user');
   await sleep(50);q().setSelection(0,0);
-  const unselected=JSON.stringify(q().getContents());let needsSelection=false;
-  try{await convertEditorFont(q(),'unicode-to-krutidev',()=>{throw Error('Unselected document sent')})}catch(error){needsSelection=error.message.startsWith('Select the text')}
-  check('no selection leaves the entire existing document untouched',needsSelection&&JSON.stringify(q().getContents())===unselected);
+  const unselected=JSON.stringify(q().getContents());
+  await convertEditorFont(q(),'unicode-to-krutidev',text=>{if(text!==word)throw Error('Non-Devanagari submitted');return 'ueLrs'});
+  check('no selection converts all Devanagari while preserving English and root font',q().getText()==='Start Typing ueLrs English ueLrs\n'&&!q().root.style.fontFamily);
+  q().history.undo();check('whole-document conversion undo restores original content and formatting',JSON.stringify(q().getContents())===unselected);
   await sleep(50);q().setSelection(13,word.length);q().blur();await sleep(40);
   const before=JSON.stringify(q().getContents()), historyBefore=q().history.stack.undo.length;
   [...document.querySelectorAll('button')].find(button=>button.textContent.includes('Convert Font')).click();

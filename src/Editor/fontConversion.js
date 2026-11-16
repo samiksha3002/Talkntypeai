@@ -1,5 +1,6 @@
 // H3: convert text only; Quill owns whitespace, embeds and block attributes.
 import { conversionUnavailable } from '../../utils/legacyFontSupport.js';
+import { defaultTypingFont } from './editorInput.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 export async function convertFontDelta(delta, conversionType, request) {
   // Never convert halves of a Unicode character independently across style runs.
@@ -117,10 +118,7 @@ async function convertKrutiSelection(editor, type, request, { isCurrent, fallbac
     position += typeof op.insert === 'string' ? op.insert.length : 1;
     if (!boundaries.has(position)) throw new Error('Formatting splits a character cluster. Keep each character together and retry; your document was kept.');
   }
-  if (!range.length) {
-    if (/[\u0900-\u097f\ua8e0-\ua8ff]/u.test(text)) throw new Error('Select the text you want to convert to KrutiDev. Your document was kept.');
-    return false;
-  }
+  // A collapsed caret targets the document; an expanded range targets selection.
   if (!boundaries.has(start) || !boundaries.has(end)) throw new Error('Selection splits a character cluster. Select the whole character and retry; your document was kept.');
   const ops = [], changes = [], cache = new Map();
   position = 0;
@@ -146,7 +144,11 @@ async function convertKrutiSelection(editor, type, request, { isCurrent, fallbac
     append(selected.slice(cursor)); append(op.insert.slice(right));
     position += length;
   }
-  if (!isCurrent() || !changes.length) return false;
+  if (!isCurrent()) return false;
+  if (!changes.length) {
+    if (!range.length) defaultTypingFont(editor, range, 'user');
+    return false;
+  }
   if (JSON.stringify(editor.getContents()) !== JSON.stringify(original)) throw new Error('The document changed during conversion. Your edits were kept. Please retry.');
   const Delta = document.constructor;
   const patch = document.diff(new Delta(ops));
@@ -164,5 +166,6 @@ async function convertKrutiSelection(editor, type, request, { isCurrent, fallbac
   };
   const mappedStart = Math.min(mapIndex(range.index), editor.getLength() - 1);
   editor.setSelection(mappedStart, Math.max(0, Math.min(mapIndex(range.index + range.length), editor.getLength() - 1) - mappedStart), 'silent');
+  if (!range.length) defaultTypingFont(editor, { index: mappedStart, length: 0 }, 'user');
   return true;
 }

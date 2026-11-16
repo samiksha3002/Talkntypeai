@@ -168,7 +168,8 @@ useEffect(() => {
     .then(applied => { if (applied && active) {
       onRootFontChange(editor.root.style.fontFamily);
       lastSelectionRef.current = editor.getSelection() || lastSelectionRef.current;
-      setManualText(editor.root.innerHTML);
+      // Quill's onChange already staged the conversion. The restored caret may
+      // contain a temporary cursor blot; never serialize it back as document HTML.
     } })
     .catch(error => { if (active) alert('Font conversion failed: ' + error.message); })
     .finally(() => { if (active) { setIsConverting(false); setFontConvertCommand(null); } });

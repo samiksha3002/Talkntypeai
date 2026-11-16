@@ -86,6 +86,46 @@ try {
   await check('empty placeholder is Latin and absent from document text',`q().getText()==='\\n' && q().root.dataset.placeholder==='Start typing or speaking...' && !getComputedStyle(q().root,'::before').fontFamily.includes('KrutiDev')`);
   await input('Normal English');
   await check('typing after clearing converted content defaults to Latin',`q().getText()==='Normal English\\n' && q().getFormat(0,1).font!=='krutidev'`);
+  for (const selected of [true, false]) {
+    const mode = selected ? 'selection' : 'whole document';
+    await evaluate(`q().setContents({ops:[{insert:'English ',attributes:{italic:true}},{insert:'अर्ज',attributes:{bold:true}},{insert:' tail '},{insert:'मराठी',attributes:{underline:true}},{insert:'\\n',attributes:{align:'right'}}]},'user');q().history.cutoff();q().setSelection(${selected ? '8,4' : '12,0'},'user');q().blur()`);
+    const original = await evaluate('JSON.stringify(q().getContents())');
+    const historyLength = await evaluate('q().history.stack.undo.length');
+    await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Convert Font')).click()`);
+    const expected = selected ? 'English vtZ tail मराठी\n' : 'English vtZ tail ejkBh\n';
+    for(let i=0;i<100;i++){if(await evaluate(`q().getText()===${JSON.stringify(expected)}`))break;await sleep(50);}
+    await check(mode+' converts only the intended Marathi runs and preserves English',`q().getText()===${JSON.stringify(expected)} && !q().getFormat(0,1).font && !q().getFormat(11,1).font && q().getFormat(8,3).font==='krutidev' && q().getFormat(17,1).font===${selected ? 'undefined' : "'krutidev'"} && !q().root.style.fontFamily`);
+    if(await evaluate('window.__alerts.length'))throw Error(mode+': '+await evaluate('window.__alerts.join("; ")'));
+    await check(mode+' preserves inline formatting, paragraph formatting and mapped cursor',`q().getFormat(0,1).italic && q().getFormat(8,3).bold && q().getFormat(17,1).underline && q().getFormat(0,1).align==='right' && q().getSelection()?.index===${selected ? 8 : 11} && q().getSelection()?.length===${selected ? 3 : 0}`);
+    const converted = await evaluate('JSON.stringify(q().getContents())');
+    await check(mode+' adds exactly one undo step',`q().history.stack.undo.length===${historyLength+1}`);
+    if (!selected) {
+      await input(' English');
+      await check('typing immediately after whole-document conversion stays Latin and bold',`q().getText().startsWith('English vtZ English tail') && q().getFormat(11,8).font!=='krutidev' && q().getFormat(11,8).bold`);
+      await evaluate('q().history.undo()');
+      await check('undoing subsequent typing retains whole-document conversion',`JSON.stringify(q().getContents())===${JSON.stringify(converted)}`);
+    }
+    await evaluate('q().history.undo()');
+    await check(mode+' undo restores exact original text and formatting',`JSON.stringify(q().getContents())===${JSON.stringify(original)}`);
+    await evaluate('q().history.redo()');
+    await check(mode+' redo restores exact converted text and formatting',`JSON.stringify(q().getContents())===${JSON.stringify(converted)}`);
+    // Redo may restore a different cursor; repeat conversion at a collapsed caret
+    // to check idempotence and pending typing font in whole-document mode.
+    if (!selected) {
+      await evaluate(`q().setSelection(11,0,'user');q().blur()`);
+      await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Convert Font')).click()`);
+      await sleep(150);
+      await check('repeated whole-document conversion keeps bytes and undo history',`JSON.stringify(q().getContents())===${JSON.stringify(converted)} && q().history.stack.undo.length===${historyLength+1}`);
+      await evaluate(`q().focus();q().setSelection(11,0,'silent')`);
+      await input(' English');
+      await check('whole-document conversion leaves future English typing Latin',`q().getText().startsWith('English vtZ English tail') && q().getFormat(11,8).font!=='krutidev' && !q().root.style.fontFamily`);
+    }
+    await evaluate(`window.dispatchEvent(new Event('pagehide'))`);
+    const persisted = await evaluate('JSON.stringify(q().getContents())');
+    await send('Page.reload');
+    for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('.ql-editor') && q().getText().includes('vtZ')`))break;await sleep(50);}
+    await check(mode+' autosave reload preserves exact mixed text and formatting',`JSON.stringify(q().getContents())===${JSON.stringify(persisted)} && !q().root.style.fontFamily`);
+  }
   // Seed an old root-font autosave in this disposable browser only.
   await evaluate(`window.dispatchEvent(new Event('pagehide'));localStorage.setItem('autosave_'+owner,'<h2><strong>ueLrs</strong></h2><p><span class="ql-font-arial">English</span></p>');localStorage.setItem('autosave_font_'+owner,JSON.stringify({version:1,html:localStorage.getItem('autosave_'+owner),fontFamily:'KrutiDev, sans-serif'}))`);
   await send('Page.reload');
@@ -102,7 +142,7 @@ try {
   await send('Page.reload');
   for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('.ql-editor') && q().getText()==='\\n'`))break;await sleep(50);}
   await check('empty historical autosave restores a Latin placeholder without invented content',`q().getText()==='\\n' && !q().root.style.fontFamily && !getComputedStyle(q().root,'::before').fontFamily.includes('KrutiDev')`);
-  if(requests.length!==1 || requests[0].text!=='\u0928\u092e\u0938\u094d\u0924\u0947' || paths.some(p=>p.includes('transliterat')))throw Error('Unexpected conversion/transliteration request');
+  if(JSON.stringify(requests.map(r=>r.text))!==JSON.stringify(['नमस्ते','अर्ज','अर्ज','मराठी']) || paths.some(p=>p.includes('transliterat')))throw Error('Unexpected conversion/transliteration request');
   console.log(`${results.filter(r=>r.pass).length} PASS; ${results.filter(r=>!r.pass).length} FAIL`);
   if(results.some(r=>!r.pass))throw Error('Browser regression failure');
 } catch(error) { console.error(error.message); process.exitCode=1; }

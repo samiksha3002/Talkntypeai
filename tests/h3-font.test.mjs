@@ -6,7 +6,7 @@ import {convertFontDelta,convertEditorFont,requestFontConversion} from '../src/E
 import fontRouter from '../routes/fontConvert.js';
 import {convert,SUPPORTED_CONVERSIONS} from '../utils/fontConverterUtils.js';
 const clone=x=>JSON.parse(JSON.stringify(x));
-function quill(delta){return {delta:clone(delta),range:{index:0,length:0},root:{style:{}},writes:0,history:{cutoff(){}},getContents(){return new Delta(clone(this.delta).ops)},getSelection(){return this.range},getLength(){return this.delta.ops.reduce((n,op)=>n+(typeof op.insert==='string'?op.insert.length:1),0)},setContents(d){this.delta=clone(d);this.writes++},updateContents(d){this.delta=clone(this.getContents().compose(d));this.writes++},setSelection(index,length){this.range={index,length}}}}
+function quill(delta){return {delta:clone(delta),range:{index:0,length:0},root:{style:{}},writes:0,history:{cutoff(){}},getContents(){return new Delta(clone(this.delta).ops)},getSelection(){return this.range},getFormat(range){return this.getContents().slice(Math.max(0,range.index-1),Math.max(1,range.index)).ops[0]?.attributes || {}},format(name,value){this.typingFormat={...this.typingFormat,[name]:value}},getLength(){return this.delta.ops.reduce((n,op)=>n+(typeof op.insert==='string'?op.insert.length:1),0)},setContents(d){this.delta=clone(d);this.writes++},updateContents(d){this.delta=clone(this.getContents().compose(d));this.writes++},setSelection(index,length){this.range={index,length}}}}
 const words='\u0928\u092e\u0938\u094d\u0924\u0947';
 test('H3 whitespace-only Delta operations make zero requests and preserve attributes',async()=>{const delta={ops:[{insert:'\n',attributes:{align:'center'}},{insert:' \t\u00a0\n\n'}]};const r=await convertFontDelta(delta,'test',()=>assert.fail('whitespace request'));assert.deepEqual(r.delta,delta)});
 test('H3 meaningful text converts while separate paragraph/list formatting survives',async()=>{const delta={ops:[{insert:words,attributes:{bold:true}},{insert:'\n',attributes:{header:2}},{insert:'\n'},{insert:words,attributes:{italic:true}},{insert:'\n',attributes:{list:'bullet'}}]};const calls=[];const r=await convertFontDelta(delta,'unicode-to-krutidev',async text=>{calls.push(text);return 'ueLrs'});assert.equal(calls.length,1);assert.deepEqual(r.delta.ops.map(op=>op.attributes),delta.ops.map(op=>op.attributes));assert.equal(r.delta.ops.map(op=>op.insert).join(''),'ueLrs\n\nueLrs\n')});
@@ -43,15 +43,46 @@ test('Kruti selected conversion rejects an in-flight edit',async()=>{
   assert.equal(q.writes,0);assert.equal(q.delta.ops[0].insert,'new typing\n');
 });
 
-test('Kruti requires a selection and supports the remembered range after toolbar blur',async()=>{
+test('Kruti supports the remembered selection after toolbar blur',async()=>{
   const q=quill({ops:[{insert:'Start Typing '+words+' English '+words+'\n',attributes:{italic:true}}]});
-  await assert.rejects(convertEditorFont(q,'unicode-to-krutidev',()=>assert.fail('unselected conversion')),/Select the text/);
-  assert.equal(q.writes,0);
   q.range=null;const calls=[];
   await convertEditorFont(q,'unicode-to-krutidev',async text=>{calls.push(text);return 'ueLrs'},{fallbackRange:{index:13,length:words.length}});
   assert.deepEqual(calls,[words]);assert.equal(q.delta.ops.map(op=>op.insert).join(''),'Start Typing ueLrs English '+words+'\n');
   const old=quill({ops:[{insert:words+'\n'}]});old.range={index:0,length:words.length};old.root.style.fontFamily='KrutiDev, sans-serif';
   await convertEditorFont(old,'unicode-to-krutidev',async()=> 'ueLrs');assert.equal(old.root.style.fontFamily,'KrutiDev, sans-serif');
+});
+
+test('Kruti collapsed or absent selection converts all Devanagari, maps caret and defaults future typing to Latin',async()=>{
+  for(const mode of ['caret','blurred','absent']){
+    const q=quill({ops:[{insert:'English ',attributes:{italic:true}},{insert:'अर्ज',attributes:{bold:true}},{insert:' tail मराठी'},{insert:'\n',attributes:{align:'right'}}]});
+    q.range=mode==='caret'?{index:12,length:0}:null;
+    const calls=[];
+    await convertEditorFont(q,'unicode-to-krutidev',async(text,type)=>{calls.push(text);return convert(type,text)},mode==='blurred'?{fallbackRange:{index:12,length:0}}:{});
+    assert.deepEqual(calls,['अर्ज','मराठी']);
+    assert.equal(q.delta.ops.map(op=>op.insert).join(''),'English vtZ tail ejkBh\n');
+    assert.equal(q.delta.ops[0].attributes.font,undefined);
+    assert.deepEqual(q.delta.ops[1].attributes,{bold:true,font:'krutidev'});
+    assert.equal(q.delta.ops.at(-1).attributes.align,'right');
+    assert.deepEqual(q.range,{index:mode==='absent'?0:11,length:0});
+    if(mode!=='absent')assert.equal(q.typingFormat.font,false);
+    assert.equal(q.root.style.fontFamily,undefined);
+    const saved=q.getContents(),writes=q.writes;
+    assert.equal(await convertEditorFont(q,'unicode-to-krutidev',()=>assert.fail('already converted')),false);
+    assert.deepEqual(q.getContents(),saved);assert.equal(q.writes,writes);
+  }
+});
+
+test('Kruti whole-document failure, cancellation and in-flight edits never commit a partial conversion',async()=>{
+  for(const mode of ['failure','cancel','edit']){
+    const q=quill({ops:[{insert:'English अर्ज tail मराठी\n'}]});q.range={index:12,length:0};
+    const before=q.getContents();let calls=0;
+    const request=async(text,type)=>{calls++;if(calls===2){if(mode==='failure')throw Error('offline');if(mode==='edit')q.delta={ops:[{insert:'new English typing\n'}]}}return convert(type,text)};
+    q.history.cutoff=()=>assert.fail('history touched');
+    if(mode==='cancel')assert.equal(await convertEditorFont(q,'unicode-to-krutidev',request,{isCurrent:()=>false}),false);
+    else await assert.rejects(convertEditorFont(q,'unicode-to-krutidev',request),mode==='failure'?/offline/:/document changed/);
+    assert.equal(q.writes,0);assert.deepEqual(q.range,{index:12,length:0});
+    assert.deepEqual(q.getContents(),mode==='edit'?new Delta([{insert:'new English typing\n'}]):before);
+  }
 });
 
 test('Kruti failure and cancellation leave the document, selection and history untouched',async()=>{
