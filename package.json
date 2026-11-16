@@ -11,7 +11,10 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed:templates": "node seedTemplates.js"
+    "seed:templates": "node seedTemplates.js",
+    "ocr:provision": "node scripts/provision-ocr.mjs",
+    "ocr:check": "node scripts/check-ocr.mjs",
+    "prebuild": "npm run ocr:provision && npm run ocr:check"
   },
   "dependencies": {
     "@anthro-ai/krutidev-unicode": "^0.1.0",
@@ -61,7 +64,8 @@
     "react-speech-recognition": "^4.0.0",
     "regenerator-runtime": "^0.14.1",
     "tesseract.js": "^7.0.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@napi-rs/canvas": "0.1.80"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
