@@ -1,5 +1,6 @@
 import { getNodeOrigin } from '../nodeApi.js';
 import { insertSpeech } from './speech.js';
+import { restoreKrutiRootFont, defaultTypingFont } from './editorInput.js';
 import { convertEditorFont, requestFontConversion } from './fontConversion.js';
   import React, { useState, useEffect, useRef } from "react";
   import EditorActions from "./EditorActions";
@@ -50,12 +51,20 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     // 🎤 Speech Append Logic
   useEffect(() => {
     const editor = quillRef.current?.getEditor();
-    if (editor) editor.root.style.fontFamily = rootFontFamily || '';
-  }, [rootFontFamily]);
+    if (!editor) return;
+    editor.root.lang = 'en';
+    if (restoreKrutiRootFont(editor, rootFontFamily)) {
+      onRootFontChange('');
+      setManualText(editor.root.innerHTML);
+    } else editor.root.style.fontFamily = rootFontFamily || '';
+  }, [rootFontFamily, onRootFontChange, setManualText]);
   useEffect(() => {
     const editor = quillRef.current?.getEditor();
     if (!editor) return;
-    const rememberSelection = range => { if (range) lastSelectionRef.current = { ...range }; };
+    const rememberSelection = (range, previous, source) => {
+      if (range) lastSelectionRef.current = { ...range };
+      defaultTypingFont(editor, range, source);
+    };
     editor.on('selection-change', rememberSelection);
     return () => editor.off('selection-change', rememberSelection);
   }, []);

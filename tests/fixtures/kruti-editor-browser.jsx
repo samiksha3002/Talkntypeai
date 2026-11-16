@@ -78,7 +78,7 @@ mount();
     root.unmount();
     localStorage.setItem(key,legacy);localStorage.setItem('autosave_font_'+owner,JSON.stringify({version:1,html:legacy,fontFamily:'KrutiDev, sans-serif'}));
     root=createRoot(document.getElementById('root'));mount();await wait(()=>document.querySelector('.ql-editor'));await sleep(80);
-    check('old root-font autosave remains recoverable without migration',q().getText()==='ueLrs\nExisting saved draft\n'&&q().root.style.fontFamily==='KrutiDev, sans-serif'&&q().getFormat(0,3).bold);
+    check('old root-font autosave keeps text and glyphs using inline formatting',q().getText()==='ueLrs\nExisting saved draft\n'&&!q().root.style.fontFamily&&q().getFormat(0,3).font==='krutidev'&&q().getFormat(0,3).bold);
     check('restoring old draft does not erase its stored HTML',localStorage.getItem(key)===legacy);
     report();return;
   }
