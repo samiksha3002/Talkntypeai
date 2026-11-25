@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { getDraftSession } from "./Features/LegalHubMain/draftClient.js";
+import { apiBase } from "./apiAuth.js";
 
 // GLOBAL CONTEXT PROVIDERS
 import { CaseProvider } from "./context/CaseContext";
@@ -86,8 +87,8 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   // Define API URL and userId here so they are available for routes
-  // This uses Vite env variable if available, otherwise defaults to localhost
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  // VITE_API_URL in production builds (required); loopback only in the dev server.
+  const API_URL = apiBase();
   
   // Safely get user ID from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");

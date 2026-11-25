@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import express from 'express';
 import { createAuth, tokenHash } from '../middleware/auth.js';
 import { createApiGuard, createUserLimiters, isPaid, loginLimiter } from '../middleware/apiGuard.js';
-import { isOwnApi, installApiAuth, attachAxiosAuth } from '../src/apiAuth.js';
+import { isOwnApi, installApiAuth, attachAxiosAuth, apiOrigins, apiBase } from '../src/apiAuth.js';
+import { buildEnvProblems, assertProductionBuildEnv } from '../scripts/check-build-env.mjs';
 
 const ids = { active: '0000000000000000000000a1', expired: '0000000000000000000000a2', pending: '0000000000000000000000a3', admin: '0000000000000000000000a4', other: '0000000000000000000000a5' };
 const accounts = {
@@ -97,7 +98,11 @@ test('frontend: the JWT is attached only to our own API, never to other hosts', 
   const pageOrigin = 'https://talkntype.pro';
   assert.ok(isOwnApi('https://talkntypeai.onrender.com/api/chat', { pageOrigin }));
   assert.ok(isOwnApi('/api/judgements/search', { pageOrigin }));
-  assert.ok(isOwnApi('http://localhost:5000/api/x', { pageOrigin }));
+  // Loopback origins get the token only in the Vite dev server, never in production builds.
+  assert.equal(isOwnApi('http://localhost:5000/api/x', { pageOrigin }), false);
+  assert.equal(isOwnApi('http://127.0.0.1:5000/api/x', { pageOrigin }), false);
+  assert.ok(isOwnApi('http://localhost:5000/api/x', { pageOrigin, origins: apiOrigins({ dev: true, vars: {} }) }));
+  assert.ok(!apiOrigins({ dev: false, vars: {} }).some(o => /localhost|127\.0\.0\.1/.test(o)));
   for (const url of ['https://talkntype-ai-python.onrender.com/api/legal-research', 'https://api.deepgram.com/v1/listen', 'https://api.dictionaryapi.dev/api/v2/x',
     'https://talkntypeai.onrender.com/health', 'https://evil.example/api/chat', 'javascript:alert(1)'])
     assert.equal(isOwnApi(url, { pageOrigin }), false, url);
@@ -117,4 +122,29 @@ test('frontend: the JWT is attached only to our own API, never to other hosts', 
     assert.equal(interceptor({ baseURL: 'https://talkntypeai.onrender.com/api', url: '/judgements/search', headers: {} }).headers.Authorization, 'Bearer jwt-value');
     assert.equal(interceptor({ url: 'https://api.dictionaryapi.dev/api/v2/entries/en/x', headers: {} }).headers.Authorization, undefined);
   } finally { globalThis.location = savedLocation; }
+});
+
+test('apiBase never falls back to localhost outside the dev server', () => {
+  assert.equal(apiBase({ dev: false, vars: {} }), 'https://talkntypeai.onrender.com');
+  assert.equal(apiBase({ dev: true, vars: {} }), 'http://localhost:5000');
+  assert.equal(apiBase({ dev: false, vars: { VITE_API_URL: 'https://api.example.test/api/' } }), 'https://api.example.test');
+});
+
+test('production build refuses a missing or unsafe VITE_API_URL', () => {
+  assert.match(buildEnvProblems({})[0], /VITE_API_URL is not set/);
+  assert.match(buildEnvProblems({ VITE_API_URL: '  ' })[0], /not set/);
+  assert.ok(buildEnvProblems({ VITE_API_URL: 'http://talkntypeai.onrender.com' }).some(p => /https/.test(p)));
+  assert.ok(buildEnvProblems({ VITE_API_URL: 'https://localhost:5000' }).some(p => /localhost/.test(p)));
+  assert.ok(buildEnvProblems({ VITE_API_URL: 'not a url' }).some(p => /valid URL/.test(p)));
+  assert.ok(buildEnvProblems({ VITE_API_URL: 'https://u:p@talkntypeai.onrender.com' }).some(p => /credentials/.test(p)));
+  assert.ok(buildEnvProblems({ VITE_API_URL: 'https://talkntypeai.onrender.com/other' }).some(p => /origin/.test(p)));
+  for (const ok of ['https://talkntypeai.onrender.com', 'https://talkntypeai.onrender.com/', 'https://talkntypeai.onrender.com/api'])
+    assert.deepEqual(buildEnvProblems({ VITE_API_URL: ok }), [], ok);
+  assert.throws(() => assertProductionBuildEnv({}), /Production build stopped/);
+});
+
+test('no production source file falls back to a localhost API origin via VITE_API_URL', () => {
+  const offenders = ['src/App.jsx', 'src/components/LegalDictionary.jsx', 'src/Editor/Editor.jsx', 'src/components/ImageToText.jsx']
+    .filter(file => /VITE_API_URL\s*(\|\||\?)[^;]*localhost/.test(fs.readFileSync(file, 'utf8')));
+  assert.deepEqual(offenders, []);
 });

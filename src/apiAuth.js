@@ -6,17 +6,21 @@ import axios from 'axios';
 import { getDraftSession } from './Features/LegalHubMain/draftClient.js';
 
 const env = typeof import.meta !== 'undefined' ? (import.meta.env || {}) : {};
-export const API_ORIGINS = [
-  'https://talkntypeai.onrender.com',
-  'http://localhost:5000', 'http://127.0.0.1:5000', 'http://localhost:10000',
-  env.VITE_API_URL, env.VITE_DRAFT_API_URL,
-];
+export const PRODUCTION_API_ORIGIN = 'https://talkntypeai.onrender.com';
+export const DEV_API_ORIGINS = ['http://localhost:5000', 'http://127.0.0.1:5000', 'http://localhost:10000'];
 
-// Base URL of our Node API for new code (existing components still hard-code it).
-export function apiBase() {
-  if (env.VITE_API_URL) return String(env.VITE_API_URL).replace(/\/$/, '').replace(/\/api$/, '');
-  const host = globalThis.location?.hostname;
-  return host === 'localhost' || host === '127.0.0.1' ? 'http://localhost:5000' : 'https://talkntypeai.onrender.com';
+// Origins that receive the session token. Loopback origins are trusted only in the
+// Vite dev server (import.meta.env.DEV), never in a production build.
+export function apiOrigins({ dev = Boolean(env.DEV), vars = env } = {}) {
+  return [PRODUCTION_API_ORIGIN, vars.VITE_API_URL, vars.VITE_DRAFT_API_URL, ...(dev ? DEV_API_ORIGINS : [])];
+}
+export const API_ORIGINS = apiOrigins();
+
+// Base URL of our Node API. Production builds always have VITE_API_URL
+// (vite.config.js refuses to build without it); loopback is a dev-only default.
+export function apiBase({ dev = Boolean(env.DEV), vars = env } = {}) {
+  if (vars.VITE_API_URL) return String(vars.VITE_API_URL).replace(/\/$/, '').replace(/\/api$/, '');
+  return dev ? DEV_API_ORIGINS[0] : PRODUCTION_API_ORIGIN;
 }
 
 // AI endpoints served by the Python service are reached only through our Node API

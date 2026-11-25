@@ -1,4 +1,5 @@
 import { insertSpeech } from './speech.js';
+import { apiBase } from '../apiAuth.js';
 import { convertEditorFont, requestFontConversion } from './fontConversion.js';
   import React, { useState, useEffect, useRef } from "react";
   import EditorActions from "./EditorActions";
@@ -37,7 +38,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
 
     // 🌐 API Base URL
     const [API_BASE_URL, setApiBaseUrl] = useState(
-      import.meta.env.VITE_API_URL || "http://localhost:5000"
+      apiBase()
     );
 
     // Load Config

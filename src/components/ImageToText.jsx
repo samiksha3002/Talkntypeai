@@ -1,13 +1,12 @@
-import React, { useState } from "react";
+import React, { useState } from "react";
+import { apiBase } from '../apiAuth.js';
 
 const ImageToText = ({ onExtract }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Auto-detect API URL (Compatible with Vite)
-  const API_URL = import.meta.env.VITE_API_URL
-    ? `${import.meta.env.VITE_API_URL}/api/ocr/image-to-text`
-    : "http://localhost:5000/api/ocr/image-to-text";
+  const API_URL = `${apiBase()}/api/ocr/image-to-text`;
 
   const uploadImage = async (e) => {
     const file = e.target.files[0];

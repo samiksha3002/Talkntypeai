@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { apiBase } from '../apiAuth.js';
 
 const LegalDictionary = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -14,8 +15,7 @@ const LegalDictionary = () => {
         setResult(null);
 
         try {
-            // Replace with your actual Render URL or localhost during dev
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const API_URL = apiBase();
             const response = await axios.get(`${API_URL}/api/dictionary/define/${searchTerm}`);
             setResult(response.data);
         } catch (error) {
