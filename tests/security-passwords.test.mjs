@@ -125,15 +125,62 @@ test('migration never overwrites a password that changed between read and write'
   assert.ok(await bcrypt.compare('user-changed-it', users.docs[0].password));
 });
 
-test('create-admin: dry run writes nothing; apply creates or promotes with a bcrypt hash', async () => {
+function fakeSessions(rows) {
+  const deleted = [];
+  return { rows, deleted, async deleteMany(q) {
+    const before = rows.length;
+    for (let i = rows.length - 1; i >= 0; i--) if (rows[i].ownerId === q.ownerId) { deleted.push(rows[i]); rows.splice(i, 1); }
+    return { deletedCount: before - rows.length };
+  } };
+}
+
+test('create-admin: dry run needs no password and writes nothing; apply creates or promotes with a bcrypt hash', async () => {
   const users = fakeUsers([{ _id: 7, email: 'existing@example.test', role: 'user', password: 'x' }]);
-  await assert.rejects(upsertAdmin(users, { email: 'bad', password: 'long-enough-password', log() {} }));
-  await assert.rejects(upsertAdmin(users, { email: 'boss@example.test', password: 'short', log() {} }));
-  assert.equal(await upsertAdmin(users, { email: 'boss@example.test', password: 'long-enough-password', log() {} }), 'create');
-  assert.deepEqual(users.writes, []);
-  assert.equal(await upsertAdmin(users, { email: 'Boss@Example.test', password: 'long-enough-password', apply: true, log() {}, hash: fastHash }), 'create');
+  const sessions = fakeSessions([{ ownerId: 7 }, { ownerId: 7 }, { ownerId: 99 }]);
+  await assert.rejects(upsertAdmin(users, { email: 'bad', log() {} }));
+  assert.equal(await upsertAdmin(users, { email: 'boss@example.test', log() {} }), 'create', 'dry run works without a password');
+  assert.equal(await upsertAdmin(users, { email: 'existing@example.test', log() {}, sessions }), 'promote');
+  assert.deepEqual(users.writes, []); assert.equal(sessions.rows.length, 3, 'dry run revokes nothing');
+  await assert.rejects(upsertAdmin(users, { email: 'boss@example.test', password: 'short', apply: true, sessions, log() {} }), /at least 12/);
+  await assert.rejects(upsertAdmin(users, { email: 'boss@example.test', apply: true, sessions, log() {} }), /at least 12/);
+  assert.equal(await upsertAdmin(users, { email: 'Boss@Example.test', password: 'long-enough-password', apply: true, sessions, log() {}, hash: fastHash }), 'create');
   const created = users.docs.find(d => d.email === 'boss@example.test');
   assert.equal(created.role, 'admin'); assert.ok(await bcrypt.compare('long-enough-password', created.password));
-  assert.equal(await upsertAdmin(users, { email: 'existing@example.test', password: 'another-long-password', apply: true, log() {}, hash: fastHash }), 'promote');
+  assert.equal(sessions.rows.length, 3, 'creating a new account revokes nothing');
+});
+
+test('create-admin: promote and password reset revoke all existing sessions of that account only', async () => {
+  const users = fakeUsers([{ _id: 7, email: 'existing@example.test', role: 'user', password: 'x' }, { _id: 8, email: 'boss@example.test', role: 'admin', password: 'y' }]);
+  const sessions = fakeSessions([{ ownerId: 7 }, { ownerId: 7 }, { ownerId: 8 }, { ownerId: 99 }]);
+  const lines = [];
+  assert.equal(await upsertAdmin(users, { email: 'existing@example.test', password: 'another-long-password', apply: true, sessions, log: l => lines.push(l), hash: fastHash }), 'promote');
   assert.equal(users.docs[0].role, 'admin'); assert.ok(await bcrypt.compare('another-long-password', users.docs[0].password));
+  assert.deepEqual(sessions.rows.map(r => r.ownerId), [8, 99]);
+  assert.ok(lines.some(l => /Revoked 2 existing session/.test(l)));
+  assert.equal(await upsertAdmin(users, { email: 'boss@example.test', password: 'reset-long-password', apply: true, sessions, log() {}, hash: fastHash }), 'reset-password');
+  assert.deepEqual(sessions.rows.map(r => r.ownerId), [99]);
+  assert.ok(!lines.join('\n').includes('another-long-password'), 'password is never logged');
+});
+
+test('create-admin: password is read hidden from a terminal, or from piped stdin, never echoed', async () => {
+  const { readPassword, promptNewPassword } = await import('../scripts/create-admin.mjs');
+  const { PassThrough, Readable } = await import('node:stream');
+  const piped = Readable.from(['piped-secret-value\nignored second line\n']);
+  assert.equal(await readPassword('x', { input: piped, output: new PassThrough() }), 'piped-secret-value');
+
+  const terminal = () => { const s = new PassThrough(); s.isTTY = true; s.raw = []; s.setRawMode = v => s.raw.push(v); return s; };
+  let shown = ''; const output = { write: t => { shown += t; } };
+  const input = terminal();
+  const pending = promptNewPassword({ input, output });
+  input.write('zeb'); input.write('ra-x'); input.write('\u007f'); input.write('pass\r');   // backspace removes "x"
+  await new Promise(r => setImmediate(r));
+  input.write('zebra-pass\r');
+  assert.equal(await pending, 'zebra-pass');
+  assert.ok(!shown.includes('zebra'), 'typed characters are not echoed');
+  assert.deepEqual(input.raw, [true, false, true, false], 'raw mode is restored after each prompt');
+
+  const mismatch = terminal();
+  const failing = promptNewPassword({ input: mismatch, output });
+  mismatch.write('first-password\r'); await new Promise(r => setImmediate(r)); mismatch.write('other-password\r');
+  await assert.rejects(failing, /do not match/);
 });
