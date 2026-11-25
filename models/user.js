@@ -20,11 +20,11 @@ const UserSchema = new mongoose.Schema({
   executive: { type: String }, 
   
   // 2. Security
-  password: { 
-    type: String, 
-    required: [true, "Password is required"] 
-    // Note: We removed 'select: false' for now so your plain-text login logic works easily. 
-    // Once we add hashing later, we can add it back.
+  // bcrypt hash (cost 12). Never selected unless explicitly requested with '+password'.
+  password: {
+    type: String,
+    required: [true, "Password is required"],
+    select: false,
   },
   
   // 3. Roles & Permissions

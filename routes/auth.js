@@ -1,28 +1,38 @@
 import express from 'express';
 import User from '../models/user.js';
 import { issueSession, publicUser } from '../middleware/auth.js';
+import { hashPassword, verifyPassword, passwordProblem, findWithPassword, upgradeLegacyPassword } from '../utils/password.js';
 
 const router = express.Router();
+const optionalText = (value, max) => value === undefined || value === null || (typeof value === 'string' && value.length <= max);
 
 // --- REGISTER ROUTE ---
 router.post('/create-user', async (req, res) => {
   try {
-    const { fullName, email, state, city, phone, executive, password } = req.body;
+    const { fullName, email, state, city, phone, executive, password } = req.body || {};
+    if (typeof fullName !== 'string' || !fullName.trim() || fullName.length > 200 ||
+      typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254 ||
+      ![state, city, phone, executive].every(value => optionalText(value, 200))) {
+      return res.status(400).json({ message: 'Please fill in your name and a valid email.' });
+    }
+    const problem = passwordProblem(password);
+    if (problem) return res.status(400).json({ message: problem });
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Optional: keep the configured administrator address from being registered as a normal user.
     const reserved = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-    if (reserved && typeof email === 'string' && email.trim().toLowerCase() === reserved) {
+    if (reserved && normalizedEmail === reserved) {
       return res.status(400).json({ message: 'This email cannot be registered.' });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
     const newUser = new User({
-      fullName, email, state, city, phone, executive,
-      password: password, 
+      fullName: fullName.trim(), email: normalizedEmail, state, city, phone, executive,
+      password: await hashPassword(password),
       role: 'user',
       subscription: { isActive: false, plan: 'demo', startDate: null, expiryDate: null }
     });
@@ -46,10 +56,13 @@ router.post('/login', async (req, res) => {
 
     // Every account, including administrators, is verified against the database.
     // There is no hard-coded or environment-variable login bypass.
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
-    if (!user || user.password !== password) {
+    const user = await findWithPassword(User, { email: email.trim().toLowerCase() });
+    const check = await verifyPassword(password, user?.password);
+    if (!user || !check.ok) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
+    // Accounts not yet migrated still store plain text: replace it with a bcrypt hash now.
+    if (check.needsUpgrade) await upgradeLegacyPassword(User, user, password);
 
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
        return res.status(403).json({ message: '⛔ Account Pending Approval. Contact Admin.' });
