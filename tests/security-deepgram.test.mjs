@@ -66,3 +66,32 @@ test('frontend source contains no hard-coded Deepgram key or 40-hex credentials'
   const steno = fs.readFileSync(new URL('../src/components/Sidebar/Stenocard.jsx', import.meta.url), 'utf8');
   assert.match(steno, /createClient\(\{ accessToken \}\)/);
 });
+
+test('token endpoint is limited per user (default 6 per minute) and keeps the 60 s token lifetime', async () => {
+  const { createTokenLimiter } = await import('../routes/deepgram.js');
+  const saved = process.env.DEEPGRAM_TOKENS_PER_MINUTE; delete process.env.DEEPGRAM_TOKENS_PER_MINUTE;
+  try {
+    const app = express();
+    app.use((req, res, next) => { req.user = { id: req.headers['x-test-user'] }; next(); });
+    app.use('/api/deepgram', createDeepgramRouter({ grant: async () => ({ accessToken: 't', expiresIn: 60 }), limiter: createTokenLimiter() }));
+    const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r));
+    const url = 'http://127.0.0.1:' + server.address().port + '/api/deepgram/token';
+    const call = user => fetch(url, { method: 'POST', headers: { 'x-test-user': user } }).then(r => r.status);
+    try {
+      const statuses = []; for (let i = 0; i < 7; i++) statuses.push(await call('0000000000000000000000a1'));
+      assert.deepEqual(statuses, [200, 200, 200, 200, 200, 200, 429]);
+      assert.equal(await call('0000000000000000000000b2'), 200, 'other users are not affected');
+    } finally { await new Promise(r => server.close(r)); }
+    process.env.DEEPGRAM_TOKENS_PER_MINUTE = '2';
+    const small = express();
+    small.use((req, res, next) => { req.user = { id: 'u' }; next(); });
+    small.use('/d', createDeepgramRouter({ grant: async () => ({ accessToken: 't', expiresIn: 60 }), limiter: createTokenLimiter() }));
+    const s2 = small.listen(0, '127.0.0.1'); await new Promise(r => s2.once('listening', r));
+    try {
+      const u2 = 'http://127.0.0.1:' + s2.address().port + '/d/token';
+      const got = []; for (let i = 0; i < 3; i++) got.push(await fetch(u2, { method: 'POST' }).then(r => r.status));
+      assert.deepEqual(got, [200, 200, 429], 'DEEPGRAM_TOKENS_PER_MINUTE is configurable');
+    } finally { await new Promise(r => s2.close(r)); }
+  } finally { if (saved === undefined) delete process.env.DEEPGRAM_TOKENS_PER_MINUTE; else process.env.DEEPGRAM_TOKENS_PER_MINUTE = saved; }
+  assert.equal(tokenTtlSeconds({}), 60);
+});

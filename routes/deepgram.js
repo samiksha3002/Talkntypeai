@@ -1,4 +1,6 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
+import { setting } from '../utils/resourceProtection.js';
 
 // Live dictation (Deepgram) without exposing the real API key.
 //
@@ -26,9 +28,18 @@ export async function deepgramGrant({ apiKey = process.env.DEEPGRAM_API_KEY, ttl
   return { accessToken: data.access_token, expiresIn: Number(data.expires_in) || ttlSeconds };
 }
 
-export function createDeepgramRouter({ grant = deepgramGrant } = {}) {
+// Each token can open a dictation stream billed to us, so tokens are limited per
+// signed-in user (DEEPGRAM_TOKENS_PER_MINUTE, default 6) on top of the general
+// paid-API limit. A normal session needs one token per start/stop of the mic.
+export function createTokenLimiter({ perMinute = setting('DEEPGRAM_TOKENS_PER_MINUTE', 6) } = {}) {
+  return rateLimit({ windowMs: 60 * 1000, limit: perMinute, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: req => 'deepgram:' + (req.user?.id || 'unauthenticated'),
+    message: { error: 'Too many dictation starts. Please wait a minute and try again.' } });
+}
+
+export function createDeepgramRouter({ grant = deepgramGrant, limiter = createTokenLimiter() } = {}) {
   const router = express.Router();
-  router.post('/token', async (req, res) => {
+  router.post('/token', limiter, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
       const { accessToken, expiresIn } = await grant({ signal: AbortSignal.timeout(10000) });
