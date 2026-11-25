@@ -178,6 +178,7 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
     return;
   }
 
+  if (file.size > 50 * 1024 * 1024) { alert("PDF exceeds the 50 MB upload limit. Split the document."); return; }
   setLoading(true);
   const formData = new FormData();
   formData.append("file", file);

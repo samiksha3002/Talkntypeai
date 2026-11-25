@@ -1,93 +1,59 @@
 // backend/routes/inquiries.js
 import express from "express";
-import Inquiry from "../models/Inquiry.js"; // Ensure this path matches your file structure
+import Inquiry from "../models/Inquiry.js";
+import { ownerOf, pick, validObjectId, sendError, createRecord } from "../utils/ownership.js";
+import { requireDraftAuth, matchingOwner } from "../middleware/tenantScope.js";
 
-const router = express.Router();
+const INQUIRY_FIELDS = ["inquirerName", "contactNumber", "email", "typeOfCase", "summary", "followUpDate"];
 
-// ==========================================
-// 1. CREATE NEW INQUIRY
-// ==========================================
-router.post("/", async (req, res) => {
-  try {
-    const inquiry = new Inquiry(req.body);
-    await inquiry.save();
-    res.status(201).json({ success: true, message: "Inquiry saved successfully", inquiry });
-  } catch (err) {
-    console.error("Error creating inquiry:", err);
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
+// Inquiries belong to the signed-in user (req.user from the verified JWT).
+export function createInquiriesRouter({ inquiries = Inquiry, auth = requireDraftAuth } = {}) {
+  const router = express.Router();
+  router.use(auth, matchingOwner);   // a userId in query/body must match the session (403)
 
-// ==========================================
-// 2. GET ALL INQUIRIES
-// ==========================================
-router.get("/", async (req, res) => {
-  try {
-    // Sort by createdAt descending (newest first)
-    const inquiries = await Inquiry.find().sort({ createdAt: -1 });
-    res.status(200).json(inquiries);
-  } catch (err) {
-    console.error("Error fetching inquiries:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+  router.post("/", async (req, res) => {
+    try {
+      const inquiry = await createRecord(inquiries, { ...pick(req.body, INQUIRY_FIELDS), userId: ownerOf(req) });
+      res.status(201).json({ success: true, message: "Inquiry saved successfully", inquiry });
+    } catch (error) { sendError(res, error); }
+  });
 
-// ==========================================
-// 3. GET SINGLE INQUIRY (Required for Edit Page)
-// ==========================================
-router.get("/:id", async (req, res) => {
-  try {
-    const inquiry = await Inquiry.findById(req.params.id);
-    
-    if (!inquiry) {
-      return res.status(404).json({ success: false, message: "Inquiry not found" });
-    }
-    
-    res.status(200).json(inquiry);
-  } catch (err) {
-    console.error("Error fetching single inquiry:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+  router.get("/", async (req, res) => {
+    try {
+      const rows = await inquiries.find({ userId: ownerOf(req) }).sort({ createdAt: -1 });
+      res.status(200).json(rows);
+    } catch (error) { sendError(res, error); }
+  });
 
-// ==========================================
-// 4. UPDATE INQUIRY
-// ==========================================
-router.put("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // { new: true } returns the updated document instead of the old one
-    const updatedInquiry = await Inquiry.findByIdAndUpdate(id, req.body, { new: true });
+  router.get("/:id", async (req, res) => {
+    if (!validObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid inquiry ID" });
+    try {
+      const inquiry = await inquiries.findOne({ _id: req.params.id, userId: ownerOf(req) });
+      if (!inquiry) return res.status(404).json({ success: false, message: "Inquiry not found" });
+      res.status(200).json(inquiry);
+    } catch (error) { sendError(res, error); }
+  });
 
-    if (!updatedInquiry) {
-      return res.status(404).json({ success: false, message: "Inquiry not found" });
-    }
+  router.put("/:id", async (req, res) => {
+    if (!validObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid inquiry ID" });
+    try {
+      const updated = await inquiries.findOneAndUpdate({ _id: req.params.id, userId: ownerOf(req) },
+        { $set: pick(req.body, INQUIRY_FIELDS) }, { new: true, runValidators: true });
+      if (!updated) return res.status(404).json({ success: false, message: "Inquiry not found" });
+      res.status(200).json({ success: true, message: "Inquiry updated successfully", inquiry: updated });
+    } catch (error) { sendError(res, error); }
+  });
 
-    res.status(200).json({ success: true, message: "Inquiry updated successfully", inquiry: updatedInquiry });
-  } catch (err) {
-    console.error("Error updating inquiry:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+  router.delete("/:id", async (req, res) => {
+    if (!validObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid inquiry ID" });
+    try {
+      const deleted = await inquiries.findOneAndDelete({ _id: req.params.id, userId: ownerOf(req) });
+      if (!deleted) return res.status(404).json({ success: false, message: "Inquiry not found" });
+      res.status(200).json({ success: true, message: "Inquiry deleted successfully" });
+    } catch (error) { sendError(res, error); }
+  });
 
-// ==========================================
-// 5. DELETE INQUIRY
-// ==========================================
-router.delete("/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deletedInquiry = await Inquiry.findByIdAndDelete(id);
+  return router;
+}
 
-    if (!deletedInquiry) {
-      return res.status(404).json({ success: false, message: "Inquiry not found" });
-    }
-
-    res.status(200).json({ success: true, message: "Inquiry deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting inquiry:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-export default router;
+export default createInquiriesRouter();

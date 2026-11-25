@@ -3,9 +3,9 @@ from workspace_routes import create_workspace_router
 from services.request_documents import RequestDocuments
 from document_containment import DocumentContainment
 from resource_protection import ResourceProtection, setting
+from brain_auth import BrainAuth
 from starlette.concurrency import run_in_threadpool
 import fitz
-import hashlib
 import json
 import logging
 import os
@@ -40,22 +40,21 @@ app.add_middleware(WorkspaceBoundary)
 app.include_router(create_workspace_router(RequestDocuments, research_and_draft_stream))
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-USERS_FILE = Path("users.json")
 
-# Include your production frontend and local development origins.
+# Browsers no longer call this service directly (the Node API proxies every request),
+# so CORS only allows our own production domains, with no credentials.
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
+    "BRAIN_ALLOWED_ORIGINS", "https://talkntype.pro,https://www.talkntype.pro").split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://talkntype.pro",
-        "https://www.talkntype.pro",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5174",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
+# Added last = outermost: every request except GET /health must come from the Node
+# API with the shared secret and a verified user id (see brain_auth.py).
+app.add_middleware(BrainAuth)
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exc: RequestValidationError):
     errors = []
@@ -98,39 +97,17 @@ class AICommandRequest(BaseModel):
     context: str = ""
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
+def current_user(request: Request) -> str:
+    """Verified user id supplied by the Node API (checked in BrainAuth)."""
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized.")
+    return user_id
 
 
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    name: Optional[str] = ""
-
-
-def load_users():
-    try:
-        if USERS_FILE.exists():
-            with USERS_FILE.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
-                return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError) as exc:
-        logger.exception("Could not read users store: %s", exc)
-    return {}
-
-
-def save_users(users):
-    temporary = USERS_FILE.with_suffix(".tmp")
-    with temporary.open("w", encoding="utf-8") as handle:
-        json.dump(users, handle, ensure_ascii=False)
-    temporary.replace(USERS_FILE)
-
-
-def hash_password(password: str) -> str:
-    # Kept for compatibility with the existing users.json format.
-    # For a public production service, migrate to Argon2/bcrypt and real sessions.
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+def draft_owner(user_id: str) -> str:
+    # PDFs uploaded for drafting are kept separate from the user's chat document.
+    return f"{user_id}:draft"
 
 
 def clean_upload_name(filename: Optional[str]) -> str:
@@ -150,16 +127,16 @@ async def save_pdf_upload(file: UploadFile) -> Path:
                 if total == 0 and not chunk.startswith(b"%PDF-"):
                     raise HTTPException(status_code=415, detail="Invalid PDF content.")
                 total += len(chunk)
-                if total > setting("DOCUMENT_UPLOAD_MB", 100) * 1024 * 1024:
+                if total > setting("DOCUMENT_UPLOAD_MB", 50) * 1024 * 1024:
                     raise HTTPException(status_code=413, detail="PDF exceeds the upload limit.")
                 output.write(chunk)
         if not total:
             raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
         with fitz.open(path) as pdf:
-            if not pdf.page_count or pdf.page_count > setting("DOCUMENT_MAX_PAGES", 500):
+            if not pdf.page_count or pdf.page_count > setting("DOCUMENT_MAX_PAGES", 100):
                 raise HTTPException(status_code=413, detail="PDF page limit exceeded.")
             pixels = [page.rect.width * page.rect.height * (200/72)**2 for page in pdf]
-            if max(pixels) > setting("DOCUMENT_MAX_IMAGE_PIXELS", 40000000) or sum(pixels) > setting("DOCUMENT_MAX_RASTER_PIXELS", 2000000000):
+            if max(pixels) > setting("DOCUMENT_MAX_IMAGE_PIXELS", 12000000) or sum(pixels) > setting("DOCUMENT_MAX_RASTER_PIXELS", 500000000):
                 raise HTTPException(status_code=413, detail="PDF rasterization budget exceeded.")
     except BaseException:
         path.unlink(missing_ok=True)
@@ -176,46 +153,11 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {
-        "success": True,
-        "document_loaded": False,
-        "document_features": "security-maintenance",
-    }
+    # Public for the hosting health check; reveals nothing about users or documents.
+    return {"success": True}
 
-
-@app.post("/api/login")
-async def login(request: LoginRequest):
-    users = load_users()
-    email = request.email.lower().strip()
-    record = users.get(email)
-    if not record or record.get("password") != hash_password(request.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password.")
-    return {
-        "success": True,
-        "message": "Login successful.",
-        "user": {"email": email, "name": record.get("name", "")},
-        # Compatibility token only; replace with real JWT/session authentication.
-        "token": hashlib.sha256(f"{email}:loggedin".encode()).hexdigest(),
-    }
-
-
-@app.post("/api/register")
-async def register(request: RegisterRequest):
-    email = request.email.lower().strip()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Please provide a valid email.")
-    if len(request.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
-    users = load_users()
-    if email in users:
-        raise HTTPException(status_code=400, detail="Email already registered.")
-    users[email] = {"password": hash_password(request.password), "name": request.name or ""}
-    try:
-        save_users(users)
-    except OSError as exc:
-        logger.exception("Could not save user")
-        raise HTTPException(status_code=500, detail="Could not save registration.") from exc
-    return {"success": True, "message": "Registration successful. Please login."}
+# The separate users.json login/register endpoints were removed: accounts live only
+# in the Node API (MongoDB, bcrypt), which authenticates users before proxying here.
 
 
 @app.post("/api/generate-legal-draft-stream")
@@ -224,6 +166,7 @@ async def generate_draft_stream(request: Request):
     Accept JSON or multipart FormData. Parsing manually is intentional: declaring
     Form fields in the function signature would make JSON requests fail validation.
     """
+    owner = draft_owner(current_user(request))
     content_type = request.headers.get("content-type", "").lower()
     uploaded_file = None
     facts = ""
@@ -258,16 +201,17 @@ async def generate_draft_stream(request: Request):
         final_facts = facts or ""
         if uploaded_file is not None:
             uploaded_path = await save_pdf_upload(uploaded_file)
-            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
+            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path), owner)
             if vector_db is None:
                 raise HTTPException(
                     status_code=422,
-                    detail=doc_service.last_error or "The uploaded PDF could not be analyzed.",
+                    detail=doc_service.last_error_for(owner) or "The uploaded PDF could not be analyzed.",
                 )
             pdf_summary = await run_in_threadpool(doc_service.ask_question,
                 vector_db,
                 "Summarize the document's key facts, parties, dates, case numbers, legal provisions, and procedural history. Clearly flag anything uncertain.",
                 [],
+                owner,
             )
             final_facts = (
                 f"DOCUMENT CONTENT / SUMMARY:\n{pdf_summary}\n\n"
@@ -313,15 +257,16 @@ async def generate_draft_stream(request: Request):
 
 
 @app.post("/api/analyze-document")
-async def analyze_doc(file: UploadFile = File(...)):
+async def analyze_doc(request: Request, file: UploadFile = File(...)):
+    owner = current_user(request)
     uploaded_path = None
     try:
         uploaded_path = await save_pdf_upload(file)
-        vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
+        vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path), owner)
         if vector_db is None:
             raise HTTPException(
                 status_code=422,
-                detail=doc_service.last_error or "PDF analysis failed. Please try another PDF.",
+                detail=doc_service.last_error_for(owner) or "PDF analysis failed. Please try another PDF.",
             )
         timeline = await run_in_threadpool(doc_service.get_timeline, vector_db)
         if not timeline or timeline.startswith("Analysis failed.") or timeline.startswith("Timeline generation failed:"):
@@ -346,19 +291,21 @@ async def analyze_doc(file: UploadFile = File(...)):
 
 
 @app.post("/api/chat-with-pdf")
-async def chat_with_pdf(request: ChatRequest):
-    query = request.query.strip()
+async def chat_with_pdf(body: ChatRequest, request: Request):
+    owner = current_user(request)
+    query = body.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Enter a question about the document.")
 
     try:
-        vector_db = doc_service.get_active_db()
+        # Only this user's own analysed document is ever searched.
+        vector_db = await run_in_threadpool(doc_service.get_db, owner)
         if vector_db is not None:
-            answer = await run_in_threadpool(doc_service.ask_question,vector_db, query, request.history)
+            answer = await run_in_threadpool(doc_service.ask_question, vector_db, query, body.history, owner)
             if answer:
                 return {"answer": answer, "source": "document"}
         # A short generic error context must never be treated as document evidence.
-        fallback_context = (request.context or "").strip()
+        fallback_context = (body.context or "").strip()
         invalid_contexts = {
             "analysis failed. document could not be read.",
             "error: please upload and analyze pdf again.",
@@ -368,7 +315,7 @@ async def chat_with_pdf(request: ChatRequest):
             history_text = "\n".join(
                 f"{'User' if item.get('role') == 'user' else 'Assistant'}: "
                 f"{item.get('content') or item.get('text') or ''}"
-                for item in request.history[-6:]
+                for item in body.history[-6:]
             )
             response = await run_in_threadpool(llm.invoke, [
                 ("system", "You are a careful Indian legal document assistant. Answer only from the provided document context. If the context does not contain the answer, say so. Do not invent facts or legal citations."),
@@ -377,7 +324,7 @@ async def chat_with_pdf(request: ChatRequest):
             return {"answer": response.content, "source": "provided_context"}
         raise HTTPException(
             status_code=409,
-            detail=doc_service.last_error or "No analyzed PDF is available. Upload and analyze the PDF again.",
+            detail=doc_service.last_error_for(owner) or "No analyzed PDF is available. Upload and analyze the PDF again.",
         )
     except HTTPException:
         raise
@@ -388,26 +335,29 @@ async def chat_with_pdf(request: ChatRequest):
 
 @app.post("/api/generate-legal-draft")
 async def generate_draft(
+    request: Request,
     facts: Optional[str] = Form(None),
     language: Optional[str] = Form("English"),
     documentType: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
 ):
+    owner = draft_owner(current_user(request))
     uploaded_path = None
     try:
         final_facts = facts or ""
         if file is not None:
             uploaded_path = await save_pdf_upload(file)
-            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path))
+            vector_db = await run_in_threadpool(doc_service.process_pdf, str(uploaded_path), owner)
             if vector_db is None:
                 raise HTTPException(
                     status_code=422,
-                    detail=doc_service.last_error or "The uploaded PDF could not be analyzed.",
+                    detail=doc_service.last_error_for(owner) or "The uploaded PDF could not be analyzed.",
                 )
             pdf_summary = await run_in_threadpool(doc_service.ask_question,
                 vector_db,
                 "Summarize the legal facts, party names, dates, case numbers, legal provisions, and procedural history.",
                 [],
+                owner,
             )
             final_facts = f"CONTEXT FROM PDF:\n{pdf_summary}\n\nUSER INSTRUCTIONS:\n{final_facts}"
         if not final_facts.strip():

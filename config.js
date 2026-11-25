@@ -17,7 +17,7 @@ const config = {
 if (!config.indianKanoon.token) {
   console.warn("⚠️  INDIAN_KANOON_API_TOKEN not set — LexArchive calls will fail.");
 } else {
-  console.log(`✅ Indian Kanoon token loaded: ${config.indianKanoon.token.slice(0, 6)}...`);
+  console.log("✅ Indian Kanoon token loaded.");
 }
 
 export default config;

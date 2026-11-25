@@ -1,5 +1,6 @@
 import { bookmarkRequest } from './bookmarks.js';
 import axios from 'axios';
+import { attachAxiosAuth } from '../../apiAuth.js';
 
 import { getNodeApi } from '../../nodeApi.js';
 
@@ -7,6 +8,7 @@ const api = axios.create({
   timeout : 20000,
   headers : { 'Content-Type': 'application/json' },
 });
+attachAxiosAuth(api);
 
 api.interceptors.request.use(async config => { config.baseURL = await getNodeApi(); return config; });
 

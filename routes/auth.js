@@ -1,82 +1,98 @@
-import { hashNewPassword, verifyPassword } from '../utils/passwords.js';
 import express from 'express';
 import User from '../models/user.js';
-import { issueDraftSession } from '../middleware/draftAuth.js';
+import { issueSession, publicUser } from '../middleware/auth.js';
+import { loginLimiter, registerLimiter } from '../middleware/apiGuard.js';
+import { hashNewPassword, checkPassword, passwordProblem, findWithPassword, upgradeLegacyPassword } from '../utils/passwords.js';
 
 const router = express.Router();
+const optionalText = (value, max) => value === undefined || value === null || (typeof value === 'string' && value.length <= max);
 
 // --- REGISTER ROUTE ---
-router.post('/create-user', async (req, res) => {
+router.post('/create-user', registerLimiter, async (req, res) => {
   try {
-    const { fullName, email, state, city, phone, executive, password } = req.body;
+    const { fullName, email, state, city, phone, executive, password } = req.body || {};
+    if (typeof fullName !== 'string' || !fullName.trim() || fullName.length > 200 ||
+      typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.length > 254 ||
+      ![state, city, phone, executive].every(value => optionalText(value, 200))) {
+      return res.status(400).json({ message: 'Please fill in your name and a valid email.' });
+    }
+    // At least 8 characters; at most 72 UTF-8 bytes so bcrypt never truncates.
+    const problem = passwordProblem(password);
+    if (problem) return res.status(400).json({ message: problem });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (email === 'admin@talkntype.com') {
-      return res.status(400).json({ message: 'This email is reserved for Admin. Use Login page.' });
+    // Optional: keep the configured administrator address from being registered as a normal user.
+    const reserved = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    if (reserved && normalizedEmail === reserved) {
+      return res.status(400).json({ message: 'This email cannot be registered.' });
     }
 
-    if(typeof password!=='string'||!password||Buffer.byteLength(password,'utf8')>72)return res.status(400).json({message:'New passwords must contain 1 to 72 UTF-8 bytes.'});
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    // New accounts store only the bcrypt hash (passwordHash), never plain text.
     const newUser = new User({
-      fullName, email, state, city, phone, executive,
+      fullName: fullName.trim(), email: normalizedEmail, state, city, phone, executive,
       passwordHash: await hashNewPassword(password),
       role: 'user',
       subscription: { isActive: false, plan: 'demo', startDate: null, expiryDate: null }
     });
-    
+
     await newUser.save();
     res.status(201).json({ message: 'Registration successful! Wait for admin approval.' });
 
-  } catch (error) {
-    console.error("Registration failed.");
+  } catch {
+    console.error("Registration failed.");   // no exception text: it may contain personal data
     res.status(500).json({ message: 'Server Error' });
   }
 });
 
 // --- LOGIN ROUTE ---
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    if(typeof email!=='string'||email.length>254||typeof password!=='string'||!password)return res.status(400).json({message:'Invalid credentials'});
-    // B. NORMAL USER CHECK
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (!await verifyPassword(user,password)) {
-          return res.status(400).json({ message: 'Invalid credentials' });
+    const { email, password } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password || email.length > 254 || password.length > 1024) {
+      return res.status(400).json({ message: 'Enter your email and password.' });
     }
+
+    // Every account, including administrators, is verified against the database.
+    // There is no hard-coded or environment-variable login bypass.
+    const user = await findWithPassword(User, { email: email.trim().toLowerCase() });
+    const check = await checkPassword(user, password);
+    if (!user || !check.ok) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+    // Legacy plain text: moved to passwordHash unless LEGACY_PASSWORD_UPGRADE is "off".
+    if (check.needsUpgrade) await upgradeLegacyPassword(User, user, password);
 
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
        return res.status(403).json({ message: '⛔ Account Pending Approval. Contact Admin.' });
     }
 
-    const userExpiryDate = user.subscription && user.subscription.expiryDate 
-                            ? user.subscription.expiryDate.toISOString() 
+    const userExpiryDate = user.subscription && user.subscription.expiryDate
+                            ? user.subscription.expiryDate.toISOString()
                             : null;
-    
-    // Sessions are issued only for database-verified accounts, never static bypasses.
-    let draftSession = null;
-    try { draftSession = await issueDraftSession(user._id); } catch { /* Draft access fails closed. */ }
+
+    // The JWT is required by every protected API route, so login fails if it cannot be issued.
+    let session;
+    try { session = await issueSession(user._id); }
+    catch {
+      console.error('Login session could not be issued.');
+      return res.status(503).json({ message: 'Sign-in is temporarily unavailable.' });
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
-      draftSession,
+      draftSession: session,   // name kept for the existing frontend
+      token: session.token,
       message: 'Login successful!',
-      user: {
-        _id: user._id, 
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        subscription: user.subscription
-      },
+      user: publicUser(user),
       expiryDate: userExpiryDate
     });
 
-  } catch (error) {
-    console.error("Login failed.");
+  } catch {
+    console.error("Login failed.");   // no exception text: it may contain personal data
     res.status(500).json({ message: 'Server Error' });
   }
 });

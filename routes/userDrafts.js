@@ -4,6 +4,7 @@ import UserDraft from '../models/UserDraft.js';
 import DraftTemplate from '../models/DraftTemplate.js';
 import DraftSession from '../models/DraftSession.js';
 import { requireDraftAuth, tokenHash } from '../middleware/draftAuth.js';
+import { bearerClaims } from '../middleware/auth.js';
 import { sanitizeDraftHtml } from '../utils/draftHtml.js';
 const id = value => typeof value === 'string' && /^[a-f0-9]{24}$/i.test(value);
 const key = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{16,100}$/.test(value);
@@ -25,10 +26,12 @@ export function createUserDraftRouter({ drafts = UserDraft, templates = DraftTem
   const router = express.Router();
   router.use((req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   router.post('/logout', async (req, res) => {
-    const token = /^Bearer ([a-f0-9]{64})$/.exec(req.headers.authorization || '')?.[1];
-    if (!token) return res.status(401).json({ success: false, error: 'A draft session is required.' });
-    // Possession is sufficient to revoke; deactivated/deleted accounts must still log out.
-    try { await sessions.deleteOne({ tokenHash: tokenHash(token) }); res.json({ success: true }); }
+    // A correctly signed token (even if expired) may revoke its own session;
+    // deactivated/deleted accounts must still be able to log out.
+    let claims = null;
+    try { claims = bearerClaims(req, { allowExpired: true }); } catch { claims = null; }
+    if (!claims) return res.status(401).json({ success: false, error: 'A draft session is required.' });
+    try { await sessions.deleteOne({ tokenHash: tokenHash(claims.jti) }); res.json({ success: true }); }
     catch { res.status(503).json({ success: false, error: 'Could not revoke session.' }); }
   });
   router.use(auth);

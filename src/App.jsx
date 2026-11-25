@@ -1,6 +1,8 @@
 import MaintenanceNotice from './components/MaintenanceNotice.jsx';
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { getDraftSession } from "./Features/LegalHubMain/draftClient.js";
+import { apiBase } from "./apiAuth.js";
 
 // GLOBAL CONTEXT PROVIDERS
 import { CaseProvider } from "./context/CaseContext";
@@ -50,9 +52,14 @@ const LandingPage = () => {
   );
 };
 
+// These guards only improve navigation; the API enforces authentication and roles.
+// Without a session token every API call would fail, so send the user to sign in.
+const hasSession = () => Boolean(getDraftSession());
+
 // Protect Admin Route
 const AdminRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  if (!hasSession()) return <Navigate to="/login" replace />;
   if (!user.role || user.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -62,7 +69,7 @@ const AdminRoute = ({ children }) => {
 // Protect User Route
 const UserRoute = ({ children }) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  if (!user.role) {
+  if (!user.role || !hasSession()) {
     return <Navigate to="/login" replace />;
   }
   if (user.role === "admin") {
@@ -75,8 +82,8 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   // Define API URL and userId here so they are available for routes
-  // This uses Vite env variable if available, otherwise defaults to localhost
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  // VITE_API_URL in production builds (required); loopback only in the dev server.
+  const API_URL = apiBase();
   
   // Safely get user ID from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -140,7 +147,7 @@ function App() {
                 <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
                 
                 {/* EDIT ROUTES */}
-                <Route path="/case/edit/:id" element={<EditCasePage />} />
+                <Route path="/case/edit/:id" element={<UserRoute><EditCasePage /></UserRoute>} />
                 <Route path="/edit-inquiry/:id" element={<MaintenanceNotice feature="Inquiry editing" />} />
 
                 {/* 404 */}

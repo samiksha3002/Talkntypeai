@@ -2,7 +2,7 @@ import { getNodeApi } from '../nodeApi.js';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import { storeDraftSession, SESSION_STORAGE_MESSAGE } from '../Features/LegalHubMain/draftClient.js';
+import { storeDraftSession, SESSION_STORAGE_MESSAGE, SESSION_TOKEN_PATTERN } from '../Features/LegalHubMain/draftClient.js';
 
 const Login = () => {
   // 1. State to capture user input
@@ -36,7 +36,7 @@ const Login = () => {
       let data;
       try { data = await response.json(); }
       catch { throw new Error('The login service returned an invalid response. Check the Node API routing.'); }
-      if (response.ok && !/^[a-f0-9]{64}$/.test(data.draftSession?.token || '')) throw new Error('Your account was verified, but a secure session could not be created. Please try again or contact support.');
+      if (response.ok && !SESSION_TOKEN_PATTERN.test(data.draftSession?.token || '')) throw new Error('Your account was verified, but a secure session could not be created. Please try again or contact support.');
 
       if (response.ok) {
         const user = data.user;
@@ -84,8 +84,7 @@ const Login = () => {
         setStatus({ type: 'error', message: data.message || 'Invalid Email or Password' });
       }
     } catch (error) {
-      console.error("Login Error:", error);
-      
+      console.error("Login Error:", error?.message);
       setStatus({ type: 'error', message: error.message || 'Login service unavailable. Please try again later.' });
     }
   };

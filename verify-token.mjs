@@ -1,17 +1,23 @@
 // verify-token.mjs
-// Run: node verify-token.mjs YOUR_TOKEN_HERE
-// Example: node verify-token.mjs d2fbb3b9b94e1478a646646d28eeb54334a0b99e
-
+// Checks that INDIAN_KANOON_API_TOKEN (from .env or your shell) is valid.
+// Command: node verify-token.mjs --confirm-paid
+//
+// Makes 1 PAID search call (≈ ₹0.50), hence the flag. The token is never
+// accepted on the command line (shell history) and never printed.
+const PAID_NOTICE = "This makes 1 paid Indian Kanoon search (~₹0.50). Re-run with --confirm-paid to continue.";
+import "dotenv/config";
 import axios from "axios";
 
-const token = process.argv[2] || process.env.INDIAN_KANOON_API_TOKEN;
-
-if (!token) {
-  console.error("Usage: node verify-token.mjs <your_token>");
+// The token is read only from the environment (.env or shell) and is never printed.
+const TOKEN = process.env.INDIAN_KANOON_API_TOKEN;
+if (!TOKEN) {
+  console.error("Set INDIAN_KANOON_API_TOKEN in .env or your shell first.");
   process.exit(1);
 }
-
-console.log(`\nTesting token: ${token.slice(0,8)}...${token.slice(-4)} (length: ${token.length})\n`);
+if (!process.argv.includes("--confirm-paid")) {
+  console.error(PAID_NOTICE);
+  process.exit(1);
+}
 
 try {
   const { data } = await axios.post(
@@ -20,7 +26,7 @@ try {
     {
       timeout: 30000,
       headers: {
-        "Authorization": `Token ${token}`,
+        "Authorization": `Token ${TOKEN}`,
         "Accept": "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
       }
@@ -29,7 +35,6 @@ try {
   console.log("✅ TOKEN VALID!");
   console.log(`   Results: ${data.found}`);
   console.log(`   First:   ${data.docs?.[0]?.title?.slice(0, 70)}`);
-  console.log(`\n👉 Copy this token to your .env:\n   INDIAN_KANOON_API_TOKEN=${token}`);
 } catch (err) {
   console.error(`❌ Status: ${err.response?.status}`);
   if (err.response?.status === 401) {

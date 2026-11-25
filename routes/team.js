@@ -1,32 +1,33 @@
 // backend/routes/team.js
 import express from "express";
 import TeamMember from "../models/TeamMember.js";
-// import { authMiddleware } from "../middleware/auth.js"; // if you want user-specific
+import { ownerOf, pick, sendError, createRecord } from "../utils/ownership.js";
+import { requireDraftAuth, matchingOwner } from "../middleware/tenantScope.js";
 
-const router = express.Router();
+const MEMBER_FIELDS = ["fullName", "email", "phone", "role"];
 
-// POST: Add new team member
-router.post("/", async (req, res) => {
-  try {
-    const member = new TeamMember({
-      ...req.body,
-      userId: req.user?.id || null // attach logged-in user if authMiddleware is used
-    });
-    await member.save();
-    res.status(201).json({ message: "Team member added successfully", member });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+// Team members belong to the signed-in user (req.user from the verified JWT).
+export function createTeamRouter({ members = TeamMember, auth = requireDraftAuth } = {}) {
+  const router = express.Router();
+  router.use(auth, matchingOwner);   // a userId in query/body must match the session (403)
 
-// GET: List team members for user
-router.get("/", async (req, res) => {
-  try {
-    const members = await TeamMember.find({ userId: req.user?.id });
-    res.json(members);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+  router.post("/", async (req, res) => {
+    try {
+      const member = await createRecord(members, { ...pick(req.body, MEMBER_FIELDS, { max: 300 }), userId: ownerOf(req) });
+      res.status(201).json({ message: "Team member added successfully", member });
+    } catch (error) {
+      if (error?.code === 11000) return res.status(400).json({ error: "A team member with this email already exists." });
+      sendError(res, error);
+    }
+  });
 
-export default router;
+  router.get("/", async (req, res) => {
+    try {
+      res.json(await members.find({ userId: ownerOf(req) }));
+    } catch (error) { sendError(res, error); }
+  });
+
+  return router;
+}
+
+export default createTeamRouter();

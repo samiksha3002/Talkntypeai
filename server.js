@@ -35,6 +35,8 @@ import judgementAiRouter from "./routes/judgementAi.js";
 
 // ── Middleware Imports ─────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
+import { createApiGuard } from "./middleware/apiGuard.js";
+import brainRouter from "./routes/brain.js";
 
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
 import draftsRouter        from "./routes/draft.ready.js";
@@ -110,9 +112,15 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
+// 1) Temporarily suspended features (main): 503 before anything else runs.
 installReleaseContainment(app);
 app.use("/api", apiLimiter);
+// 2) Server-side authentication for every /api route (default deny), before any body is parsed.
+app.use("/api", createApiGuard());
+// 3) Streaming proxies to the Python service, mounted before the body parsers:
+//    Legal AI workspace (main) and research/translation (security/critical-fixes).
 app.use("/api/legal-workspace", legalWorkspaceRouter);
+app.use("/api/brain", brainRouter);
 app.use(createBodyBudget());
 app.use(
   express.json({
