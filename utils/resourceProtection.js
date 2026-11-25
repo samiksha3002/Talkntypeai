@@ -16,11 +16,12 @@ export function setting(name, fallback) {
 }
 export const limits = {
   upload: setting('DOCUMENT_UPLOAD_MB', 100) * 1024 * 1024,
-  searchable: setting('SEARCHABLE_UPLOAD_MB', 25) * 1024 * 1024,
-  pages: setting('DOCUMENT_MAX_PAGES', 500),
-  pixels: setting('DOCUMENT_MAX_IMAGE_PIXELS', 40000000),
-  rasterPixels: setting('DOCUMENT_MAX_RASTER_PIXELS', 2000000000),
-  timeout: setting('DOCUMENT_TIMEOUT_MS', 600000),
+  pdfUpload: setting('PDF_UPLOAD_MB', 50) * 1024 * 1024,
+  searchable: setting('SEARCHABLE_UPLOAD_MB', 50) * 1024 * 1024,
+  pages: setting('DOCUMENT_MAX_PAGES', 100),
+  pixels: setting('DOCUMENT_MAX_IMAGE_PIXELS', 12000000),
+  rasterPixels: setting('DOCUMENT_MAX_RASTER_PIXELS', 500000000),
+  timeout: setting('DOCUMENT_TIMEOUT_MS', 180000),
 };
 export const resourceError = (status, message) => Object.assign(new Error(message), { status, resourceProtection:true });
 export function sendResourceError(res, error) {
@@ -64,7 +65,7 @@ export function createBudget({concurrency = 2, timeout = limits.timeout, rate = 
   }
   return [limiter, admit];
 }
-export const documentBudget = createBudget({concurrency:setting('DOCUMENT_CONCURRENCY',2)});
+export const documentBudget = createBudget({concurrency:setting('DOCUMENT_CONCURRENCY',1)});
 export const aiBudget = createBudget({concurrency:setting('AI_CONCURRENCY',8),timeout:setting('AI_TIMEOUT_MS',180000),rate:setting('AI_REQUESTS_PER_MINUTE',60)});
 export const job = handler => async (req,res) => {
   req.resource?.begin();
@@ -81,13 +82,13 @@ const temporaryStorage={
   },
   async _removeFile(req,file,callback){await fs.unlink(file.path).catch(()=>{});callback(null);},
 };
-export function uploadFile(field, kind, maxBytes = limits.upload) {
+export function uploadFile(field, kind, maxBytes = kind==='pdf'?limits.pdfUpload:limits.upload) {
   const allowed = {pdf:['application/pdf','application/octet-stream'],image:['image/png','image/jpeg','image/webp','image/gif'],csv:['text/csv','application/csv','application/vnd.ms-excel','application/octet-stream']}[kind];
   const upload = multer({storage:temporaryStorage,limits:{fileSize:maxBytes,files:1,fields:20,fieldSize:1024*1024,parts:21},
     fileFilter(req,file,cb){cb(allowed.includes(file.mimetype) ? null : resourceError(415,'Unsupported file type.'),allowed.includes(file.mimetype));}}).single(field);
   return (req,res,next)=>{req.resource?.begin();if(req.resource)req.resource.uploading=true;upload(req,res,async error=>{
     if(req.resource)req.resource.uploading=false;
-    if(error){if(req.file)await fs.unlink(req.file.path).catch(()=>{});sendResourceError(res,resourceError(error.code==='LIMIT_FILE_SIZE'?413:error.status||400,error.code==='LIMIT_FILE_SIZE'?'Upload exceeds the configured size limit.':error.status?error.message:'Invalid multipart upload.'));req.resource?.release();return;}
+    if(error){if(req.file)await fs.unlink(req.file.path).catch(()=>{});sendResourceError(res,resourceError(error.code==='LIMIT_FILE_SIZE'?413:error.status||400,error.code==='LIMIT_FILE_SIZE'?`Upload exceeds ${maxBytes/1024/1024} MB limit.`:error.status?error.message:'Invalid multipart upload.'));req.resource?.release();return;}
     if(req.resource?.signal.aborted){if(req.file)await fs.unlink(req.file.path).catch(()=>{});req.resource.release();return;}
     if(!req.file){sendResourceError(res,resourceError(400,'No file uploaded.'));req.resource?.release();return;}
     // Multer owns cleanup on partial uploads; after completion our finalizer owns it.
@@ -101,9 +102,9 @@ export async function withFile(req, handler) {
   finally {await fs.unlink(req.file.path).catch(()=>{});}
 }
 export async function inspectPdf(bytes) {
-  if(!Buffer.from(bytes).subarray(0,5).equals(Buffer.from('%PDF-')))throw resourceError(415,'Invalid PDF content.');
+  if(!Buffer.from(bytes.subarray(0,5)).equals(Buffer.from('%PDF-')))throw resourceError(415,'Invalid PDF content.');
   let pdf;try{pdf=await PDFDocument.load(bytes);}catch{throw resourceError(422,'Unreadable or encrypted PDF.');}
-  if(!pdf.getPageCount() || pdf.getPageCount()>limits.pages)throw resourceError(413,'PDF exceeds the configured page limit.');
+  if(!pdf.getPageCount() || pdf.getPageCount()>limits.pages)throw resourceError(413,`PDF exceeds page limit (${limits.pages} pages). Split the document.`);
   let total=0;
   for(const page of pdf.getPages()){
     const {width,height}=page.getCropBox();const pixels=Math.ceil(width*200/72)*Math.ceil(height*200/72);

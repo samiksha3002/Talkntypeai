@@ -1,0 +1,27 @@
+# Optional blueprint for the Node API. Apply only to the intended Node service.
+# The repository's render.yaml describes a separate Python service, not this API.
+services:
+  - type: web
+    name: talkntypeai-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: PDF_UPLOAD_MB
+        value: 50
+      - key: SEARCHABLE_UPLOAD_MB
+        value: 50
+      - key: DOCUMENT_CONCURRENCY
+        value: 1
+      - key: DOCUMENT_MAX_PAGES
+        value: 100
+      - key: DOCUMENT_TIMEOUT_MS
+        value: 180000
+      - key: OCR_PROCESS_BUDGET_MB
+        value: 420
+# Keep the existing API secrets/environment on the intended service.
+# Do not set OCR_LANG_PATH unless provisioning a separate, verified model directory.

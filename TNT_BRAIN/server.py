@@ -143,16 +143,16 @@ async def save_pdf_upload(file: UploadFile) -> Path:
                 if total == 0 and not chunk.startswith(b"%PDF-"):
                     raise HTTPException(status_code=415, detail="Invalid PDF content.")
                 total += len(chunk)
-                if total > setting("DOCUMENT_UPLOAD_MB", 100) * 1024 * 1024:
+                if total > setting("DOCUMENT_UPLOAD_MB", 50) * 1024 * 1024:
                     raise HTTPException(status_code=413, detail="PDF exceeds the upload limit.")
                 output.write(chunk)
         if not total:
             raise HTTPException(status_code=400, detail="The uploaded PDF is empty.")
         with fitz.open(path) as pdf:
-            if not pdf.page_count or pdf.page_count > setting("DOCUMENT_MAX_PAGES", 500):
+            if not pdf.page_count or pdf.page_count > setting("DOCUMENT_MAX_PAGES", 100):
                 raise HTTPException(status_code=413, detail="PDF page limit exceeded.")
             pixels = [page.rect.width * page.rect.height * (200/72)**2 for page in pdf]
-            if max(pixels) > setting("DOCUMENT_MAX_IMAGE_PIXELS", 40000000) or sum(pixels) > setting("DOCUMENT_MAX_RASTER_PIXELS", 2000000000):
+            if max(pixels) > setting("DOCUMENT_MAX_IMAGE_PIXELS", 12000000) or sum(pixels) > setting("DOCUMENT_MAX_RASTER_PIXELS", 500000000):
                 raise HTTPException(status_code=413, detail="PDF rasterization budget exceeded.")
     except BaseException:
         path.unlink(missing_ok=True)

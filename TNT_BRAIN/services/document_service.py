@@ -122,7 +122,9 @@ class DocumentService:
         logger.info("Starting vision OCR for %s", file_path)
         extracted = []
         with fitz.open(file_path) as pdf:
-            page_count = min(len(pdf), int(os.getenv("OCR_MAX_PAGES", "25")))
+            page_count = len(pdf)
+            if page_count > int(os.getenv("OCR_MAX_PAGES", "100")):
+                raise ValueError("PDF exceeds the 100-page OCR limit. Split the document.")
             for page_index in range(page_count):
                 page = pdf.load_page(page_index)
                 pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), alpha=False)
