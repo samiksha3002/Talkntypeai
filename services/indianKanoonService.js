@@ -21,6 +21,7 @@ const IK = axios.create({
 // Log every request + response for debugging
 IK.interceptors.request.use((req) => {
   console.log(`[IK REQ] ${req.method?.toUpperCase()} ${req.baseURL}${req.url}`);
+  console.log(`[IK REQ] Token: ${config.indianKanoon.token?.slice(0,8)}...`);
   return req;
 });
 

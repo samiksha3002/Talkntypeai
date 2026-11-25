@@ -1,32 +1,27 @@
 import { requireDraftAuth, matchingOwner } from '../middleware/tenantScope.js';
 import express from "express";
 import PDFDocument from "pdfkit";
-import Case from "../models/case.js";
-import { ownerOf } from "../utils/ownership.js";
+import Case from "../models/case.js"; 
 
 export function createReportRouter({cases:repository=Case,auth=requireDraftAuth}={}) {
 const router = express.Router();
 router.use(auth,matchingOwner);
 
-// Report of the signed-in user's own cases only (owner from the verified JWT;
-// any userId in the query string is ignored).
 router.get("/", async (req, res) => {
   const { startDate, endDate } = req.query;
 
-  // Strict YYYY-MM-DD dates (main); owner only from the verified session.
   if (![startDate,endDate].every(v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v)))) {
     return res.status(400).json({ error: "Start and end dates are required" });
   }
 
-  let finalUserId;
-  try { finalUserId = ownerOf(req); } catch { return res.status(401).json({ error: "Sign in to continue." }); }
+  const finalUserId = req.draftOwnerId;
+  if (!finalUserId) {
+    return res.status(400).json({ error: "User ID is required to fetch cases" });
+  }
 
   try {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return res.status(400).json({ error: "Invalid dates" });
-    }
     end.setHours(23, 59, 59, 999);
 
     const cases = await repository.find({
@@ -46,7 +41,7 @@ router.get("/", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=CaseReport_${start.toISOString().slice(0, 10)}.pdf`
+      `attachment; filename=CaseReport_${startDate}.pdf`
     );
 
     doc.pipe(res);

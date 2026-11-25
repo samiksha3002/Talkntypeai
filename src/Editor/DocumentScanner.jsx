@@ -186,7 +186,6 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
     const baseUrl = API || DEFAULT_API;
 
     try {
-      if (isPdf && file.size > 50 * 1024 * 1024) throw new Error("PDF exceeds the 50 MB upload limit. Split the document.");
       const formData = new FormData();
       let endpoint;
 
@@ -238,7 +237,6 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
     });
 
     try {
-      if (isPdf && file.size > 50 * 1024 * 1024) throw new Error("PDF exceeds the 50 MB upload limit. Split the document.");
       const formData = new FormData();
       let endpoint;
 
@@ -368,7 +366,6 @@ const DocumentScanner = ({ file, onClose, onInsertText, API }) => {
               )}
             </div>
 
-            {isPdf && <p className="text-xs text-gray-500">PDF upload limit: 50 MB. OCR also has page, time and memory limits; large documents may need splitting.</p>}
             {/* Page navigation (PDF only) */}
             {isPdf && numPages > 1 && (
               <div className="flex justify-center items-center gap-4 py-2.5 border-t border-gray-100 bg-white">

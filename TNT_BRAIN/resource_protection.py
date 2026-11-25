@@ -17,7 +17,7 @@ def setting(name, default):
 class ResourceProtection:
     def __init__(self, app, max_bytes=None, concurrency=None, timeout=None, rate=None):
         self.app = app
-        self.max_bytes = max_bytes or setting("BRAIN_BODY_MB", 51) * 1024 * 1024
+        self.max_bytes = max_bytes or setting("BRAIN_BODY_MB", 100) * 1024 * 1024
         self.concurrency = concurrency or setting("BRAIN_CONCURRENCY", 2)
         self.timeout = timeout or setting("BRAIN_TIMEOUT_SECONDS", 600)
         self.rate = rate or setting("BRAIN_REQUESTS_PER_MINUTE", 30)

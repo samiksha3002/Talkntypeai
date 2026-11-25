@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { draftRequest, storeDraftSession, SESSION_STORAGE_MESSAGE, SESSION_TOKEN_PATTERN } from './draftClient.js';
+import { draftRequest, storeDraftSession, SESSION_STORAGE_MESSAGE } from './draftClient.js';
 export default function DraftSignIn({ onSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -11,7 +11,7 @@ export default function DraftSignIn({ onSuccess }) {
     setBusy(true); setError('');
     try {
       const result = await draftRequest('/draft-session', { method: 'POST', publicRequest: true, body: { email, password } });
-      if (!SESSION_TOKEN_PATTERN.test(result.data?.token || '')) throw new Error('Session was not confirmed.');
+      if (!/^[a-f0-9]{64}$/.test(result.data?.token || '')) throw new Error('Session was not confirmed.');
       if (!storeDraftSession(result.data)) throw new Error(SESSION_STORAGE_MESSAGE);
       setPassword(''); onSuccess();
     } catch (e) { setError(e.message); } finally { setBusy(false); }

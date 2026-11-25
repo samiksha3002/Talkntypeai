@@ -1,49 +1,74 @@
 import express from 'express';
 import Client from '../models/Client.js';
 import { requireDraftAuth, matchingOwner } from '../middleware/tenantScope.js';
-import { ownerOf, pick, validObjectId, sendError, createRecord } from '../utils/ownership.js';
 
-const CLIENT_FIELDS = ['name', 'phone', 'email', 'address', 'notes'];
+export function createClientRouter({clients:repository=Client,auth=requireDraftAuth}={}) {
+const router = express.Router();
+router.use(auth,matchingOwner);
+router.param('userId',(req,res,next)=>matchingOwner(req,res,next));
 
-// All queries are scoped to the signed-in user from the verified session.
-// A userId in the URL, query or body must match that user (matchingOwner: 403).
-export function createClientRouter({ clients = Client, auth = requireDraftAuth } = {}) {
-  const router = express.Router();
-  router.use(auth, matchingOwner);
-  router.param('userId', (req, res, next) => matchingOwner(req, res, next));
+// 1. ADD NEW CLIENT
+// POST /api/clients/add
+router.post('/add', async (req, res) => {
+  try {
+    const userId=req.draftOwnerId;
+    const { name, phone, email, address, notes } = req.body;
 
-  // POST /api/clients/add
-  router.post('/add', async (req, res) => {
-    try {
-      const fields = pick(req.body, CLIENT_FIELDS);
-      if (!fields.name || !fields.phone) {
-        return res.status(400).json({ success: false, message: 'Missing required fields (Name and Phone are mandatory)' });
-      }
-      const created = await createRecord(clients, { ...fields, userId: ownerOf(req) });
-      res.status(201).json({ success: true, message: 'Client added successfully!', client: created });
-    } catch (error) { sendError(res, error); }
-  });
+    // Validation
+    if (!userId || !name || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields (Name and Phone are mandatory)',
+      });
+    }
 
-  // GET /api/clients/user/:userId
-  router.get('/user/:userId', async (req, res) => {
-    try {
-      const rows = await clients.find({ userId: ownerOf(req) }).sort({ createdAt: -1 });
-      res.json({ success: true, clients: rows });
-    } catch (error) { sendError(res, error); }
-  });
+    const newClient = new repository({
+      userId,
+      name,   // ✅ use "name" to match schema
+      phone,
+      email,
+      address,
+      notes,
+    });
 
-  // DELETE /api/clients/:clientId
-  router.delete('/:clientId', async (req, res) => {
-    if (!validObjectId(req.params.clientId)) return res.status(400).json({ success: false, message: 'Invalid client ID' });
-    try {
-      const deleted = await clients.findOneAndDelete({ _id: req.params.clientId, userId: ownerOf(req) });
-      if (!deleted) return res.status(404).json({ success: false, message: 'Client not found' });
-      res.json({ success: true, message: 'Client deleted successfully' });
-    } catch (error) { sendError(res, error, 'Error deleting client'); }
-  });
+    await newClient.save();
+    res.status(201).json({
+      success: true,
+      message: 'Client added successfully!',
+      client: newClient,
+    });
+  } catch (error) {
+    console.error('Error adding client:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
 
-  return router;
+// 2. GET USER'S CLIENTS
+// GET /api/clients/user/:userId
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const userId=req.draftOwnerId;
+    const clients = await repository.find({ userId }).sort({ createdAt: -1 });
+    res.json({ success: true, clients });
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// 3. DELETE CLIENT
+// DELETE /api/clients/:clientId
+router.delete('/:clientId', async (req, res) => {
+  try {
+    const removed=await repository.findOneAndDelete({_id:req.params.clientId,userId:req.draftOwnerId});
+    if(!removed)return res.status(404).json({success:false,message:'Client not found'});
+    res.json({ success: true, message: 'Client deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    res.status(500).json({ success: false, message: 'Error deleting client' });
+  }
+});
+
+return router;
 }
-
-export const createClientsRouter = createClientRouter;   // name used on security/critical-fixes
 export default createClientRouter();
