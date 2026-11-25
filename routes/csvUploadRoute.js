@@ -4,19 +4,15 @@ import fs from 'node:fs';
 import csv from 'csv-parser';
 import CsvCaseModel from '../models/CsvCaseModel.js';
 import {documentBudget,uploadFile,withFile,job,setting,resourceError} from '../utils/resourceProtection.js';
-import { ownerOf } from '../utils/ownership.js';
-// Rows are owned by the signed-in user from the verified session. A userId in the
-// URL or form body must match it (matchingOwner / explicit checks: 403).
 export function createCsvRouter(repository=CsvCaseModel,auth=requireDraftAuth){
 const router=express.Router();
 router.use(auth,matchingOwner);
 router.param('userId',(req,res,next)=>matchingOwner(req,res,next));
 router.post('/import',...documentBudget,uploadFile('file','csv'),job(async(req,res)=>{
-  const userId=ownerOf(req);
   await withFile(req,async path=>{
-    // Multipart fields are parsed after matchingOwner ran, so check them here too (main).
-    if(req.body.userId!==undefined&&req.body.userId!==userId)throw resourceError(403,'Ownership must match your verified account.');
+    if(req.body.userId!==undefined&&req.body.userId!==String(req.draftOwnerId))throw resourceError(403,'Ownership must match your verified account.');
     if(req.body.ownerId!==undefined)throw resourceError(403,'Ownership is assigned by your verified account.');
+
     const input=fs.createReadStream(path);const parser=csv({maxRowBytes:1024*1024,mapHeaders:({header})=>header.replace(/^\uFEFF/,'').trim().toLowerCase()});
     input.on('error',error=>parser.destroy(error));input.pipe(parser);
     const abort=()=>parser.destroy(resourceError(408,'CSV import cancelled.'));
@@ -26,7 +22,7 @@ router.post('/import',...documentBudget,uploadFile('file','csv'),job(async(req,r
       for await(const data of parser){
         if(results.length>=setting('CSV_MAX_ROWS',50000))throw resourceError(413,'CSV row limit exceeded.');
         if(Object.values(data).some(value=>String(value).includes('\0')))throw resourceError(415,'Invalid CSV content.');
-        results.push({userId,serialNo:data.id||data.serialno,lastDate:data.lastdate||data['last date'],courtName:data.court||data.courtname,caseNumber:data.matterno||data['matter no']||data.casenumber,petitioner:data['first party']||data.petitioner||data.firstparty,respondent:data['second party']||data.respondent||data.secondparty,nextDate:data['next date']||data.nextdate||''});
+        results.push({userId:req.draftOwnerId,serialNo:data.id||data.serialno,lastDate:data.lastdate||data['last date'],courtName:data.court||data.courtname,caseNumber:data.matterno||data['matter no']||data.casenumber,petitioner:data['first party']||data.petitioner||data.firstparty,respondent:data['second party']||data.respondent||data.secondparty,nextDate:data['next date']||data.nextdate||''});
       }
       if(!results.length||!results.some(row=>row.caseNumber||row.petitioner||row.courtName))throw resourceError(400,'CSV file is empty or headers mismatch.');
       req.resource.signal.throwIfAborted();
@@ -37,10 +33,9 @@ router.post('/import',...documentBudget,uploadFile('file','csv'),job(async(req,r
 }));
 router.get("/list/:userId", async (req, res) => {
   try {
-    const cases = await repository.find({ userId: ownerOf(req) });
+    const cases = await repository.find({ userId: req.draftOwnerId });
     res.json(cases);
   } catch (error) {
-    if (error?.status === 401) return res.status(401).json({ error: "Sign in to continue." });
     res.status(500).json({ error: "Failed to fetch cases" });
   }
 });

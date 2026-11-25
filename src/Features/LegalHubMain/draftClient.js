@@ -3,14 +3,12 @@ import { getNodeApi, normalizeNodeApi } from '../../nodeApi.js';
 export const resolveDraftApi = normalizeNodeApi;
 export const SESSION_KEY = 'tnt_draft_session';
 export const SESSION_STORAGE_MESSAGE = 'Secure draft session storage is unavailable. Enable session storage and sign in again. Your unsaved text has been kept.';
-// Shape of the server-issued HS256 JWT (header.payload.signature). Verified server-side only.
-export const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{10,200}\.[A-Za-z0-9_-]{10,1000}\.[A-Za-z0-9_-]{43}$/;
 let storageUnavailable = false;
 export function storeDraftSession(session) {
   clearDraftRecovery();
   try {
     sessionStorage.removeItem(SESSION_KEY);
-    if (session?.token && SESSION_TOKEN_PATTERN.test(session.token)) {
+    if (session?.token && /^[a-f0-9]{64}$/.test(session.token)) {
       sessionStorage.setItem(SESSION_KEY, session.token);
       if (sessionStorage.getItem(SESSION_KEY) !== session.token) throw new Error('Storage did not retain session.');
     }

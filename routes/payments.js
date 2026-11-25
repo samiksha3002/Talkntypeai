@@ -1,36 +1,53 @@
-// routes/payments.js — the signed-in advocate's income/expense ledger.
+// routes/payments.js
 import express from "express";
-import Payment from "../models/Payment.js";
-import { ownerOf, pick, sendError, createRecord } from "../utils/ownership.js";
-import { requireDraftAuth, matchingOwner } from "../middleware/tenantScope.js";
+import Payment from "../models/Payment.js"; // ✅ make sure this file exists
 
-// All entries are scoped to the signed-in user (req.user from the verified JWT).
-export function createPaymentsRouter({ payments = Payment, auth = requireDraftAuth } = {}) {
-  const router = express.Router();
-  router.use(auth, matchingOwner);   // a userId in query/body must match the session (403)
+const router = express.Router();
 
-  // GET /api/payments — only the signed-in user's entries
-  router.get("/", async (req, res) => {
-    try {
-      const rows = await payments.find({ userId: ownerOf(req) }).sort({ date: -1 });
-      res.json({ payments: rows });
-    } catch (error) { sendError(res, error, "Failed to fetch payments"); }
-  });
+/**
+ * GET /api/payments
+ * Fetch all payments for the logged-in user (if auth is enabled),
+ * otherwise return all payments.
+ */
+router.get("/", async (req, res) => {
+  try {
+    const query = req.user ? { userId: req.user.id } : {};
+    const payments = await Payment.find(query).sort({ date: -1 });
+    res.json({ payments });
+  } catch (err) {
+    console.error("Error fetching payments:", err);
+    res.status(500).json({ error: "Failed to fetch payments" });
+  }
+});
 
-  // POST /api/payments
-  router.post("/", async (req, res) => {
-    try {
-      const { date, client, amount, type, caseId } = pick(req.body, ["date", "client", "amount", "type", "caseId"], { max: 500 });
-      const value = Number(amount);
-      if (!date || !client || !Number.isFinite(value) || value <= 0 || !["Income", "Expense"].includes(type)) {
-        return res.status(400).json({ error: "Missing or invalid fields" });
-      }
-      const payment = await createRecord(payments, { date: new Date(date), client, amount: value, type, caseId, userId: ownerOf(req) });
-      res.status(201).json({ payment });
-    } catch (error) { sendError(res, error, "Failed to add payment"); }
-  });
+/**
+ * POST /api/payments
+ * Add a new payment entry.
+ */
+router.post("/", async (req, res) => {
+  try {
+    const { date, client, amount, type, caseId } = req.body;
 
-  return router;
-}
+    // Basic validation
+    if (!date || !client || !amount || !type) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
-export default createPaymentsRouter();
+    const payment = new Payment({
+      date: new Date(date),
+      client,
+      amount,
+      type,
+      caseId,
+      userId: req.user ? req.user.id : null, // attach user if available
+    });
+
+    await payment.save();
+    res.status(201).json({ payment });
+  } catch (err) {
+    console.error("Error adding payment:", err);
+    res.status(500).json({ error: "Failed to add payment" });
+  }
+});
+
+export default router;

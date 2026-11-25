@@ -1,14 +1,11 @@
-import {testJwt} from './fixtures/jwt.mjs'; // test-only JWT signing key
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createLegalWorkspaceRouter } from '../routes/legalWorkspace.js';
 import { createDraftAuth, tokenHash } from '../middleware/draftAuth.js';
 const users=[{_id:'a'.repeat(24),role:'user',subscription:{isActive:true}},{_id:'b'.repeat(24),role:'user',subscription:{isActive:true}}];
-// Merge note: sessions are JWTs; the session store is keyed by the hash of the token's jti.
-const jtis=['1'.repeat(64),'2'.repeat(64)];
-const tokens=jtis.map((jti,i)=>testJwt(users[i]._id,jti));
-const sessions=jtis.map((jti,i)=>({tokenHash:tokenHash(jti),ownerId:users[i]._id,expiresAt:new Date(Date.now()+600000)}));
+const tokens=['1'.repeat(64),'2'.repeat(64)];
+const sessions=tokens.map((token,i)=>({tokenHash:tokenHash(token),ownerId:users[i]._id,expiresAt:new Date(Date.now()+600000)}));
 const auth=createDraftAuth({sessions:{findOne:async q=>sessions.find(s=>s.tokenHash===q.tokenHash&&s.expiresAt>q.expiresAt.$gt)},users:{findById:async id=>users.find(u=>u._id===id)}});
 const calls=[];
 const app=express();app.use('/api/legal-workspace',createLegalWorkspaceRouter({auth,config:()=>({url:'http://127.0.0.1:8000',key:'synthetic-only-key-'.repeat(3)}),fetcher:async(url,options)=>{calls.push({url,...options});return new Response('data: synthetic draft\n\ndata: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}})}}));app.use((err,req,res,next)=>res.status(err.status||500).json({error:'Request failed'}));

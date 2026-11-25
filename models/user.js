@@ -20,18 +20,13 @@ const UserSchema = new mongoose.Schema({
   executive: { type: String }, 
   
   // 2. Security
-  // Legacy plain text (accounts created before hashing). Accepted at login; moved to
-  // passwordHash on login when LEGACY_PASSWORD_UPGRADE is on, or by
-  // scripts/hash-existing-passwords.mjs. New accounts never store this field.
-  // Neither field is ever selected unless explicitly requested ('+password +passwordHash').
-  password: {
-    type: String,
-    required: function () { return !this.passwordHash; },
-    select: false,
+  password: { 
+    type: String, 
+    required: function () { return !this.passwordHash; }
+    // Legacy records remain readable; new registrations store passwordHash only.
   },
-
-  // bcrypt, cost 12.
-  passwordHash: { type: String, select: false, validate: value => value === undefined || /^\$2[aby]\$12\$[./A-Za-z0-9]{53}$/.test(value) },
+  
+  passwordHash: { type: String, validate: value => value === undefined || /^\$2[aby]\$12\$[./A-Za-z0-9]{53}$/.test(value) },
 
   // 3. Roles & Permissions
   role: { 

@@ -1,4 +1,3 @@
-import './fixtures/jwt.mjs'; // test-only JWT signing key (sessions are JWTs after the merge)
 import authRouter from '../routes/auth.js';import DraftSession from '../models/DraftSession.js';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {hashNewPassword,verifyPassword} from '../utils/passwords.js';import User from '../models/user.js';import {createDraftSessionRouter} from '../routes/draftSession.js';import express from 'express';
