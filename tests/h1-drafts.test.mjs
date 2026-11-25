@@ -1,3 +1,4 @@
+import { testJwt } from './fixtures/jwt.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -72,15 +73,15 @@ test('database errors return failure without success payload',async()=>{
 test('authentication rejects missing/invalid/expired/revoked token and disabled account',async()=>{
   const response=()=>({status(n){this.code=n;return this},json(v){this.body=v;return this}});
   for(const header of [undefined,'Bearer forged']){const res=response();await createDraftAuth()({headers:{authorization:header}},res,()=>assert.fail('unauthorized'));assert.equal(res.code,401)}
-  const token='a'.repeat(64);let queried=false;
-  const auth=createDraftAuth({sessions:{findOne:async q=>{assert.equal(q.tokenHash,tokenHash(token));assert.ok(q.expiresAt.$gt instanceof Date);queried=true;return null}},users:{}});
+  const jti='a'.repeat(64),token=testJwt(A,jti);let queried=false;
+  const auth=createDraftAuth({sessions:{findOne:async q=>{assert.equal(q.tokenHash,tokenHash(jti));assert.ok(q.expiresAt.$gt instanceof Date);queried=true;return null}},users:{}});
   const res=response();await auth({headers:{authorization:'Bearer '+token}},res,()=>assert.fail('expired'));assert.equal(res.code,401);assert.ok(queried);
   const disabled=createDraftAuth({sessions:{findOne:async()=>({ownerId:A})},users:{findById:async()=>({_id:A,role:'user',subscription:{isActive:false}})}});
   const blocked=response();await disabled({headers:{authorization:'Bearer '+token}},blocked,()=>assert.fail('disabled'));assert.equal(blocked.code,403);
 });
 test('verified session supplies server owner, regardless of supplied user identity',async()=>{
   const auth=createDraftAuth({sessions:{findOne:async()=>({ownerId:A,tokenHash:'hash'})},users:{findById:async()=>({_id:A,role:'user',subscription:{isActive:true}})}});
-  const req={headers:{authorization:'Bearer '+'a'.repeat(64)},body:{ownerId:B}};let called=false;
+  const req={headers:{authorization:'Bearer '+testJwt(A,'a'.repeat(64))},body:{ownerId:B}};let called=false;
   await auth(req,{},()=>{called=true});assert.ok(called);assert.equal(req.draftOwnerId,A);
 });
 test('sanitization retains supported formatting and removes executable HTML/URLs/styles',()=>{
@@ -134,7 +135,7 @@ test('logout revokes the authenticated token only',async()=>{
   const router=createUserDraftRouter({sessions:{deleteOne:async q=>{query=q}},auth:(req,res,next)=>next()});
   const handler=router.stack.find(l=>l.route?.path==='/logout').route.stack[0].handle;
   const res={json(b){this.body=b},status(){return this}};
-  await handler({headers:{authorization:'Bearer '+'a'.repeat(64)},body:{ownerId:B}},res);assert.deepEqual(query,{tokenHash:tokenHash('a'.repeat(64))});assert.equal(res.body.success,true);
+  await handler({headers:{authorization:'Bearer '+testJwt(A,'a'.repeat(64))},body:{ownerId:B}},res);assert.deepEqual(query,{tokenHash:tokenHash('a'.repeat(64))});assert.equal(res.body.success,true);
 });
 test('table spans and paragraph spacing survive canonicalization',()=>{
   const html='<table style="border-collapse:collapse"><tr><td colspan="2" style="text-align:center">\u0928\u0935\u0940\u0928</td></tr></table><p style="margin-bottom:12pt">\u0928\u0935\u0940\u0928</p>';
@@ -147,7 +148,7 @@ test('SPA recovery remains in memory and is cleared on account/session change',a
 
 test('session issuance stores only a hash and enforces a bounded lifetime',async()=>{
   const {default:Session}=await import('../models/DraftSession.js');const {issueDraftSession}=await import('../middleware/draftAuth.js');const original=Session.create;let row;
-  try {Session.create=async value=>{row=value};const result=await issueDraftSession(A);assert.match(result.token,/^[a-f0-9]{64}$/);assert.equal(row.tokenHash,tokenHash(result.token));assert.equal(row.token,undefined);assert.equal(String(row.ownerId),A);assert.ok(new Date(result.expiresAt).getTime()>Date.now());assert.ok(new Date(result.expiresAt).getTime()<=Date.now()+12*3600000);}finally{Session.create=original}
+  try {Session.create=async value=>{row=value};const result=await issueDraftSession(A);const {verifyJwt}=await import('../utils/jwt.js');const claims=verifyJwt(result.token);assert.ok(claims);assert.equal(claims.sub,A);assert.match(claims.jti,/^[a-f0-9]{64}$/);assert.equal(row.tokenHash,tokenHash(claims.jti));assert.ok(!row.tokenHash.includes(claims.jti));assert.equal(row.token,undefined);assert.equal(String(row.ownerId),A);assert.ok(new Date(result.expiresAt).getTime()>Date.now());assert.ok(new Date(result.expiresAt).getTime()<=Date.now()+12*3600000);}finally{Session.create=original}
 });
 test('model declares atomic idempotency index and strict ownership fields',async()=>{
   const {default:Draft}=await import('../models/UserDraft.js');assert.equal(Draft.schema.options.strict,'throw');assert.ok(Draft.schema.path('ownerId').isRequired);assert.ok(Draft.schema.indexes().some(([fields,opts])=>fields.ownerId===1&&fields.creationKey===1&&opts.unique));
@@ -231,7 +232,7 @@ test('session storage get/set/remove exceptions fail closed without breaking loc
       else storage[failure]=()=>{throw Error('blocked')};
       localStorage.setItem('user','verified-local-display-only');
       assert.doesNotThrow(()=>storeDraftSession(null));
-      assert.equal(storeDraftSession({token:'b'.repeat(64)}),false);
+      assert.equal(storeDraftSession({token:testJwt(A,'b'.repeat(64))}),false);
       assert.equal(getDraftSession(),null);
       assert.throws(()=>readDraftSession(),e=>e.message===SESSION_STORAGE_MESSAGE);
       let called=false;
@@ -240,7 +241,7 @@ test('session storage get/set/remove exceptions fail closed without breaking loc
       assert.equal(called,false);assert.equal(localStorage.getItem('user'),'verified-local-display-only');
     }
     const map=new Map();Object.defineProperty(globalThis,'sessionStorage',{configurable:true,value:{getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)}});
-    assert.equal(storeDraftSession({token:'c'.repeat(64)}),true);assert.equal(readDraftSession(),'c'.repeat(64));
+    const jwt=testJwt(A,'c'.repeat(64));assert.equal(storeDraftSession({token:'c'.repeat(64)}),true);assert.equal(readDraftSession(),null);assert.equal(storeDraftSession({token:jwt}),true);assert.equal(readDraftSession(),jwt);
     storeDraftSession(null);
   } finally {
     if(original)Object.defineProperty(globalThis,'sessionStorage',original);else delete globalThis.sessionStorage;

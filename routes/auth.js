@@ -1,6 +1,6 @@
 import express from 'express';
 import User from '../models/user.js';
-import { issueDraftSession } from '../middleware/draftAuth.js';
+import { issueSession, publicUser } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -9,8 +9,10 @@ router.post('/create-user', async (req, res) => {
   try {
     const { fullName, email, state, city, phone, executive, password } = req.body;
 
-    if (email === 'admin@talkntype.com') {
-      return res.status(400).json({ message: 'This email is reserved for Admin. Use Login page.' });
+    // Optional: keep the configured administrator address from being registered as a normal user.
+    const reserved = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    if (reserved && typeof email === 'string' && email.trim().toLowerCase() === reserved) {
+      return res.status(400).json({ message: 'This email cannot be registered.' });
     }
 
     const existingUser = await User.findOne({ email });
@@ -29,70 +31,53 @@ router.post('/create-user', async (req, res) => {
     res.status(201).json({ message: 'Registration successful! Wait for admin approval.' });
 
   } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error("Registration Error:", error?.message);
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
 // --- LOGIN ROUTE ---
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    // A. STATIC ADMIN LOGIN
-    if (email === 'admin@talkntype.com' && password === 'TNT2024') {
-        const oneYearFromNow = new Date();
-        oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1); 
-        
-      return res.status(200).json({
-        message: 'Welcome Boss!',
-        user: {
-          id: 'admin-static-id',
-          fullName: 'Super Admin',
-          email: 'admin@talkntype.com',
-          role: 'admin', 
-          subscription: { isActive: true, plan: 'unlimited' }
-        },
-        expiryDate: oneYearFromNow.toISOString() 
-      });
+    const { email, password } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password || email.length > 254 || password.length > 1024) {
+      return res.status(400).json({ message: 'Enter your email and password.' });
     }
 
-    // B. NORMAL USER CHECK
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (user.password !== password) {
-          return res.status(400).json({ message: 'Invalid credentials' });
+    // Every account, including administrators, is verified against the database.
+    // There is no hard-coded or environment-variable login bypass.
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user || user.password !== password) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
        return res.status(403).json({ message: '⛔ Account Pending Approval. Contact Admin.' });
     }
 
-    const userExpiryDate = user.subscription && user.subscription.expiryDate 
-                            ? user.subscription.expiryDate.toISOString() 
+    const userExpiryDate = user.subscription && user.subscription.expiryDate
+                            ? user.subscription.expiryDate.toISOString()
                             : null;
-    
-    // Sessions are issued only for database-verified accounts, never static bypasses.
-    let draftSession = null;
-    try { draftSession = await issueDraftSession(user._id); } catch { /* Draft access fails closed. */ }
+
+    // The JWT is required by every protected API route, so login fails if it cannot be issued.
+    let session;
+    try { session = await issueSession(user._id); }
+    catch (error) {
+      console.error('Login session error:', error?.message);
+      return res.status(503).json({ message: 'Sign-in is temporarily unavailable.' });
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
-      draftSession,
+      draftSession: session,   // name kept for the existing frontend
+      token: session.token,
       message: 'Login successful!',
-      user: {
-        _id: user._id, 
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        subscription: user.subscription
-      },
+      user: publicUser(user),
       expiryDate: userExpiryDate
     });
 
   } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error("Login Error:", error?.message);
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 

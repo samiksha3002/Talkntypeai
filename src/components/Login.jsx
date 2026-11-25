@@ -82,16 +82,8 @@ const Login = () => {
         setStatus({ type: 'error', message: data.message || 'Invalid Email or Password' });
       }
     } catch (error) {
-      console.error("Login Error:", error);
-      
-      // Fallback for testing 
-      if(formData.email === "admin@test.com") {
-          localStorage.setItem('user', JSON.stringify({ role: 'admin', _id: 'test_admin_id' }));
-          localStorage.setItem('userId', 'test_admin_id'); // Fix fallback too
-          navigate('/admin');
-      } else {
-          setStatus({ type: 'error', message: 'Server error. Please try again later.' });
-      }
+      console.error("Login Error:", error?.message);
+      setStatus({ type: 'error', message: 'Server error. Please try again later.' });
     }
   };
 

@@ -1,5 +1,18 @@
 import { logoutDraftSession } from '../Features/LegalHubMain/draftLogout.js';
+import { getDraftSession } from '../Features/LegalHubMain/draftClient.js';
 import React, { useState, useEffect } from 'react';
+
+const ADMIN_API = 'https://talkntypeai.onrender.com/api/admin';
+// Every admin request carries the signed-in admin's JWT; the server checks the role in the database.
+class AdminAuthError extends Error {}
+async function adminFetch(path, options = {}) {
+  const token = getDraftSession();
+  if (!token) throw new AdminAuthError('Sign in again as an administrator.');
+  const response = await fetch(ADMIN_API + path, { ...options, cache: 'no-store',
+    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
+  if (response.status === 401 || response.status === 403) throw new AdminAuthError('Sign in again as an administrator.');
+  return response;
+}
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas'; // 1. Import html2canvas
 import jsPDF from 'jspdf';             // 2. Import jsPDF
@@ -42,15 +55,22 @@ const AdminDashboard = () => {
     fetchUsers();
   }, []);
 
+  const handleAuthError = (error) => {
+    if (!(error instanceof AdminAuthError)) return false;
+    alert(error.message);
+    navigate('/login');
+    return true;
+  };
+
   const fetchUsers = async () => {
     try {
-      const response = await fetch('https://talkntypeai.onrender.com/api/admin/users');
+      const response = await adminFetch('/users');
       const data = await response.json();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching users:', error);
       setLoading(false);
+      if (!handleAuthError(error)) console.error('Error fetching users:', error?.message);
     }
   };
 
@@ -65,14 +85,14 @@ const AdminDashboard = () => {
   const toggleStatus = async (id, currentStatus) => {
     setUsers(users.map(u => u._id === id ? { ...u, subscription: { ...u.subscription, isActive: !currentStatus } } : u));
     try {
-      await fetch(`https://talkntypeai.onrender.com/api/admin/update-status/${id}`, {
+      await adminFetch(`/update-status/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
       });
-      fetchUsers(); 
+      fetchUsers();
     } catch (error) {
-      console.error('Error updating status:', error);
+      if (!handleAuthError(error)) console.error('Error updating status:', error?.message);
     }
   };
 
@@ -80,7 +100,7 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm("ARE YOU SURE? \n\nThis will permanently delete the user and all their data.")) {
       try {
-        const response = await fetch(`https://talkntypeai.onrender.com/api/admin/delete-user/${userId}`, {
+        const response = await adminFetch(`/delete-user/${encodeURIComponent(userId)}`, {
           method: 'DELETE',
         });
         if (response.ok) {
@@ -90,7 +110,7 @@ const AdminDashboard = () => {
           alert("Failed to delete user");
         }
       } catch (error) {
-        console.error("Error deleting user:", error);
+        if (!handleAuthError(error)) console.error("Error deleting user:", error?.message);
       }
     }
   };
@@ -120,7 +140,7 @@ const AdminDashboard = () => {
   const saveSubscription = async () => {
     if (!selectedUser) return;
     try {
-      const response = await fetch(`https://talkntypeai.onrender.com/api/admin/update-subscription/${selectedUser._id}`, {
+      const response = await adminFetch(`/update-subscription/${encodeURIComponent(selectedUser._id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(planDates),
@@ -130,9 +150,12 @@ const AdminDashboard = () => {
         setShowModal(false);
         fetchUsers();
         alert("Plan Updated Successfully!");
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.message || "Failed to update plan");
       }
     } catch (error) {
-      console.error("Failed to update plan", error);
+      if (!handleAuthError(error)) console.error("Failed to update plan", error?.message);
     }
   };
 
@@ -207,7 +230,7 @@ const AdminDashboard = () => {
         <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">User Management</h2>
-            <p className="text-slate-500 text-sm mt-1">View details, passwords, and manage subscriptions.</p>
+            <p className="text-slate-500 text-sm mt-1">View details and manage subscriptions.</p>
           </div>
           
           <div className="relative w-full md:w-72">
@@ -334,10 +357,6 @@ const AdminDashboard = () => {
                         <div className="col-span-1">
                             <label className="block text-xs text-slate-500 mb-1">Executive ID</label>
                             <div className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded inline-block min-w-[80px]">{selectedUser.executive || 'N/A'}</div>
-                        </div>
-                        <div className="col-span-1">
-                            <label className="block text-xs text-slate-500 mb-1">Password</label>
-                            <div className="font-mono text-sm text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded break-all">{selectedUser.password || '••••••'}</div>
                         </div>
                         <div className="col-span-2">
                              <label className="block text-xs text-slate-500">Full Name</label>
