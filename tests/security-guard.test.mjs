@@ -97,7 +97,9 @@ test('login limiter blocks repeated failures per IP but not successful sign-ins'
 test('frontend: the JWT is attached only to our own API, never to other hosts', async () => {
   const pageOrigin = 'https://talkntype.pro';
   assert.ok(isOwnApi('https://talkntypeai.onrender.com/api/chat', { pageOrigin }));
-  assert.ok(isOwnApi('/api/judgements/search', { pageOrigin }));
+  // The page's own origin is not trusted: /api there goes through the hosting rewrite.
+  assert.equal(isOwnApi('/api/judgements/search', { pageOrigin }), false);
+  assert.equal(isOwnApi('https://talkntype.pro/api/chat', { pageOrigin }), false);
   // Loopback origins get the token only in the Vite dev server, never in production builds.
   assert.equal(isOwnApi('http://localhost:5000/api/x', { pageOrigin }), false);
   assert.equal(isOwnApi('http://127.0.0.1:5000/api/x', { pageOrigin }), false);

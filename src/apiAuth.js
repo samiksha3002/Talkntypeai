@@ -33,13 +33,14 @@ export function aiServiceUrl(endpoint) {
 
 function originOf(value) { try { return new URL(value).origin; } catch { return null; } }
 
+// Relative URLs are resolved against the page, but the page's own origin is NOT
+// trusted: a same-origin /api request would leave through the hosting rewrite to
+// whatever host vercel.json names, so it never gets the token implicitly.
 export function isOwnApi(url, { origins = API_ORIGINS, pageOrigin = globalThis.location?.origin } = {}) {
   let target;
   try { target = new URL(String(url), pageOrigin || 'http://invalid.local'); } catch { return false; }
   if (!target.pathname.startsWith('/api/')) return false;
-  const allowed = new Set(origins.map(originOf).filter(Boolean));
-  if (pageOrigin) allowed.add(pageOrigin);          // same-origin /api (Vercel rewrite)
-  return allowed.has(target.origin);
+  return new Set(origins.map(originOf).filter(Boolean)).has(target.origin);
 }
 
 export function installApiAuth({ token = getDraftSession, target = globalThis, http = axios } = {}) {
