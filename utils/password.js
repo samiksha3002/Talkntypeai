@@ -35,9 +35,21 @@ export async function findWithPassword(users, filter) {
   return typeof query?.select === 'function' ? query.select('+password') : query;
 }
 
+// LEGACY_PASSWORD_UPGRADE (default "on"). Set it to "off" during the first days
+// after deploying so a rollback to the old code (which compares plain text) stays
+// possible: legacy plain-text passwords are then still ACCEPTED at login but NOT
+// rewritten. Do not run scripts/hash-existing-passwords.mjs while it is "off".
+export function legacyUpgradeEnabled(env = process.env) {
+  const value = String(env.LEGACY_PASSWORD_UPGRADE ?? 'on').trim().toLowerCase();
+  return !['off', 'false', '0', 'no'].includes(value);
+}
+
 // Replaces a verified legacy plain-text password with a bcrypt hash.
 // Compare-and-set: only updates if the stored value is still the old plain text.
-export async function upgradeLegacyPassword(users, user, password) {
+// Returns true if an upgrade was attempted.
+export async function upgradeLegacyPassword(users, user, password, { env = process.env } = {}) {
+  if (!legacyUpgradeEnabled(env)) return false;
   try { await users.updateOne({ _id: user._id, password: user.password }, { $set: { password: await hashPassword(password) } }); }
   catch (error) { console.error('[auth] password upgrade failed:', error?.message); }
+  return true;
 }

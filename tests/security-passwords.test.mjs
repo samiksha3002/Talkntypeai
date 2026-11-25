@@ -184,3 +184,36 @@ test('create-admin: password is read hidden from a terminal, or from piped stdin
   mismatch.write('first-password\r'); await new Promise(r => setImmediate(r)); mismatch.write('other-password\r');
   await assert.rejects(failing, /do not match/);
 });
+
+test('LEGACY_PASSWORD_UPGRADE=off: legacy plain-text accounts still sign in but are NOT rewritten', async () => {
+  const { legacyUpgradeEnabled } = await import('../utils/password.js');
+  for (const v of [undefined, 'on', 'ON', 'true', '1', 'yes', 'anything']) assert.equal(legacyUpgradeEnabled(v === undefined ? {} : { LEGACY_PASSWORD_UPGRADE: v }), true, String(v));
+  for (const v of ['off', 'OFF', ' off ', 'false', '0', 'no']) assert.equal(legacyUpgradeEnabled({ LEGACY_PASSWORD_UPGRADE: v }), false, v);
+
+  const { default: User } = await import('../models/user.js');
+  const { default: Session } = await import('../models/DraftSession.js');
+  const { default: router } = await import('../routes/auth.js');
+  const { createDraftSessionRouter } = await import('../routes/draftSession.js');
+  const original = { findOne: User.findOne, updateOne: User.updateOne, create: Session.create, flag: process.env.LEGACY_PASSWORD_UPGRADE };
+  const stored = { _id: U, email: 'user@example.test', password: 'legacy-plain-2', role: 'user', subscription: { isActive: true } };
+  const updates = [];
+  try {
+    process.env.LEGACY_PASSWORD_UPGRADE = 'off';
+    User.findOne = () => ({ select: async () => ({ ...stored }) });
+    User.updateOne = async (...args) => { updates.push(args); return { modifiedCount: 1 }; };
+    Session.create = async () => ({});
+    const ok = await invoker(routeHandler(router, '/login'))({ email: 'user@example.test', password: 'legacy-plain-2' });
+    assert.equal(ok.statusCode, 200);
+    const draftUsers = { findOne: () => ({ select: async () => ({ ...stored }) }), updateOne: async (...args) => { updates.push(args); } };
+    const draftRouter = createDraftSessionRouter({ users: draftUsers, issue: async () => ({ token: 't', expiresAt: '' }) });
+    const draft = await invoker(draftRouter.stack.find(l => l.route).route.stack.at(-1).handle)({ email: 'user@example.test', password: 'legacy-plain-2' });
+    assert.equal(draft.body.success, true);
+    assert.equal(updates.length, 0, 'no rewrite while the flag is off');
+    process.env.LEGACY_PASSWORD_UPGRADE = 'on';
+    await invoker(routeHandler(router, '/login'))({ email: 'user@example.test', password: 'legacy-plain-2' });
+    assert.equal(updates.length, 1, 'turning the flag back on resumes upgrades');
+  } finally {
+    Object.assign(User, { findOne: original.findOne, updateOne: original.updateOne }); Session.create = original.create;
+    if (original.flag === undefined) delete process.env.LEGACY_PASSWORD_UPGRADE; else process.env.LEGACY_PASSWORD_UPGRADE = original.flag;
+  }
+});
