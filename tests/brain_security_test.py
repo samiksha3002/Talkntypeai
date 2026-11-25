@@ -103,9 +103,18 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(self.client.post(path, json={}).status_code, 401, path)
             self.assertEqual(self.client.post(path, json={}, headers={"X-Brain-Secret": "guess", "X-User-Id": USER_A}).status_code, 401, path)
 
-    def test_chat_without_own_document_is_409_not_another_users_document(self):
-        response = self.client.post("/api/chat-with-pdf", json={"query": "What is the date?"}, headers=self.headers(USER_B))
-        self.assertEqual(response.status_code, 409)
+    def test_legacy_document_endpoints_stay_contained_even_with_valid_gateway_headers(self):
+        # Merge note: main's DocumentContainment suspends the shared-document endpoints;
+        # per-user isolation of DocumentService is covered by DocumentIsolationTests.
+        for path in ["/api/chat-with-pdf", "/api/analyze-document", "/api/generate-legal-draft", "/api/generate-legal-draft-stream"]:
+            self.assertEqual(self.client.post(path, json={"query": "x"}, headers=self.headers(USER_B)).status_code, 503, path)
+
+    def test_legal_workspace_gateway_is_guarded_by_its_own_key(self):
+        # BrainAuth hands /internal/legal-workspace/* to main's WorkspaceBoundary,
+        # which still refuses requests without X-Legal-Service-Key / X-Legal-Owner.
+        for headers in [{}, self.headers(), {"X-Legal-Service-Key": "guess", "X-Legal-Owner": USER_A}]:
+            response = self.client.post("/internal/legal-workspace/chat-with-pdf", json={"query": "x"}, headers=headers)
+            self.assertEqual(response.status_code, 401)
 
     def test_separate_python_login_and_register_were_removed(self):
         for path in ["/api/login", "/api/register"]:

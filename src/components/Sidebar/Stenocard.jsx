@@ -1,13 +1,13 @@
+import { getSpeechCredential, DEEPGRAM_ENABLED } from '../../Editor/speechCredential.js';
 import { createSpeechSession } from '../../Editor/speech.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
-import { apiBase } from '../../apiAuth.js';
 
 // --- LIST OF SUPPORTED LANGUAGES (Moved from Sidebar.jsx) ---
 const languageOptions = [
-    // Deepgram Languages (Preferred STT)
-    { code: 'en-IN', label: 'English (India) ⚡', provider: 'deepgram' },
-    { code: 'hi', label: 'Hindi (हिंदी) ⚡', provider: 'deepgram' },
+    // Historical cloud preferences; native fallback is selected while containment is active.
+    { code: 'en-IN', label: 'English (India)', provider: 'deepgram' },
+    { code: 'hi', label: 'Hindi (हिंदी)', provider: 'deepgram' },
     // Web Speech API Languages (STT Fallback)
     { code: 'mr-IN', label: 'Marathi (मराठी) 🌐', provider: 'web' },
     { code: 'gu-IN', label: 'Gujarati (ગુજરાતી) 🌐', provider: 'web' },
@@ -19,20 +19,11 @@ const languageOptions = [
     { code: 'bn-IN', label: 'Bengali (বাংলা) 🌐', provider: 'web' },
 ];
 
-// Live dictation uses a short-lived Deepgram token issued by our API for the
-// signed-in user (POST /api/deepgram/token). No Deepgram key is ever in the browser.
-async function fetchDeepgramToken() {
-    const response = await fetch(apiBase() + '/api/deepgram/token', { method: 'POST' });
-    if (response.status === 401) throw Object.assign(new Error('Please sign in again to use live dictation.'), { user: true });
-    if (response.status === 403) throw Object.assign(new Error('Live dictation needs an active subscription.'), { user: true });
-    if (response.status === 429) throw Object.assign(new Error('Too many dictation requests. Please wait a minute.'), { user: true });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || typeof data.accessToken !== 'string') throw Object.assign(new Error(data.error || 'Live dictation is unavailable right now.'), { user: true });
-    return data.accessToken;
-}
 
 const StenoCard = ({ onSpeechInput }) => {
     const [isListening, setIsListening] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
+    const [speechError, setSpeechError] = useState('');
     const [language, setLanguage] = useState('en-IN');
     
     // Refs for Deepgram
@@ -47,14 +38,14 @@ const StenoCard = ({ onSpeechInput }) => {
     // --- Deepgram Start/Stop Logic (Kept as is) ---
     const startDeepgram = async () => { /* ... (Your existing startDeepgram logic) ... */
         try {
+            const credential = await getSpeechCredential();
             speechSessionRef.current?.stop();
             const session = createSpeechSession('deepgram', onSpeechInput);
             speechSessionRef.current = session;
-            const accessToken = await fetchDeepgramToken();
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
-            const deepgram = createClient({ accessToken });
+            const deepgram = createClient(credential);
 
             const connection = deepgram.listen.live({
                 model: "nova-2",
@@ -70,6 +61,7 @@ const StenoCard = ({ onSpeechInput }) => {
             connectionRef.current = connection;
 
             connection.on(LiveTranscriptionEvents.Open, () => {
+                setIsStarting(false);
                 setIsListening(true);
                 
                 const mediaRecorder = new MediaRecorder(stream);
@@ -91,28 +83,30 @@ const StenoCard = ({ onSpeechInput }) => {
                 stopSteno();
             });
         } catch (error) {
-            speechSessionRef.current?.stop();
-            if (error?.user) { alert(error.message); return; }
-            console.error("Mic Access Error:", error?.message);
-            alert("Could not access microphone.");
+            setIsStarting(false);
+            console.error("Mic Access Error:", error);
+            alert(error.message || "Could not access microphone.");
         }
     };
 
     // --- Web Speech API Start Logic (Kept as is) ---
     const startWebSpeech = () => { /* ... (Your existing startWebSpeech logic) ... */
         if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-            alert("Your browser does not support Web Speech API. Please use Chrome or Edge.");
+            setSpeechError('Browser speech is unavailable here. Try Chrome or Edge with microphone permission, or continue typing.');
+            setIsStarting(false);
             return;
         }
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         
-        recognition.lang = language;
+        recognition.lang = language === 'hi' ? 'hi-IN' : language;
         recognition.continuous = true;
         recognition.interimResults = false;
 
         recognition.onstart = () => {
+            if (recognitionRef.current !== recognition) return;
+            setIsStarting(false);
             setIsListening(true);
         };
 
@@ -123,21 +117,32 @@ const StenoCard = ({ onSpeechInput }) => {
             session.web(event);
         };
 
-        recognition.onerror = (event) => {
-            console.error("Web Speech Error:", event.error);
-            if(event.error === 'not-allowed') {
-                alert("Microphone permission denied.");
-                stopSteno();
-            }
+        recognition.onerror = event => {
+            if (recognitionRef.current !== recognition) return;
+            const messages = {
+                'not-allowed': 'Microphone permission denied. Allow microphone access and try again, or continue typing.',
+                'service-not-allowed': 'Browser speech is blocked by your browser settings. Continue typing or use a supported browser.',
+                'language-not-supported': 'The selected language is unavailable in this browser. Choose another language or continue typing.',
+                'audio-capture': 'No microphone is available. Connect one and try again, or continue typing.',
+                network: 'Browser speech could not connect. Check your connection and retry, or continue typing.',
+                'no-speech': 'No speech was detected. Try again when ready.',
+            };
+            setSpeechError(messages[event.error] || 'Browser speech stopped. Try again or continue typing.');
+            setIsStarting(false);
+            stopSteno(true);
         };
 
         recognition.onend = () => {
             session.stop();
+            if (recognitionRef.current !== recognition) return;
+            recognitionRef.current = null;
+            setIsStarting(false);
             setIsListening(false);
         };
 
         recognitionRef.current = recognition;
-        recognition.start();
+        try { recognition.start(); }
+        catch { session.stop(); recognitionRef.current = null; setIsStarting(false); setSpeechError('Browser speech could not start. Try again or continue typing.'); }
     };
 
     // --- Combined Stop Logic (Kept as is) ---
@@ -155,20 +160,24 @@ const StenoCard = ({ onSpeechInput }) => {
         streamRef.current?.getTracks().forEach(track => track.stop());
         connectionRef.current = null;
         // Native stop may still emit a final result; onend retires its session.
-        recognitionRef.current?.stop();
+        try { recognitionRef.current?.stop(); } catch { /* Recognition may already have ended. */ }
         recognitionRef.current = null;
         setIsListening(false);
+        setIsStarting(false);
     };
 
-    // --- Hybrid Router (Kept as is) ---
+    // --- Provider selection with native fallback during containment ---
     const toggleListening = () => {
+        if (isStarting) return;
+        setSpeechError('');
         if (isListening) {
             stopSteno();
         } else {
             const selectedOption = languageOptions.find(opt => opt.code === language);
             const provider = selectedOption ? selectedOption.provider : 'web';
 
-            if (provider === 'deepgram') {
+            setIsStarting(true);
+            if (provider === 'deepgram' && DEEPGRAM_ENABLED) {
                 startDeepgram();
             } else {
                 startWebSpeech();
@@ -176,19 +185,12 @@ const StenoCard = ({ onSpeechInput }) => {
         }
     };
 
-    // Auto-restart if Steno language changes and Cleanup (Kept as is)
-    useEffect(() => {
-        if (isListening) {
-            stopSteno();
-            setTimeout(() => toggleListening(), 1000); 
-        }
-    }, [language]); 
+    // The language selector is locked while starting/listening; retire on unmount.
+    const stopRef = useRef(stopSteno);
+    stopRef.current = stopSteno;
+    useEffect(() => () => stopRef.current(true), []);
 
-    useEffect(() => {
-        return () => stopSteno(true);
-    }, []);
-
-    const currentProvider = languageOptions.find(opt => opt.code === language)?.provider === 'deepgram' ? 'Deepgram ⚡' : 'Browser 🌐';
+    const currentProvider = DEEPGRAM_ENABLED && languageOptions.find(opt => opt.code === language)?.provider === 'deepgram' ? 'Deepgram' : 'Browser';
 
     return (
         // --- CARD 1: SUPER STENO (INPUT) ---
@@ -201,7 +203,7 @@ const StenoCard = ({ onSpeechInput }) => {
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="w-full border border-gray-300 rounded p-2 mb-3 text-sm bg-white outline-none focus:border-indigo-500 transition cursor-pointer"
-                disabled={isListening}
+                disabled={isListening || isStarting}
             >
                 {languageOptions.map((lang) => (
                     <option key={lang.code} value={lang.code}>
@@ -212,14 +214,17 @@ const StenoCard = ({ onSpeechInput }) => {
             
             <button 
                 onClick={toggleListening}
+                disabled={isStarting}
                 className={`w-full py-2.5 rounded font-medium flex items-center justify-center gap-2 transition shadow-sm text-white ${
                     isListening ? 'bg-red-500 animate-pulse hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'
                 }`}
             >
                 <span>{isListening ? '⏹️' : '🎙️'}</span> 
-                {isListening ? 'Stop Speaking' : 'Start Speaking'}
+                {isStarting ? 'Starting...' : isListening ? 'Stop Speaking' : 'Start Speaking'}
             </button>
             
+            {!DEEPGRAM_ENABLED && <p role="status" className="text-xs mt-2">Using browser speech for the selected language. Deepgram remains paused for security maintenance.</p>}
+            {speechError && <p role="alert" className="text-xs mt-2">{speechError}</p>}
             {isListening && (
                 <div className="flex items-center justify-center gap-2 mt-3">
                     <span className="relative flex h-3 w-3">

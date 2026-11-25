@@ -1,3 +1,4 @@
+import MaintenanceNotice from './components/MaintenanceNotice.jsx';
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { getDraftSession } from "./Features/LegalHubMain/draftClient.js";
@@ -24,19 +25,13 @@ import AdminPanel from "./components/AdminPanel";
 import JudgementsPage from "./components/JudgementsPage";
 import AddClientPage from "./pages/AddClientPage";
 import GenerateReportPage from "./pages/GenerateReportPage";
-import AddInquiryPage from "./pages/AddInquiryPage";
-import ManageInquiries from "./pages/ManageInquiries";
-import AddTeamMemberPage from "./pages/AddTeamMemberPage";
-import PaymentBookPage from "./pages/PaymentBookPage";
 import AddCasePage from "./pages/AddCasePage";
 import ManageCasesPage from "./pages/ManageCasesPage";
 import BusinessCardRequest from "./components/BusinessCardRequest";
 import ImportECourtPage from "./pages/ImportECourtPage";
-import ManageTeamPage from "./pages/ManageTeamPage"; 
 import WebsiteShowcase from "./components/WebsiteShowcase";
 import ManageClientsPage from "./pages/ManageClientsPage";
 import EditCasePage from "./pages/EditCasePage";
-import EditInquiryPage from "./pages/EditInquiryPage";
 import Packages from "./components/Packages";
 import MyDrafts from "./Features/LegalHubMain/pages/MyDrafts.jsx";
 import DraftStudio from "./Features/LegalHubMain/pages/DraftStudio";
@@ -131,15 +126,15 @@ function App() {
                 <Route path="/diary" element={<UserRoute><Diary /></UserRoute>} />
                 <Route path="/add-case" element={<UserRoute><AddCasePage /></UserRoute>} />
                 <Route path="/manage-cases" element={<UserRoute><ManageCasesPage /></UserRoute>} />
-                <Route path="/manage-team" element={<UserRoute><ManageTeamPage /></UserRoute>} />
+                <Route path="/manage-team" element={<MaintenanceNotice feature="Team management" />} />
                 <Route path="/judgements" element={<UserRoute><JudgementsPage /></UserRoute>} />
                 <Route path="/business-card" element={<UserRoute><BusinessCardRequest /></UserRoute>} />
                 <Route path="/add-client" element={<UserRoute><AddClientPage /></UserRoute>} />
                 <Route path="/generate-report" element={<UserRoute><GenerateReportPage /></UserRoute>} />
-                <Route path="/inquiries" element={<UserRoute><AddInquiryPage /></UserRoute>} />
-                <Route path="/manage-inquiries" element={<UserRoute><ManageInquiries /></UserRoute>} />
-                <Route path="/team" element={<UserRoute><AddTeamMemberPage /></UserRoute>} />
-                <Route path="/payments" element={<UserRoute><PaymentBookPage /></UserRoute>} />
+                <Route path="/inquiries" element={<UserRoute><MaintenanceNotice feature="Inquiry management" /></UserRoute>} />
+                <Route path="/manage-inquiries" element={<UserRoute><MaintenanceNotice feature="Inquiry management" /></UserRoute>} />
+                <Route path="/team" element={<UserRoute><MaintenanceNotice feature="Team management" /></UserRoute>} />
+                <Route path="/payments" element={<UserRoute><MaintenanceNotice feature="Payment book" /></UserRoute>} />
                 <Route path="/import-ecourt" element={<UserRoute><ImportECourtPage /></UserRoute>} />
                 <Route path="/website-showcase" element={<UserRoute><WebsiteShowcase /></UserRoute>} />
                 <Route path="/manage-clients" element={<UserRoute><ManageClientsPage /></UserRoute>} />
@@ -153,7 +148,7 @@ function App() {
                 
                 {/* EDIT ROUTES */}
                 <Route path="/case/edit/:id" element={<UserRoute><EditCasePage /></UserRoute>} />
-                <Route path="/edit-inquiry/:id" element={<UserRoute><EditInquiryPage /></UserRoute>} />
+                <Route path="/edit-inquiry/:id" element={<MaintenanceNotice feature="Inquiry editing" />} />
 
                 {/* 404 */}
                 <Route path="*" element={<div>404 Page Not Found</div>} />

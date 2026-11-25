@@ -1,3 +1,4 @@
+import { getNodeApi } from '../nodeApi.js';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -30,7 +31,7 @@ const Register = () => {
 
     try {
       // API Call
-      const response = await fetch('https://talkntypeai.onrender.com/api/create-user', {
+      const response = await fetch((await getNodeApi()) + '/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

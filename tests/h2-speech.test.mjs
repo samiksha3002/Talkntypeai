@@ -22,3 +22,29 @@ test('H2 partial/empty events make no editor change',()=>{const q=editor('existi
 test('H2 provider punctuation attached to a spoken command is not duplicated',()=>{assert.equal(processSpeech('alpha comma, beta full stop.'),'alpha, beta.');assert.equal(processSpeech('comma comma'),',,');assert.equal(processSpeech('literal ... remains'),'literal ... remains')});
 
 test('H2 explicit speech-final fallback is accepted without treating an interim result as final',()=>{const events=[];const session=createSpeechSession('deepgram',e=>events.push(e));const data=final('endpoint final');delete data.is_final;session.deepgram({...data,speech_final:true});session.deepgram({...final('interim',1),is_final:false,speech_final:true});assert.deepEqual(events.map(e=>e.text),['endpoint final'])});
+
+test('native Hindi/Marathi commands preserve surrounding dictated words',()=>{
+  assert.equal(processSpeech('पहिले पूर्ण विराम दुसरे नवीन परिच्छेद तिसरे स्वल्पविराम चौथे'),'पहिले. दुसरे\n\nतिसरे, चौथे');
+  assert.equal(processSpeech('पहला नई पंक्ति दूसरा नया पैराग्राफ तीसरा प्रश्नवाचक चिह्न'),'पहला\nदूसरा\n\nतीसरा?');
+  assert.equal(processSpeech('नमस्कार पूर्णविराम पुढे नवी ओळ अर्ज'),'नमस्कार. पुढे\nअर्ज');
+});
+
+test('native punctuation aliases and provider punctuation are applied exactly once',()=>{
+  for(const [phrase,symbol] of [['अल्पविराम',','],['स्वल्प विराम',','],['प्रश्नचिन्ह','?'],['आश्चर्यवाचक चिन्ह','!'],['विस्मयादिबोधक','!'],['अपूर्ण विराम',':'],['अर्धविराम',';'],['डॅश','-'],['स्लैश','/']]){
+    assert.equal(processSpeech('अर्ज '+phrase),'अर्ज'+symbol);
+    assert.equal(processSpeech('अर्ज '+phrase+symbol),'अर्ज'+symbol);
+  }
+  assert.equal(processSpeech('अर्ज पूर्ण विराम।'),'अर्ज।');
+});
+
+test('native boundaries, combining marks and quoted command names remain ordinary text',()=>{
+  for(const text of ['पूर्ण विरामाचा अर्थ','अल्पविरामामुळे बदल','अपूर्णविरामासाठी','मराठी हिंदी न्यायालय','पूर्ण विरामा','त्याने “पूर्ण विराम” म्हटले','शब्द "नवीन परिच्छेद" जतन करा']) assert.equal(processSpeech(text),text);
+  assert.equal(processSpeech('शब्द “पूर्ण विराम” new line पुढे'),'शब्द “पूर्ण विराम”\nपुढे');
+});
+
+test('native dictation uses remembered caret and retains existing text and formatting',()=>{
+  const q=editor('left right\n',null);
+  const range=insertSpeech(q,speechEvent('अर्ज पूर्ण विराम नवीन परिच्छेद पुढे'),{index:5,length:0});
+  assert.equal(q.text,'left अर्ज.\n\nपुढे right\n');
+  assert.equal(range.index,q.text.indexOf('right'));assert.deepEqual(q.formats,{bold:true});
+});

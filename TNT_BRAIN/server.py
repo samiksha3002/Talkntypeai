@@ -1,3 +1,7 @@
+from workspace_boundary import WorkspaceBoundary
+from workspace_routes import create_workspace_router
+from services.request_documents import RequestDocuments
+from document_containment import DocumentContainment
 from resource_protection import ResourceProtection, setting
 from brain_auth import BrainAuth
 from starlette.concurrency import run_in_threadpool
@@ -31,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TalkNType AI Python API")
 app.add_middleware(ResourceProtection)
+app.add_middleware(DocumentContainment)
+app.add_middleware(WorkspaceBoundary)
+app.include_router(create_workspace_router(RequestDocuments, research_and_draft_stream))
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

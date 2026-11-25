@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useState } from "react";
 import { ChevronLeft, Calendar, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +38,7 @@ const GenerateReportPage = () => {
       const API_URL = "https://talkntypeai.onrender.com"; // ✅ Direct URL for stability
 
       // ✅ Added userId to query parameters
-      const res = await fetch(
+      const res = await tenantFetch(
         `${API_URL}/api/reports?startDate=${startDate}&endDate=${endDate}&userId=${userId}`,
         {
           method: 'GET',

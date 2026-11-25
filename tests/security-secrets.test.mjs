@@ -17,13 +17,25 @@ const PATTERNS = {
 };
 const SKIP = /(^|\/)(package-lock\.json|node_modules\/)|\.(png|jpe?g|gif|webp|ico|pdf|mp4|ttf|woff2?|bin|pickle|sqlite3|pyc|zip|traineddata)$/i;
 
+// Release notes cite full commit hashes; a 40-hex value that is a git object in this
+// repository is a reference, not a credential.
+const gitObject = hex => { try { execFileSync('git', ['cat-file', '-e', hex], { stdio: 'ignore' }); return true; } catch { return false; } };
+const HEX40 = /[0-9a-f]{40}/g;
+
 test('tracked files contain no hard-coded credentials', () => {
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(f => f && !SKIP.test(f) && fs.existsSync(f));
   assert.ok(files.length > 100);
   const findings = [];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
-    for (const [name, pattern] of Object.entries(PATTERNS)) if (pattern.test(text)) findings.push(`${file}: ${name}`);
+    for (const [name, pattern] of Object.entries(PATTERNS)) {
+      if (!pattern.test(text)) continue;
+      if (name.includes('40-hex')) {
+        const lines = text.split('\n').filter(line => pattern.test(line));
+        if (lines.every(line => (line.match(HEX40) || []).every(gitObject))) continue;
+      }
+      findings.push(`${file}: ${name}`);
+    }
   }
   assert.deepEqual(findings, []);
 });

@@ -12,13 +12,15 @@ import express from 'express';
 import { once } from 'node:events';
 import { setting } from '../utils/resourceProtection.js';
 
-export const BRAIN_ENDPOINTS = new Set(['generate-legal-draft-stream', 'generate-legal-draft', 'analyze-document',
-  'chat-with-pdf', 'ai-command', 'legal-research', 'translate-research-marathi']);
+// Document actions (analyze, chat-with-PDF, drafting, ai-command) go through main's
+// /api/legal-workspace gateway; this proxy covers the remaining Python endpoints.
+export const BRAIN_ENDPOINTS = new Set(['legal-research', 'translate-research-marathi']);
 const FORWARD_RESPONSE_HEADERS = ['content-type', 'x-accel-buffering'];
 
 export function brainConfig(env = process.env) {
-  const url = (env.BRAIN_URL || '').replace(/\/+$/, '');
-  const secret = env.BRAIN_SHARED_SECRET || '';
+  // One URL/secret pair serves both gateways: BRAIN_* or main's LEGAL_AI_SERVICE_*.
+  const url = (env.BRAIN_URL || env.LEGAL_AI_SERVICE_URL || '').replace(/\/+$/, '');
+  const secret = env.BRAIN_SHARED_SECRET || env.LEGAL_AI_SERVICE_KEY || '';
   return {
     url: /^https?:\/\//.test(url) ? url : '',
     secret: secret.length >= 32 ? secret : '',

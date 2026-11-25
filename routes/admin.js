@@ -16,7 +16,11 @@ const date = value => {
 // Only non-admin accounts can be changed or deleted through these endpoints.
 export function createAdminRouter({ users = User, auth = requireAdmin } = {}) {
   const router = express.Router();
-  router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, auth);
+  router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, auth,
+    // Defence in depth (from main): even if a weaker auth middleware is injected, the
+    // role read from the database by that middleware must be "admin".
+    (req, res, next) => (req.draftRole === 'admin' || req.user?.role === 'admin')
+      ? next() : res.status(403).json({ message: 'Administrator access required.' }));
 
   router.get('/users', async (req, res) => {
     try {

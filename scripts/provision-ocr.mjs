@@ -9,7 +9,7 @@ export const models={
 };
 export const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export async function provision(){
-  const destination=path.resolve('ocr-data');await fs.mkdir(destination,{recursive:true});
+  const destination=fileURLToPath(new URL('../ocr-data/',import.meta.url));await fs.mkdir(destination,{recursive:true});
   for(const [lang,hash] of Object.entries(models)){
     const target=path.join(destination,lang+'.traineddata');
     if(await fs.readFile(target).then(bytes=>digest(bytes)===hash,()=>false)){console.log(lang+': verified');continue;}

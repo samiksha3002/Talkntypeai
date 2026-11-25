@@ -1,18 +1,8 @@
+import { adminFetch } from './adminFetch.js';
 import { logoutDraftSession } from '../Features/LegalHubMain/draftLogout.js';
-import { getDraftSession } from '../Features/LegalHubMain/draftClient.js';
 import React, { useState, useEffect } from 'react';
-
-const ADMIN_API = 'https://talkntypeai.onrender.com/api/admin';
-// Every admin request carries the signed-in admin's JWT; the server checks the role in the database.
-class AdminAuthError extends Error {}
-async function adminFetch(path, options = {}) {
-  const token = getDraftSession();
-  if (!token) throw new AdminAuthError('Sign in again as an administrator.');
-  const response = await fetch(ADMIN_API + path, { ...options, cache: 'no-store',
-    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
-  if (response.status === 401 || response.status === 403) throw new AdminAuthError('Sign in again as an administrator.');
-  return response;
-}
+// Every admin request carries the signed-in admin's session (adminFetch, from main);
+// the server checks the role in the database.
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas'; // 1. Import html2canvas
 import jsPDF from 'jspdf';             // 2. Import jsPDF
@@ -56,7 +46,7 @@ const AdminDashboard = () => {
   }, []);
 
   const handleAuthError = (error) => {
-    if (!(error instanceof AdminAuthError)) return false;
+    if (!error?.auth) return false;   // missing/expired session or not an administrator
     alert(error.message);
     navigate('/login');
     return true;

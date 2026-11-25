@@ -3,8 +3,9 @@ import { PenTool, Search, FileText, ArrowRight, Sparkles, Scale, MessageSquare }
 
 // --- FEATURE IMPORTS ---
 import AIDrafting from "./AIDrafting";
-import LegalResearch from "./LegalResearch";
 import ChatWithPDF from "./ChatWithPDF";
+import LegalResearch from "./LegalResearch";
+
 
 const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
   const [activeFeature, setActiveFeature] = useState("main");
@@ -12,20 +13,13 @@ const LegalAIHub = ({ setIsAIGenerating, setManualText }) => {
   // --- NAVIGATION LOGIC ---
   if (activeFeature === "drafting") {
     return (
-      <AIDrafting 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-        setManualText={setManualText} 
-      />
+      <AIDrafting onBack={() => setActiveFeature("main")} setIsAIGenerating={setIsAIGenerating} setManualText={setManualText} />
     );
   }
 
   if (activeFeature === "pdfChat") {
     return (
-      <ChatWithPDF 
-        onBack={() => setActiveFeature("main")} 
-        setIsAIGenerating={setIsAIGenerating} 
-      />
+      <ChatWithPDF onBack={() => setActiveFeature("main")} />
     );
   }
 

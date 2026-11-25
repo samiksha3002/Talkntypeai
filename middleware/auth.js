@@ -77,8 +77,9 @@ export function createAuth({ sessions = DraftSession, users = User, access = 'su
       if (access === 'admin' && user.role !== 'admin') return res.status(403).json({ success: false, error: text.admin });
       if (access === 'subscription' && !hasActiveSubscription(user)) return res.status(403).json({ success: false, error: text.forbidden });
       req.user = { ...publicUser(user), id: String(user._id) };
-      // Backwards-compatible names used by the drafts and bookmarks routers.
+      // Names used by the drafts, bookmarks, tenant and admin routers (from main).
       req.draftOwnerId = user._id;
+      req.draftRole = user.role;
       req.draftTokenHash = session.tokenHash;
       next();
     } catch {

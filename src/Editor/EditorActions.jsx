@@ -4,6 +4,7 @@ import axios from "axios";
 import { Save, Printer, Mic, Trash2, FileUp, FileText } from "lucide-react"; 
 import { fixGrammar, expandText, uploadOCR, uploadAudio, uploadPDF } from "./editor.api";
 import { exportDocument } from "./exportDownload.js";
+import { printDocument } from './printDocument.js';
 
 // 🔴 NAYA IMPORT: DOCX library for perfectly formatted Word Export
 
@@ -79,27 +80,12 @@ const EditorActions = ({
   const handleDownloadWord=()=>download('docx');
 
   // --- 🖨️ Handle Print ---
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Document</title>
-          <style>
-            body { 
-              font-family: 'Times New Roman', Times, serif; 
-              padding: 40px; 
-              line-height: 1.6; 
-              font-size: 12pt;
-              white-space: pre-wrap; 
-            }
-          </style>
-        </head>
-        <body>${manualText}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+  const handlePrint = async () => {
+    if (exportLock.current) return;
+    exportLock.current = true; setExporting(true); setExportError('');
+    try { await printDocument(quillRef?.current?.getEditor()); }
+    catch (error) { setExportError(error.message || 'Printing failed. Your document is unchanged.'); }
+    finally { exportLock.current = false; setExporting(false); }
   };
 
   const handleDictionarySearch = async (e) => {
@@ -190,7 +176,7 @@ const EditorActions = ({
             )}
         </div>
 
-        <button onClick={handlePrint} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Print">
+        <button onClick={handlePrint} disabled={exporting} className="p-2 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all" title="Print">
             <Printer size={18} strokeWidth={2} />
         </button>
 

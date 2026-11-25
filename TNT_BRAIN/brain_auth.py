@@ -14,11 +14,15 @@ import os
 import re
 
 PUBLIC_PATHS = {"/health"}
+# Main's Legal AI gateway authenticates itself (WorkspaceBoundary: X-Legal-Service-Key
+# + X-Legal-Owner, fail closed). Everything else under it is still refused there.
+GATEWAY_PREFIX = "/internal/legal-workspace/"
 USER_ID = re.compile(r"^[a-f0-9]{24}$")
 
 
 def configured_secret():
-    secret = os.getenv("BRAIN_SHARED_SECRET", "")
+    # One secret for both gateways: BRAIN_SHARED_SECRET, or main's LEGAL_AI_SERVICE_KEY.
+    secret = os.getenv("BRAIN_SHARED_SECRET") or os.getenv("LEGAL_AI_SERVICE_KEY", "")
     return secret if len(secret) >= 32 else None
 
 
@@ -30,6 +34,8 @@ class BrainAuth:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or (scope.get("method") == "GET" and scope.get("path") in PUBLIC_PATHS):
             return await self.app(scope, receive, send)
+        if scope.get("path", "").startswith(GATEWAY_PREFIX):
+            return await self.app(scope, receive, send)   # WorkspaceBoundary enforces its own key
         secret = self.secret_getter()
         if not secret:
             return await self._reject(send, 503, "Service is not configured.")

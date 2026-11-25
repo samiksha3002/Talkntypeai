@@ -9,7 +9,7 @@
 // password manager:  <your-password-manager-cli> | ADMIN_EMAIL=… node scripts/create-admin.mjs --apply
 // The password is never taken from an environment variable or the command line
 // (those end up in shell history / process listings), never printed, and is
-// stored only as a bcrypt hash. Optional ADMIN_NAME.
+// stored only as a bcrypt hash (passwordHash; any legacy plain text is removed). Optional ADMIN_NAME.
 //
 // Promoting an existing account or resetting an admin's password revokes ALL of
 // that account's existing sessions, so tokens issued before the change stop working.
@@ -17,11 +17,11 @@
 // Windows Git Bash (mintty) is not a real terminal for Node: typing there would be
 // visible. Use PowerShell / cmd, or run `winpty node scripts/create-admin.mjs --apply`.
 import { pathToFileURL } from 'node:url';
-import { hashPassword, passwordProblem } from '../utils/password.js';
+import { hashNewPassword, passwordProblem } from '../utils/passwords.js';
 
 export const MIN_ADMIN_PASSWORD_LENGTH = 12;
 
-export async function upsertAdmin(users, { email, password, name = 'Administrator', apply = false, sessions, log = console.log, hash = hashPassword }) {
+export async function upsertAdmin(users, { email, password, name = 'Administrator', apply = false, sessions, log = console.log, hash = hashNewPassword }) {
   const normalized = String(email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error('ADMIN_EMAIL must be a valid email address.');
   if (apply) {
@@ -36,12 +36,12 @@ export async function upsertAdmin(users, { email, password, name = 'Administrato
   if (!apply) return action;
   const passwordHash = await hash(password);
   if (existing) {
-    await users.updateOne({ _id: existing._id }, { $set: { role: 'admin', password: passwordHash, 'subscription.isActive': true } });
+    await users.updateOne({ _id: existing._id }, { $set: { role: 'admin', passwordHash, 'subscription.isActive': true }, $unset: { password: '' } });
     const { deletedCount = 0 } = await sessions.deleteMany({ ownerId: existing._id });
     log(`Revoked ${deletedCount} existing session(s) for this account.`);
   } else {
     const now = new Date();
-    await users.insertOne({ fullName: name, email: normalized, password: passwordHash, role: 'admin',
+    await users.insertOne({ fullName: name, email: normalized, passwordHash, role: 'admin',
       subscription: { plan: 'admin', isActive: true, startDate: now, expiryDate: null }, createdAt: now, updatedAt: now });
   }
   log('Done.');

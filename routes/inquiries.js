@@ -1,17 +1,19 @@
 // backend/routes/inquiries.js
 import express from "express";
 import Inquiry from "../models/Inquiry.js";
-import { ownerOf, pick, validObjectId, sendError } from "../utils/ownership.js";
+import { ownerOf, pick, validObjectId, sendError, createRecord } from "../utils/ownership.js";
+import { requireDraftAuth, matchingOwner } from "../middleware/tenantScope.js";
 
 const INQUIRY_FIELDS = ["inquirerName", "contactNumber", "email", "typeOfCase", "summary", "followUpDate"];
 
 // Inquiries belong to the signed-in user (req.user from the verified JWT).
-export function createInquiriesRouter({ inquiries = Inquiry } = {}) {
+export function createInquiriesRouter({ inquiries = Inquiry, auth = requireDraftAuth } = {}) {
   const router = express.Router();
+  router.use(auth, matchingOwner);   // a userId in query/body must match the session (403)
 
   router.post("/", async (req, res) => {
     try {
-      const inquiry = await inquiries.create({ ...pick(req.body, INQUIRY_FIELDS), userId: ownerOf(req) });
+      const inquiry = await createRecord(inquiries, { ...pick(req.body, INQUIRY_FIELDS), userId: ownerOf(req) });
       res.status(201).json({ success: true, message: "Inquiry saved successfully", inquiry });
     } catch (error) { sendError(res, error); }
   });

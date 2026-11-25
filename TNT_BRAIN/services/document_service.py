@@ -1,10 +1,12 @@
 import base64
+import ctypes
 import gc
 import hashlib
 import logging
 import os
 import re
 import shutil
+import sys
 import threading
 import time
 import uuid
@@ -34,6 +36,29 @@ class _Store:
         self.timer = None
         self.last_error = None
         self.last_used = time.monotonic()
+
+
+def _release_raster_memory():
+    """Return disposable OCR/raster buffers to the OS, without lowering image quality.
+
+    OCR is the dominant transient allocation on 512-MiB Linux instances. MuPDF
+    caches and glibc freed arenas can accumulate across scanned pages even after
+    a Pixmap has been deleted. This runs only after the page/prompt are released.
+    """
+    try:
+        fitz.TOOLS.store_shrink(100)
+    except (AttributeError, RuntimeError):
+        logger.debug('MuPDF cache shrink unavailable', exc_info=True)
+    gc.collect()
+    if sys.platform == 'linux':
+        try:
+            malloc_trim = ctypes.CDLL(None).malloc_trim
+            malloc_trim.argtypes = [ctypes.c_size_t]
+            malloc_trim.restype = ctypes.c_int
+            malloc_trim(0)
+        except (AttributeError, OSError):
+            # Works without glibc, including non-Linux developer machines.
+            pass
 
 
 class DocumentService:
@@ -175,9 +200,11 @@ class DocumentService:
                 raise ValueError("PDF exceeds the 100-page OCR limit. Split the document.")
             for page_index in range(page_count):
                 page = pdf.load_page(page_index)
-                pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), alpha=False)
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.7, 1.7), colorspace=fitz.csGRAY, alpha=False)
                 image_bytes = pix.tobytes("png")
+                del pix  # Release decoded RGB pixels before base64/SDK serialization.
                 encoded = base64.b64encode(image_bytes).decode("ascii")
+                del image_bytes
                 prompt = HumanMessage(content=[
                     {
                         "type": "text",
@@ -197,6 +224,7 @@ class DocumentService:
                         },
                     },
                 ])
+                del encoded  # The prompt now owns the only required image string.
                 try:
                     result = self.llm_vision.invoke([prompt])
                     content = result.content if isinstance(result.content, str) else str(result.content)
@@ -211,6 +239,14 @@ class DocumentService:
                         page_content=f"[OCR failed on page {page_index + 1}: {exc}]",
                         metadata={"page": page_index + 1, "source": "OCR-Failed"},
                     ))
+                finally:
+                    del prompt  # Do not retain the previous page during the next raster.
+                    del page
+                    # Keep the *same* lossless PNG and OCR resolution; reclaim
+                    # native raster caches before processing the next page.
+                    if 'result' in locals():
+                        del result
+                    _release_raster_memory()
                 time.sleep(0.2)
         return extracted
 

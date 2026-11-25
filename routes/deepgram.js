@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { setting } from '../utils/resourceProtection.js';
+import { unavailable } from '../middleware/releaseContainment.js';
 
 // Live dictation (Deepgram) without exposing the real API key.
 //
@@ -53,6 +54,8 @@ export function createDeepgramRouter({ grant = deepgramGrant, limiter = createTo
       res.status(502).json({ error: 'Live dictation is temporarily unavailable. Try again shortly.' });
     }
   });
+  // The old key endpoint (/api/deepgram) refuses every method and never returns a key (main, C3).
+  router.all('/', unavailable);
   return router;
 }
 

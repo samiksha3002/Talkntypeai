@@ -1,7 +1,8 @@
+import { getNodeApi } from '../nodeApi.js';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import { resolveDraftApi, storeDraftSession, SESSION_STORAGE_MESSAGE } from '../Features/LegalHubMain/draftClient.js';
+import { storeDraftSession, SESSION_STORAGE_MESSAGE, SESSION_TOKEN_PATTERN } from '../Features/LegalHubMain/draftClient.js';
 
 const Login = () => {
   // 1. State to capture user input
@@ -25,16 +26,17 @@ const Login = () => {
     setStatus({ type: 'loading', message: 'Verifying credentials...' });
 
     try {
-      const loginUrl = import.meta.env.VITE_DRAFT_API_URL
-        ? resolveDraftApi(import.meta.env.VITE_DRAFT_API_URL) + '/login'
-        : 'https://talkntypeai.onrender.com/api/login'; // Preserve existing legacy configuration.
+      const loginUrl = (await getNodeApi()) + '/login';
       const response = await fetch(loginUrl, {
-        method: 'POST',
+        method: 'POST', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000),
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, email: formData.email.trim() }),
       });
 
-      const data = await response.json();
+      let data;
+      try { data = await response.json(); }
+      catch { throw new Error('The login service returned an invalid response. Check the Node API routing.'); }
+      if (response.ok && !SESSION_TOKEN_PATTERN.test(data.draftSession?.token || '')) throw new Error('Your account was verified, but a secure session could not be created. Please try again or contact support.');
 
       if (response.ok) {
         const user = data.user;
@@ -83,7 +85,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error("Login Error:", error?.message);
-      setStatus({ type: 'error', message: 'Server error. Please try again later.' });
+      setStatus({ type: 'error', message: error.message || 'Login service unavailable. Please try again later.' });
     }
   };
 

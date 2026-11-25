@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useState } from 'react';
 import { ChevronLeft, RefreshCw, Upload, FileText, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -46,7 +47,7 @@ const ImportECourtPage = () => {
         const API_URL = import.meta.env.VITE_API_URL;
 
         // 2. Call the real backend API
-        const res = await fetch(`${API_URL}/api/cases/import`, {
+        const res = await tenantFetch(`${API_URL}/api/cases/import`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

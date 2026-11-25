@@ -12,6 +12,6 @@ dotenv.config();
 
 console.log(`[env] .env loaded — IK token: ${
   process.env.INDIAN_KANOON_API_TOKEN
-    ? "set"
+    ? "configured (redacted)"
     : "❌ NOT SET — check your .env file"
 }`);

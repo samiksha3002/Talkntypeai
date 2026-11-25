@@ -1,4 +1,5 @@
 import "./env.js";
+import { installReleaseContainment } from './middleware/releaseContainment.js';
 import { setting, createBodyBudget } from "./utils/resourceProtection.js";
 import express from "express";
 import cors from "cors";
@@ -42,6 +43,8 @@ import draftsRouter        from "./routes/draft.ready.js";
 import draftSessionRouter from "./routes/draftSession.js";
 import userDraftsRouter from "./routes/userDrafts.js";
 
+import legalWorkspaceRouter from './routes/legalWorkspace.js';
+
 connectDB();
 
 const app = express();
@@ -61,6 +64,7 @@ const allowedOrigins = [
   // Existing typo/alternate domain kept intentionally
   "https://talkntpe.pro",
   "https://www.talkntpe.pro",
+  "https://talkntypeai-az58un8no-samikshas-projects-5c4b8930.vercel.app",
 ];
 
 const corsOptions = {
@@ -108,11 +112,14 @@ const corsOptions = {
 
 
 app.use(cors(corsOptions));
+// 1) Temporarily suspended features (main): 503 before anything else runs.
+installReleaseContainment(app);
 app.use("/api", apiLimiter);
-// Server-side authentication for every /api route (default deny), before any body is parsed.
+// 2) Server-side authentication for every /api route (default deny), before any body is parsed.
 app.use("/api", createApiGuard());
-// Python AI service proxy: mounted before the body parsers so uploads and
-// server-sent events stream through unchanged (see routes/brain.js).
+// 3) Streaming proxies to the Python service, mounted before the body parsers:
+//    Legal AI workspace (main) and research/translation (security/critical-fixes).
+app.use("/api/legal-workspace", legalWorkspaceRouter);
 app.use("/api/brain", brainRouter);
 app.use(createBodyBudget());
 app.use(
@@ -402,7 +409,7 @@ app.listen(
     console.log(
       `🇮🇳 Indian Kanoon token: ${
         process.env.INDIAN_KANOON_API_TOKEN
-          ? "✅ set"
+          ? "configured (redacted)"
           : "❌ NOT SET"
       }`
     );

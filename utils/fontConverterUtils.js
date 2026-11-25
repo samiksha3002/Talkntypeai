@@ -1,4 +1,5 @@
 import kru2uni from "@anthro-ai/krutidev-unicode";
+import { conversionUnavailable } from './legacyFontSupport.js';
 
 /* ============================================================
    FONT CONVERTER UTILS
@@ -1000,6 +1001,8 @@ export const SUPPORTED_CONVERSIONS = {
    ============================================================ */
 
 export function convert(conversionType, text) {
+  const unavailable = conversionUnavailable(conversionType);
+  if (unavailable) throw new Error(unavailable);
   const entry = SUPPORTED_CONVERSIONS[conversionType];
 
   if (!entry) {

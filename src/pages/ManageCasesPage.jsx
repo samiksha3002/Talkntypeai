@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Briefcase, Calendar, List, PlusCircle, Trash2, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +20,7 @@ const ManageCasesPage = () => {
     const fetchCases = async () => {
       try {
         // Corrected URL: Backend automatically adds /api/cases from server.js
-        const res = await fetch(`https://talkntypeai.onrender.com/api/cases/user/${userId}`);
+        const res = await tenantFetch(`https://talkntypeai.onrender.com/api/cases/user/${userId}`);
         
         // Safety check if response is not JSON
         const contentType = res.headers.get("content-type");
@@ -33,6 +34,7 @@ const ManageCasesPage = () => {
         }
       } catch (err) {
         console.error("Error fetching cases:", err);
+        alert(err.message);
       } finally {
         setLoading(false);
       }
@@ -46,7 +48,7 @@ const ManageCasesPage = () => {
     if (!window.confirm("Are you sure you want to delete this case?")) return;
 
     try {
-      const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${caseId}`, {
+      const res = await tenantFetch(`https://talkntypeai.onrender.com/api/cases/${caseId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'

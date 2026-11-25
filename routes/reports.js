@@ -1,16 +1,20 @@
+import { requireDraftAuth, matchingOwner } from '../middleware/tenantScope.js';
 import express from "express";
 import PDFDocument from "pdfkit";
 import Case from "../models/case.js";
 import { ownerOf } from "../utils/ownership.js";
 
+export function createReportRouter({cases:repository=Case,auth=requireDraftAuth}={}) {
 const router = express.Router();
+router.use(auth,matchingOwner);
 
 // Report of the signed-in user's own cases only (owner from the verified JWT;
 // any userId in the query string is ignored).
 router.get("/", async (req, res) => {
   const { startDate, endDate } = req.query;
 
-  if (typeof startDate !== "string" || typeof endDate !== "string" || !startDate || !endDate) {
+  // Strict YYYY-MM-DD dates (main); owner only from the verified session.
+  if (![startDate,endDate].every(v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v)))) {
     return res.status(400).json({ error: "Start and end dates are required" });
   }
 
@@ -25,7 +29,7 @@ router.get("/", async (req, res) => {
     }
     end.setHours(23, 59, 59, 999);
 
-    const cases = await Case.find({
+    const cases = await repository.find({
       userId: finalUserId,
       hearingDate: { $gte: start, $lte: end },
     }).sort({ hearingDate: 1 }).lean();
@@ -81,4 +85,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-export default router;
+return router;
+}
+export default createReportRouter();

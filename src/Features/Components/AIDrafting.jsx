@@ -4,7 +4,6 @@
 // ==========================================
 
 import React, { useState, useEffect, useRef } from "react";
-import { aiServiceUrl } from "../../apiAuth.js";
 import {
   Maximize2, ListChecks, Sparkles, Wand2, Scale,
   ChevronLeft, ChevronRight, Gavel, Calendar, ShieldAlert,
@@ -15,8 +14,7 @@ import {
 // ==========================================
 // URL CONFIGURATION (NODE vs PYTHON)
 // ==========================================
-// Python AI endpoints go through our authenticated Node proxy (/api/brain/*).
-const getApiUrl = aiServiceUrl;
+import { workspaceFetch } from "./workspaceClient.js";
 
 // ==========================================
 // DOWNLOAD UTILITIES
@@ -464,7 +462,7 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
     if (!selectedText) return;
     setLocalIsGenerating(true);
     try {
-      const response = await fetch(getApiUrl("/api/ai-command"), {
+      const response = await workspaceFetch("/api/ai-command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command, text: selectedText, context: caseFacts }),
@@ -541,12 +539,12 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         formData.append("facts", facts || "Generate draft from this document");
         formData.append("language", lang);
         if (documentType) formData.append("documentType", documentType);
-        response = await fetch(getApiUrl("/api/generate-legal-draft-stream"), {
+        response = await workspaceFetch("/api/generate-legal-draft-stream", {
           method: "POST",
           body: formData,
         });
       } else {
-        response = await fetch(getApiUrl("/api/generate-legal-draft-stream"), {
+        response = await workspaceFetch("/api/generate-legal-draft-stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ facts, language: lang, documentType: documentType || null }),
@@ -597,14 +595,10 @@ const AIDrafting = ({ onBack, setManualText, setIsAIGenerating }) => {
         }
       }
 
-      if (fullText) {
-        parseDraftSections(fullText);
-        setStreamedText("");
-        setStep(3);
-      }
+      throw new Error("Draft stream ended before completion. Please retry.");
     } catch (error) {
       console.error("Streaming error:", error);
-      alert("Backend connection failed! Ensure your Python server is running.");
+      alert(error.message || "Draft generation failed. Please retry.");
     } finally {
       setIsGenerating(false);
       setLocalIsGenerating(false);
@@ -637,8 +631,8 @@ const handleChatSubmit = async (e) => {
   setIsChatLoading(true);
 
   try {
-    const response = await fetch(
-      getApiUrl("/api/chat-with-pdf"),
+    const response = await workspaceFetch(
+      "/api/chat-with-pdf",
       {
         method: "POST",
         headers: {
@@ -647,7 +641,7 @@ const handleChatSubmit = async (e) => {
         body: JSON.stringify({
           query: userMsg,
           context: caseFacts,
-          history: chatHistory.map((item) => ({
+          history: chatHistory.slice(-6).map((item) => ({
             role: item.role,
             content: item.content ?? item.text ?? "",
           })),

@@ -1,13 +1,16 @@
 import express from 'express';
 import Case from '../models/case.js';
-import { ownerOf, pick, validObjectId, sendError } from '../utils/ownership.js';
+import { requireDraftAuth, matchingOwner } from '../middleware/tenantScope.js';
+import { ownerOf, pick, validObjectId, sendError, createRecord } from '../utils/ownership.js';
 
 const CASE_FIELDS = ['caseName', 'caseNumber', 'courtName', 'hearingDate', 'description', 'status'];
 
-// All queries are scoped to the signed-in user (req.user from the verified JWT).
-// The :userId in "/user/:userId" is kept for frontend compatibility but ignored.
-export function createCasesRouter({ cases = Case } = {}) {
+// All queries are scoped to the signed-in user from the verified session.
+// A userId in the URL, query or body must match that user (matchingOwner: 403).
+export function createCaseRouter({ cases = Case, auth = requireDraftAuth } = {}) {
   const router = express.Router();
+  router.use(auth, matchingOwner);
+  router.param('userId', (req, res, next) => matchingOwner(req, res, next));
 
   router.post('/add', async (req, res) => {
     try {
@@ -15,7 +18,7 @@ export function createCasesRouter({ cases = Case } = {}) {
       if (!fields.caseName || !fields.courtName || !fields.hearingDate) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
       }
-      const created = await cases.create({ ...fields, userId: ownerOf(req) });
+      const created = await createRecord(cases, { ...fields, userId: ownerOf(req) });
       res.status(201).json({ success: true, message: 'Case added successfully!', case: created });
     } catch (error) { sendError(res, error); }
   });
@@ -89,4 +92,5 @@ export function createCasesRouter({ cases = Case } = {}) {
   return router;
 }
 
-export default createCasesRouter();
+export const createCasesRouter = createCaseRouter;   // name used on security/critical-fixes
+export default createCaseRouter();

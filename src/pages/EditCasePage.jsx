@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Save, ArrowLeft } from 'lucide-react';
@@ -21,7 +22,7 @@ const EditCasePage = () => {
     const fetchCaseDetails = async () => {
       try {
         // Backend API call to get single case
-        const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${id}`);
+        const res = await tenantFetch(`https://talkntypeai.onrender.com/api/cases/${id}`);
         const data = await res.json();
         
         if (data.success && data.case) {
@@ -69,7 +70,7 @@ const EditCasePage = () => {
     }
 
     try {
-      const res = await fetch(`https://talkntypeai.onrender.com/api/cases/${id}`, {
+      const res = await tenantFetch(`https://talkntypeai.onrender.com/api/cases/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

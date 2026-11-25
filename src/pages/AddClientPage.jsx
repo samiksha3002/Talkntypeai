@@ -1,3 +1,4 @@
+import { tenantFetch } from '../components/tenantFetch.js';
 import React, { useState } from 'react';
 import { ChevronLeft, User, Mail, Phone, MapPin, Save, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -35,7 +36,7 @@ const AddClientPage = () => {
     }
 
     try {
-      const response = await fetch('https://talkntypeai.onrender.com/api/clients/add', {
+      const response = await tenantFetch('https://talkntypeai.onrender.com/api/clients/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...clientDetails, userId }),

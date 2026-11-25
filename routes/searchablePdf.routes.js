@@ -7,8 +7,8 @@ export function createSearchableRouter(convert) {
   const router=express.Router();
   router.get('/status',async(req,res)=>{
     res.set('Cache-Control','no-store');
-    try {const {languages}=await ocrResources();res.json({configured:true,languages,uploadMB:limits.searchable/1024/1024,maxPages:limits.pages,timeoutMs:limits.timeout});}
-    catch {res.status(503).json({configured:false,error:'Local OCR resources are missing. Run the OCR provisioning and smoke check during build.'});}
+    try {const {languages}=await ocrResources();res.json({configured:true,languages,uploadMiB:limits.searchable/1024/1024,maxPages:limits.pages,timeoutMs:limits.timeout});}
+    catch(error){res.status(503).json({configured:false,error:error.resourceProtection?error.message:'Local OCR resources could not be checked. Run npm run ocr:provision during build.'});}
   });
   for(const [route,field,image] of [['image-to-searchable-pdf','image',true],['pdf-to-searchable-pdf','file',false]]){
     router.post('/'+route,...documentBudget,uploadFile(field,image?'image':'pdf',limits.searchable),job(async(req,res)=>{

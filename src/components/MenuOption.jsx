@@ -1,14 +1,17 @@
 // src/components/MenuOption.jsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react'; // Ek chhota arrow icon end mein add karte hain
 
-const MenuOption = ({ title, desc, icon, path }) => {
-  const navigate = useNavigate();
+const MenuOption = ({ title, desc, icon, path, isExternal = false }) => {
+  const Component = isExternal ? 'a' : Link;
+  const destination = isExternal
+    ? { href: path, target: '_blank', rel: 'noopener noreferrer' }
+    : { to: path };
 
   return (
-    <div 
-      onClick={() => navigate(path)}
+    <Component
+      {...destination}
       // Tailwind styling for the menu card
       className="group flex items-center bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:border-green-500/50 transition-all cursor-pointer active:scale-95"
     >
@@ -27,7 +30,7 @@ const MenuOption = ({ title, desc, icon, path }) => {
       <div className="ml-4 text-slate-500 group-hover:text-green-500 transition-colors">
         <ChevronRight size={20} />
       </div>
-    </div>
+    </Component>
   );
 };
 

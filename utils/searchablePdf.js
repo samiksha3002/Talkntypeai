@@ -21,7 +21,8 @@ export async function ocrResources() {
   for(const lang of ['eng','hin','mar']) {
     try { await fs.access(path.join(langPath,lang+'.traineddata'+(gzip?'.gz':''))); languages.push(lang); } catch {}
   }
-  if(!languages.includes('eng')) throw resourceError(503,'Local OCR English data is missing. Run npm run ocr:provision during build.');
+  const missing=['eng','hin','mar'].filter(lang=>!languages.includes(lang));
+  if(missing.length)throw resourceError(503,'Local OCR data is missing for '+missing.join(', ')+'. Run npm run ocr:provision and verify OCR_LANG_PATH.');
   return {langPath,gzip,languages};
 }
 export async function localWorker() {
@@ -106,11 +107,10 @@ export async function searchablePdf(bytes,{image=false,workerFactory=localWorker
         const [x,y]=viewport.convertToPdfPoint(x0,y1);
         const height=(y1-y0)*72/200,width=(x1-x0)*72/200;
         if(!textOnly){
-          try {
-            font.encodeText(text);
-            const size=Math.min(height*.85,width/font.widthOfTextAtSize(text,1));
-            page.drawText(text,{x,y,size,font,rotate:degrees(viewport.rotation),opacity:0});
-          } catch { unicodeWord(output,page,text,x,y,width,height,viewport.rotation); }
+          // Decide before drawing (main): non-WinAnsi words use the Unicode text layer.
+          let unicode=false;try{font.encodeText(text);}catch{unicode=true;}
+          if(unicode)unicodeWord(output,page,text,x,y,width,height,viewport.rotation);
+          else{const size=Math.min(height*.85,width/font.widthOfTextAtSize(text,1));page.drawText(text,{x,y,size,font,rotate:degrees(viewport.rotation),opacity:0});}
         }
         wordsTotal++;
       }

@@ -1,12 +1,16 @@
 import express from 'express';
 import Client from '../models/Client.js';
-import { ownerOf, pick, validObjectId, sendError } from '../utils/ownership.js';
+import { requireDraftAuth, matchingOwner } from '../middleware/tenantScope.js';
+import { ownerOf, pick, validObjectId, sendError, createRecord } from '../utils/ownership.js';
 
 const CLIENT_FIELDS = ['name', 'phone', 'email', 'address', 'notes'];
 
-// All queries are scoped to the signed-in user (req.user from the verified JWT).
-export function createClientsRouter({ clients = Client } = {}) {
+// All queries are scoped to the signed-in user from the verified session.
+// A userId in the URL, query or body must match that user (matchingOwner: 403).
+export function createClientRouter({ clients = Client, auth = requireDraftAuth } = {}) {
   const router = express.Router();
+  router.use(auth, matchingOwner);
+  router.param('userId', (req, res, next) => matchingOwner(req, res, next));
 
   // POST /api/clients/add
   router.post('/add', async (req, res) => {
@@ -15,12 +19,12 @@ export function createClientsRouter({ clients = Client } = {}) {
       if (!fields.name || !fields.phone) {
         return res.status(400).json({ success: false, message: 'Missing required fields (Name and Phone are mandatory)' });
       }
-      const created = await clients.create({ ...fields, userId: ownerOf(req) });
+      const created = await createRecord(clients, { ...fields, userId: ownerOf(req) });
       res.status(201).json({ success: true, message: 'Client added successfully!', client: created });
     } catch (error) { sendError(res, error); }
   });
 
-  // GET /api/clients/user/:userId  (:userId ignored; kept for frontend compatibility)
+  // GET /api/clients/user/:userId
   router.get('/user/:userId', async (req, res) => {
     try {
       const rows = await clients.find({ userId: ownerOf(req) }).sort({ createdAt: -1 });
@@ -41,4 +45,5 @@ export function createClientsRouter({ clients = Client } = {}) {
   return router;
 }
 
-export default createClientsRouter();
+export const createClientsRouter = createClientRouter;   // name used on security/critical-fixes
+export default createClientRouter();

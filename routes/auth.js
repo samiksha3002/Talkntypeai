@@ -2,7 +2,7 @@ import express from 'express';
 import User from '../models/user.js';
 import { issueSession, publicUser } from '../middleware/auth.js';
 import { loginLimiter, registerLimiter } from '../middleware/apiGuard.js';
-import { hashPassword, verifyPassword, passwordProblem, findWithPassword, upgradeLegacyPassword } from '../utils/password.js';
+import { hashNewPassword, checkPassword, passwordProblem, findWithPassword, upgradeLegacyPassword } from '../utils/passwords.js';
 
 const router = express.Router();
 const optionalText = (value, max) => value === undefined || value === null || (typeof value === 'string' && value.length <= max);
@@ -16,6 +16,7 @@ router.post('/create-user', registerLimiter, async (req, res) => {
       ![state, city, phone, executive].every(value => optionalText(value, 200))) {
       return res.status(400).json({ message: 'Please fill in your name and a valid email.' });
     }
+    // At least 8 characters; at most 72 UTF-8 bytes so bcrypt never truncates.
     const problem = passwordProblem(password);
     if (problem) return res.status(400).json({ message: problem });
     const normalizedEmail = email.trim().toLowerCase();
@@ -31,18 +32,19 @@ router.post('/create-user', registerLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    // New accounts store only the bcrypt hash (passwordHash), never plain text.
     const newUser = new User({
       fullName: fullName.trim(), email: normalizedEmail, state, city, phone, executive,
-      password: await hashPassword(password),
+      passwordHash: await hashNewPassword(password),
       role: 'user',
       subscription: { isActive: false, plan: 'demo', startDate: null, expiryDate: null }
     });
-    
+
     await newUser.save();
     res.status(201).json({ message: 'Registration successful! Wait for admin approval.' });
 
-  } catch (error) {
-    console.error("Registration Error:", error?.message);
+  } catch {
+    console.error("Registration failed.");   // no exception text: it may contain personal data
     res.status(500).json({ message: 'Server Error' });
   }
 });
@@ -58,11 +60,11 @@ router.post('/login', loginLimiter, async (req, res) => {
     // Every account, including administrators, is verified against the database.
     // There is no hard-coded or environment-variable login bypass.
     const user = await findWithPassword(User, { email: email.trim().toLowerCase() });
-    const check = await verifyPassword(password, user?.password);
+    const check = await checkPassword(user, password);
     if (!user || !check.ok) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
-    // Accounts not yet migrated still store plain text: replace it with a bcrypt hash now.
+    // Legacy plain text: moved to passwordHash unless LEGACY_PASSWORD_UPGRADE is "off".
     if (check.needsUpgrade) await upgradeLegacyPassword(User, user, password);
 
     if (user.role !== 'admin' && user.subscription && user.subscription.isActive === false) {
@@ -76,8 +78,8 @@ router.post('/login', loginLimiter, async (req, res) => {
     // The JWT is required by every protected API route, so login fails if it cannot be issued.
     let session;
     try { session = await issueSession(user._id); }
-    catch (error) {
-      console.error('Login session error:', error?.message);
+    catch {
+      console.error('Login session could not be issued.');
       return res.status(503).json({ message: 'Sign-in is temporarily unavailable.' });
     }
     res.setHeader('Cache-Control', 'no-store');
@@ -89,8 +91,8 @@ router.post('/login', loginLimiter, async (req, res) => {
       expiryDate: userExpiryDate
     });
 
-  } catch (error) {
-    console.error("Login Error:", error?.message);
+  } catch {
+    console.error("Login failed.");   // no exception text: it may contain personal data
     res.status(500).json({ message: 'Server Error' });
   }
 });

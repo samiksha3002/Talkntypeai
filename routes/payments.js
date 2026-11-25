@@ -1,11 +1,13 @@
 // routes/payments.js — the signed-in advocate's income/expense ledger.
 import express from "express";
 import Payment from "../models/Payment.js";
-import { ownerOf, pick, sendError } from "../utils/ownership.js";
+import { ownerOf, pick, sendError, createRecord } from "../utils/ownership.js";
+import { requireDraftAuth, matchingOwner } from "../middleware/tenantScope.js";
 
 // All entries are scoped to the signed-in user (req.user from the verified JWT).
-export function createPaymentsRouter({ payments = Payment } = {}) {
+export function createPaymentsRouter({ payments = Payment, auth = requireDraftAuth } = {}) {
   const router = express.Router();
+  router.use(auth, matchingOwner);   // a userId in query/body must match the session (403)
 
   // GET /api/payments — only the signed-in user's entries
   router.get("/", async (req, res) => {
@@ -23,7 +25,7 @@ export function createPaymentsRouter({ payments = Payment } = {}) {
       if (!date || !client || !Number.isFinite(value) || value <= 0 || !["Income", "Expense"].includes(type)) {
         return res.status(400).json({ error: "Missing or invalid fields" });
       }
-      const payment = await payments.create({ date: new Date(date), client, amount: value, type, caseId, userId: ownerOf(req) });
+      const payment = await createRecord(payments, { date: new Date(date), client, amount: value, type, caseId, userId: ownerOf(req) });
       res.status(201).json({ payment });
     } catch (error) { sendError(res, error, "Failed to add payment"); }
   });

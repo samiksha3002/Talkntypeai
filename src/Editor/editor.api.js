@@ -1,11 +1,5 @@
-// editor.api.js
 import axios from "axios";
-
-// 🔥 Universal API Base URL (Production + Localhost safe)
-const API =
-  window.location.hostname === "localhost"
-    ? "http://localhost:5000"
-    : "https://talkntypeai.onrender.com";
+import { getNodeOrigin } from '../nodeApi.js';
 
 // 🔒 Safe call for setLoading
 const safeSetLoading = (fn, val) => {
@@ -23,7 +17,7 @@ export const fixGrammar = async (text, setText, setLoading) => {
   safeSetLoading(setLoading, true);
 
   try {
-    const { data } = await axios.post(`${API}/api/fix-grammar`, { text });
+    const { data } = await axios.post(`${await getNodeOrigin()}/api/fix-grammar`, { text });
     setText(data.fixed || "");
   } catch (err) {
     console.error("Grammar API error:", err.response?.data || err.message);
@@ -41,7 +35,7 @@ export const expandText = async (text, setText, setLoading) => {
   safeSetLoading(setLoading, true);
 
   try {
-    const { data } = await axios.post(`${API}/api/expand`, { text });
+    const { data } = await axios.post(`${await getNodeOrigin()}/api/expand`, { text });
     setText(data.expanded || "");
   } catch (err) {
     console.error("Expand API error:", err.response?.data || err.message);
@@ -72,7 +66,7 @@ export const uploadOCR = async (fileOrEvent, setManualText, setLoading) => {
   formData.append("image", file);
 
   try {
-    const res = await fetch(`${API}/api/ocr/image-to-text`, {
+    const res = await fetch(`${await getNodeOrigin()}/api/ocr/image-to-text`, {
       method: "POST",
       body: formData
     });
@@ -126,7 +120,7 @@ export const uploadAudio = async (
 
   try {
     const response = await fetch(
-      `${API}/api/audio/transcribe`,
+      `${await getNodeOrigin()}/api/audio/transcribe`,
       {
         method: "POST",
         body: formData,
@@ -190,10 +184,7 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
   formData.append("file", file);
 
   try {
-    // Ensure API is defined! If it's an env var, use import.meta.env.VITE_API_URL
-    const baseUrl = typeof API !== 'undefined' ? API : ""; 
-    
-    const response = await fetch(`${API}/api/upload-pdf`, {
+    const response = await fetch(`${await getNodeOrigin()}/api/upload-pdf`, {
       method: "POST",
       body: formData,
     });
@@ -227,7 +218,7 @@ export const uploadPDF = async (file, setManualText, setLoading) => {
 // ------------------------------------------------------
 export const generateDraftAPI = async (body) => {
   try {
-    const { data } = await axios.post(`${API}/api/draft/generate-draft`, body, {
+    const { data } = await axios.post(`${await getNodeOrigin()}/api/draft/generate-draft`, body, {
       headers: { "Content-Type": "application/json" },
     });
     return data;

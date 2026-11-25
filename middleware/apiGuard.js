@@ -23,7 +23,7 @@ export const SELF_PROTECTED = ['/api/admin', '/api/user-drafts', '/api/saved'];
 // Endpoints that spend money on third-party APIs (OpenAI, Gemini, Deepgram, Indian Kanoon) or heavy OCR.
 export const PAID_PREFIXES = ['/api/deepgram', '/api/audio', '/api/chat', '/api/chattranslate', '/api/transliterate',
   '/api/expand', '/api/fix-grammar', '/api/ocr', '/api/upload-pdf', '/api/generate-legal-draft', '/api/list-models',
-  '/api/legal-ai', '/api/draft', '/api/judgements', '/api/judgement-ai', '/api/brain'];
+  '/api/legal-ai', '/api/draft', '/api/judgements', '/api/judgement-ai', '/api/brain', '/api/legal-workspace'];
 
 export const isPublic = (method, path) => PUBLIC_ROUTES.some(([m, p]) => m === method && (p instanceof RegExp ? p.test(path) : p === path));
 export const isSelfProtected = path => SELF_PROTECTED.some(prefix => under(path, prefix));

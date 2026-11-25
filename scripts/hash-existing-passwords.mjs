@@ -1,34 +1,41 @@
 #!/usr/bin/env node
-// One-time migration: replace plain-text passwords in the users collection with
-// bcrypt hashes (cost 12).
+// One-time migration: move legacy plain-text passwords (users.password) into
+// bcrypt hashes (users.passwordHash, cost 12) and remove the plain text.
 //
 //   node scripts/hash-existing-passwords.mjs --dry-run   # count only, writes nothing
 //   node scripts/hash-existing-passwords.mjs --apply     # hash and update
 //
+// Run --apply only once a rollback to code that compares plain text is no longer
+// needed (i.e. when you would also set LEGACY_PASSWORD_UPGRADE=on).
 // Reads MONGODB_URI (or MONGO_URI) from the environment / .env.
-// Never prints passwords or connection credentials. Safe to re-run: already
-// hashed passwords are skipped, and each update is compare-and-set so a
+// Never prints passwords or connection credentials. Safe to re-run: accounts that
+// already have passwordHash are skipped, and each update is compare-and-set so a
 // password that changed in the meantime is never overwritten.
 import { pathToFileURL } from 'node:url';
-import { hashPassword, isBcryptHash } from '../utils/password.js';
+import { hashNewPassword, MAX_PASSWORD_BYTES } from '../utils/passwords.js';
 
-const LEGACY = { password: { $exists: true, $type: 'string', $not: /^\$2[aby]\$\d{2}\$/ } };
+const NO_HASH = { $or: [{ passwordHash: { $exists: false } }, { passwordHash: null }] };
+const LEGACY = { password: { $type: 'string' }, ...NO_HASH };
 
-export async function migratePasswords(users, { apply = false, log = console.log, hash = hashPassword } = {}) {
+export async function migratePasswords(users, { apply = false, log = console.log, hash = hashNewPassword } = {}) {
   const total = await users.countDocuments({});
   const legacy = await users.countDocuments(LEGACY);
-  const summary = { total, alreadyHashed: 0, toMigrate: legacy, migrated: 0, skippedChanged: 0, skippedInvalid: 0 };
-  summary.alreadyHashed = await users.countDocuments({ password: { $type: 'string', $regex: /^\$2[aby]\$\d{2}\$/ } });
+  const summary = { total, alreadyHashed: 0, toMigrate: legacy, migrated: 0, skippedChanged: 0, skippedInvalid: 0, skippedTooLong: 0 };
+  summary.alreadyHashed = await users.countDocuments({ passwordHash: { $type: 'string' } });
   log(`Users: ${total} · already hashed: ${summary.alreadyHashed} · plain text to migrate: ${legacy}`);
   if (!apply) { log('Dry run: no changes written. Re-run with --apply to migrate.'); return summary; }
   const cursor = users.find(LEGACY, { projection: { _id: 1, password: 1 } });
   for await (const doc of cursor) {
-    if (typeof doc.password !== 'string' || !doc.password || isBcryptHash(doc.password)) { summary.skippedInvalid++; continue; }
-    const result = await users.updateOne({ _id: doc._id, password: doc.password }, { $set: { password: await hash(doc.password) } });
+    if (typeof doc.password !== 'string' || !doc.password) { summary.skippedInvalid++; continue; }
+    // bcrypt would silently truncate; such accounts keep working read-only and are reported.
+    if (Buffer.byteLength(doc.password, 'utf8') > MAX_PASSWORD_BYTES) { summary.skippedTooLong++; continue; }
+    const result = await users.updateOne({ _id: doc._id, password: doc.password, passwordHash: { $exists: false } },
+      { $set: { passwordHash: await hash(doc.password) }, $unset: { password: '' } });
     if (result.modifiedCount === 1) summary.migrated++; else summary.skippedChanged++;
     if ((summary.migrated + summary.skippedChanged) % 50 === 0) log(`… ${summary.migrated} migrated`);
   }
-  log(`Done: migrated ${summary.migrated}, skipped (changed meanwhile) ${summary.skippedChanged}, skipped (empty/invalid) ${summary.skippedInvalid}.`);
+  log(`Done: migrated ${summary.migrated}, skipped (changed meanwhile) ${summary.skippedChanged}, ` +
+    `skipped (empty/invalid) ${summary.skippedInvalid}, left as legacy (longer than 72 bytes) ${summary.skippedTooLong}.`);
   return summary;
 }
 

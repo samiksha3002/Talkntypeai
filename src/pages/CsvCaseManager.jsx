@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { tenantFetch } from '../components/tenantFetch.js';
 import { FileUp, Download } from "lucide-react";
 
-const CsvCaseManager = ({ userId, API }) => {
+const CsvCaseManager = ({ userId }) => {
+  const ownerId=userId || localStorage.getItem("userId");
   const [cases, setCases] = useState([]);
   const [importing, setImporting] = useState(false);
 
   // 1. List Fetch Karein (Page load hote hi)
   useEffect(() => {
     fetchCases();
-  }, [userId]);
+  }, [ownerId]);
 
   const fetchCases = async () => {
     try {
-      const res = await axios.get(`${API}/api/csv-manager/list/${userId}`);
-      setCases(res.data);
+      const res = await tenantFetch(`/api/csv-manager/list/${ownerId}`);
+      setCases(await res.json());
     } catch (err) {
-      console.error("Error fetching list");
+      alert(err.message);
     }
   };
 
@@ -27,14 +28,11 @@ const CsvCaseManager = ({ userId, API }) => {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("userId", userId);
 
     setImporting(true);
     try {
-      const res = await axios.post(`${API}/api/csv-manager/import`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert(res.data.message);
+      const res = await tenantFetch('/api/csv-manager/import', {method:'POST',body:formData});
+      alert((await res.json()).message);
       fetchCases(); // Upload ke baad list refresh karein
     } catch (err) {
       alert("Error uploading CSV");

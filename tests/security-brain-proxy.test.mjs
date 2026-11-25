@@ -33,12 +33,12 @@ const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'a
 test('proxy forwards the shared secret and the VERIFIED user id; never the browser token or a spoofed user', async () => {
   await fakeBrain((r, res) => json(res, 200, { ok: true }), async (brain, seen) => {
     await proxy(brain, async base => {
-      const res = await fetch(base + '/chat-with-pdf', { method: 'POST', body: JSON.stringify({ query: 'q' }),
+      const res = await fetch(base + '/legal-research', { method: 'POST', body: JSON.stringify({ query: 'q' }),
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer user-jwt', 'X-User-Id': 'ffffffffffffffffffffffff', 'X-Brain-Secret': 'guess', Cookie: 'a=b' } });
       assert.equal(res.status, 200); assert.deepEqual(await res.json(), { ok: true });
     });
     assert.equal(seen.length, 1);
-    assert.equal(seen[0].path, '/api/chat-with-pdf');
+    assert.equal(seen[0].path, '/api/legal-research');
     assert.equal(seen[0].headers['x-brain-secret'], SECRET);
     assert.equal(seen[0].headers['x-user-id'], USER);
     assert.equal(seen[0].headers.authorization, undefined);
@@ -47,10 +47,11 @@ test('proxy forwards the shared secret and the VERIFIED user id; never the brows
   });
 });
 
+// Merge note: document actions moved to main's /api/legal-workspace gateway.
 test('proxy only exposes the known AI endpoints', async () => {
   await fakeBrain((r, res) => json(res, 200, {}), async (brain, seen) => {
     await proxy(brain, async base => {
-      for (const path of ['/login', '/register', '/health', '/..%2Fhealth', '/anything'])
+      for (const path of ['/login', '/register', '/health', '/..%2Fhealth', '/anything', '/chat-with-pdf', '/analyze-document', '/ai-command'])
         assert.equal((await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 404, path);
       for (const endpoint of BRAIN_ENDPOINTS)
         assert.equal((await fetch(base + '/' + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 200, endpoint);
@@ -64,13 +65,13 @@ test('multipart PDF uploads pass through byte-for-byte; oversize uploads are ref
     await proxy(brain, async base => {
       const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(200000, 7)]);
       const form = new FormData(); form.append('file', new Blob([pdf], { type: 'application/pdf' }), 'case.pdf');
-      const res = await fetch(base + '/analyze-document', { method: 'POST', body: form });
+      const res = await fetch(base + '/legal-research', { method: 'POST', body: form });
       assert.equal(res.status, 200);
       assert.ok(seen[0].headers['content-type'].startsWith('multipart/form-data; boundary='));
       assert.ok(seen[0].body.includes(pdf));
       const big = new FormData(); big.append('file', new Blob([Buffer.alloc(2 * 1024 * 1024)]), 'big.pdf');
-      assert.equal((await fetch(base + '/analyze-document', { method: 'POST', body: big })).status, 413);
-      assert.equal((await fetch(base + '/chat-with-pdf', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'x' })).status, 415);
+      assert.equal((await fetch(base + '/legal-research', { method: 'POST', body: big })).status, 413);
+      assert.equal((await fetch(base + '/legal-research', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'x' })).status, 415);
     });
   });
 });
@@ -81,7 +82,7 @@ test('server-sent draft streams are relayed incrementally', async () => {
     res.write('data: first\n\n'); await new Promise(r2 => setTimeout(r2, 150)); res.end('data: [DONE]\n\n');
   }, async brain => {
     await proxy(brain, async base => {
-      const res = await fetch(base + '/generate-legal-draft-stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"facts":"x"}' });
+      const res = await fetch(base + '/legal-research', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"facts":"x"}' });
       assert.equal(res.headers.get('content-type'), 'text/event-stream');
       const reader = res.body.getReader(); const decoder = new TextDecoder();
       const first = decoder.decode((await reader.read()).value);
@@ -93,19 +94,19 @@ test('server-sent draft streams are relayed incrementally', async () => {
 });
 
 test('fails safely: missing config 503, unauthenticated 401, upstream refusal or outage 502', async () => {
-  await proxy('', async base => assert.equal((await fetch(base + '/ai-command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503));
-  await proxy('http://127.0.0.1:9', async base => assert.equal((await fetch(base + '/ai-command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503), { secret: 'short' });
+  await proxy('', async base => assert.equal((await fetch(base + '/translate-research-marathi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503));
+  await proxy('http://127.0.0.1:9', async base => assert.equal((await fetch(base + '/translate-research-marathi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503), { secret: 'short' });
   await fakeBrain((r, res) => json(res, 200, {}), async (brain, seen) => {
-    await proxy(brain, async base => assert.equal((await fetch(base + '/ai-command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401), { user: null });
+    await proxy(brain, async base => assert.equal((await fetch(base + '/translate-research-marathi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401), { user: null });
     assert.equal(seen.length, 0);
   });
   await fakeBrain((r, res) => json(res, 401, { detail: 'Unauthorized.' }), async brain => {
     await proxy(brain, async base => {
-      const res = await fetch(base + '/ai-command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const res = await fetch(base + '/translate-research-marathi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(res.status, 502);
     });
   });
-  await proxy('http://127.0.0.1:9', async base => assert.equal((await fetch(base + '/ai-command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 502));
+  await proxy('http://127.0.0.1:9', async base => assert.equal((await fetch(base + '/translate-research-marathi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 502));
 });
 
 test('server.js mounts the proxy after the auth guard and before any body parser', () => {

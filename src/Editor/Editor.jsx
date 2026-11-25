@@ -1,5 +1,6 @@
+import { getNodeOrigin } from '../nodeApi.js';
 import { insertSpeech } from './speech.js';
-import { apiBase } from '../apiAuth.js';
+import { restoreKrutiRootFont, defaultTypingFont } from './editorInput.js';
 import { convertEditorFont, requestFontConversion } from './fontConversion.js';
   import React, { useState, useEffect, useRef } from "react";
   import EditorActions from "./EditorActions";
@@ -14,6 +15,8 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     speechEvents,
     onSpeechConsumed,
     manualText,
+    rootFontFamily,
+    onRootFontChange,
     setManualText,
     translationCommand,
     setTranslationCommand,
@@ -36,26 +39,32 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     const [scannerFile, setScannerFile] = useState(null);
     
 
-    // 🌐 API Base URL
-    const [API_BASE_URL, setApiBaseUrl] = useState(
-      apiBase()
-    );
-
-    // Load Config
+    const [API_BASE_URL, setApiBaseUrl] = useState(null);
+    const [apiError, setApiError] = useState('');
     useEffect(() => {
-      fetch("/config.json")
-        .then((res) => res.json())
-        .then((cfg) => {
-          if (cfg.API_URL) setApiBaseUrl(cfg.API_URL);
-        })
-        .catch((err) => console.error("Failed to load config.json", err));
+      let active = true;
+      getNodeOrigin().then(base => { if (active) setApiBaseUrl(base); })
+        .catch(error => { if (active) setApiError(error.message); });
+      return () => { active = false; };
     }, []);
 
     // 🎤 Speech Append Logic
   useEffect(() => {
     const editor = quillRef.current?.getEditor();
     if (!editor) return;
-    const rememberSelection = range => { if (range) lastSelectionRef.current = { ...range }; };
+    editor.root.lang = 'en';
+    if (restoreKrutiRootFont(editor, rootFontFamily)) {
+      onRootFontChange('');
+      setManualText(editor.root.innerHTML);
+    } else editor.root.style.fontFamily = rootFontFamily || '';
+  }, [rootFontFamily, onRootFontChange, setManualText]);
+  useEffect(() => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+    const rememberSelection = (range, previous, source) => {
+      if (range) lastSelectionRef.current = { ...range };
+      defaultTypingFont(editor, range, source);
+    };
     editor.on('selection-change', rememberSelection);
     return () => editor.off('selection-change', rememberSelection);
   }, []);
@@ -78,7 +87,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     // 🌐 Translation Effect
     useEffect(() => {
       const runTranslation = async () => {
-        if (!translationCommand?.textToTranslate || !translationCommand?.lang) return;
+        if (!translationCommand?.textToTranslate || !translationCommand?.lang || !API_BASE_URL) return;
         
         try {
           setIsTranslating(true); // Triggers Global Loading
@@ -113,7 +122,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
     // ✍️ Transliteration Effect
     useEffect(() => {
       const runTransliteration = async () => {
-        if (!transliterationCommand) return;
+        if (!transliterationCommand || !API_BASE_URL) return;
         
         try {
           setIsTransliterating(true); // Triggers Global Loading
@@ -148,7 +157,7 @@ import { convertEditorFont, requestFontConversion } from './fontConversion.js';
 
     // H3: whitespace-safe, atomic Delta conversion.
 useEffect(() => {
-  if (!fontConvertCommand?.font || !quillRef.current) return;
+  if (!fontConvertCommand?.font || !quillRef.current || !API_BASE_URL) return;
   let active = true;
   const controller = new AbortController();
   const editor = quillRef.current.getEditor();
@@ -157,18 +166,22 @@ useEffect(() => {
     (text, type) => requestFontConversion(API_BASE_URL, text, type, { signal: controller.signal }),
     { isCurrent: () => active, fallbackRange: lastSelectionRef.current })
     .then(applied => { if (applied && active) {
+      onRootFontChange(editor.root.style.fontFamily);
       lastSelectionRef.current = editor.getSelection() || lastSelectionRef.current;
-      setManualText(editor.root.innerHTML);
+      // Quill's onChange already staged the conversion. The restored caret may
+      // contain a temporary cursor blot; never serialize it back as document HTML.
     } })
     .catch(error => { if (active) alert('Font conversion failed: ' + error.message); })
     .finally(() => { if (active) { setIsConverting(false); setFontConvertCommand(null); } });
   return () => { active = false; controller.abort(); };
-}, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand]);
+}, [fontConvertCommand, API_BASE_URL, setManualText, setIsConverting, setFontConvertCommand, onRootFontChange]);
 
     // ✅ HERE IS THE FIX: clearAutoSave is defined before it's used in the return block
     const clearAutoSave = () => {
       if (user?._id) {
         localStorage.removeItem(`autosave_${user._id}`);
+        localStorage.removeItem(`autosave_font_${user._id}`);
+        onRootFontChange('');
         setManualText('');
       }
     };
@@ -219,6 +232,7 @@ const handleInsertScannedText = (scannedText) => {
         <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden min-h-0">
           
           {/* Editor Toolbar - Passes Setters to Buttons */}
+          {apiError && <p role="alert">{apiError}</p>}
           <EditorActions
             manualText={manualText}
             setManualText={setManualText}
