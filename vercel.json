@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://talkntype.onrender.com/api/$1"
+      "destination": "https://talkntypeai.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
