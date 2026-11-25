@@ -1,27 +1,12 @@
 import React, { useState } from "react";
+import { aiServiceUrl } from "../../apiAuth.js";
 import { Search, BookOpen, Globe, MessageSquare, Save, History, ExternalLink, ChevronRight, Loader2 } from "lucide-react";
 
 // ==========================================
 // URL CONFIGURATION (NODE vs PYTHON)
 // ==========================================
-const NODE_API_URL = "https://talkntypeai.onrender.com"; 
-const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
-
-const getApiUrl = (endpoint) => {
-  const isLocal = window.location.hostname === "localhost";
-  const pythonEndpoints = [
-    "/api/generate-legal-draft",
-    "/api/ai-command",
-    "/api/chat-with-pdf",
-    "/api/analyze-document",
-    "/api/legal-research" // Legal research added to Python route
-  ];
-
-  if (pythonEndpoints.includes(endpoint)) {
-    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
-  }
-  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
-};
+// Python AI endpoints go through our authenticated Node proxy (/api/brain/*).
+const getApiUrl = aiServiceUrl;
 
 const LegalResearch = () => {
   const [query, setQuery] = useState("");

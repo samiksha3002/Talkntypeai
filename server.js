@@ -35,6 +35,7 @@ import judgementAiRouter from "./routes/judgementAi.js";
 // ── Middleware Imports ─────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import { createApiGuard } from "./middleware/apiGuard.js";
+import brainRouter from "./routes/brain.js";
 
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
 import draftsRouter        from "./routes/draft.ready.js";
@@ -110,6 +111,9 @@ app.use(cors(corsOptions));
 app.use("/api", apiLimiter);
 // Server-side authentication for every /api route (default deny), before any body is parsed.
 app.use("/api", createApiGuard());
+// Python AI service proxy: mounted before the body parsers so uploads and
+// server-sent events stream through unchanged (see routes/brain.js).
+app.use("/api/brain", brainRouter);
 app.use(createBodyBudget());
 app.use(
   express.json({

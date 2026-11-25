@@ -1,26 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
+import { aiServiceUrl } from "../../apiAuth.js";
 import { 
   FileText, Send, Loader2, Calendar, Layout, ListChecks, 
   Download, Maximize2, X, MessageSquare, ZoomIn, ZoomOut, RotateCw 
 } from "lucide-react";
 
-const NODE_API_URL = "https://talkntypeai.onrender.com"; 
-const PYTHON_API_URL = "https://talkntype-ai-python.onrender.com";
-
-const getApiUrl = (endpoint) => {
-  const isLocal = window.location.hostname === "localhost";
-  const pythonEndpoints = [
-    "/api/generate-legal-draft",
-    "/api/ai-command",
-    "/api/chat-with-pdf",
-    "/api/analyze-document"
-  ];
-
-  if (pythonEndpoints.includes(endpoint)) {
-    return isLocal ? `http://localhost:8000${endpoint}` : `${PYTHON_API_URL}${endpoint}`;
-  }
-  return isLocal ? `http://localhost:10000${endpoint}` : `${NODE_API_URL}${endpoint}`;
-};
+// Python AI endpoints go through our authenticated Node proxy (/api/brain/*).
+const getApiUrl = aiServiceUrl;
 
 const ChatWithPDF = () => {
   const [file, setFile] = useState(null);

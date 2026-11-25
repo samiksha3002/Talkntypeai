@@ -19,6 +19,14 @@ export function apiBase() {
   return host === 'localhost' || host === '127.0.0.1' ? 'http://localhost:5000' : 'https://talkntypeai.onrender.com';
 }
 
+// AI endpoints served by the Python service are reached only through our Node API
+// proxy (/api/brain/*), which authenticates the user and adds the service secret.
+const BRAIN_PATHS = new Set(['/api/generate-legal-draft', '/api/generate-legal-draft-stream', '/api/ai-command',
+  '/api/chat-with-pdf', '/api/analyze-document', '/api/legal-research', '/api/translate-research-marathi']);
+export function aiServiceUrl(endpoint) {
+  return BRAIN_PATHS.has(endpoint) ? apiBase() + '/api/brain/' + endpoint.slice('/api/'.length) : apiBase() + endpoint;
+}
+
 function originOf(value) { try { return new URL(value).origin; } catch { return null; } }
 
 export function isOwnApi(url, { origins = API_ORIGINS, pageOrigin = globalThis.location?.origin } = {}) {

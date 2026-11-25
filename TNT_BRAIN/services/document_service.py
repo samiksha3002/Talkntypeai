@@ -1,12 +1,14 @@
 import base64
 import gc
+import hashlib
 import logging
 import os
+import re
 import shutil
 import threading
 import time
 import uuid
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import fitz
 from langchain_community.document_loaders import PyMuPDFLoader
@@ -18,102 +20,148 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
+_OWNER = re.compile(r"^[A-Za-z0-9:_-]{1,100}$")
+_LEGACY_FOLDER = re.compile(r"^doc_[0-9a-f]{32}$")
+
+
+class _Store:
+    """One owner's analysed document (vector DB) and its lifecycle state."""
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.db = None
+        self.folder = None
+        self.timer = None
+        self.last_error = None
+        self.last_used = time.monotonic()
+
 
 class DocumentService:
     """
-    Single-active-document service for the current app architecture.
-    Note: this is process-local state; for multi-worker/multi-instance production,
-    store document/session IDs and vector data in shared storage.
+    Per-user document service.
 
-    Layout: self.db_dir is the PARENT folder. Every uploaded PDF gets its own
-    unique sub-folder (self.current_db_dir), so a Chroma path is never reused.
+    Every owner (the verified user id from the Node API, e.g. "<userId>" for chat
+    or "<userId>:draft" for draft uploads) has its own Chroma folder
+    (temp_db/doc_<sha256(owner)[:32]>_<uuid>) and its own in-memory handle. One
+    user's upload, question or cleanup never reads, replaces or deletes another
+    user's document. Folders are removed after DOCUMENT_DB_TTL_SECONDS (default 2 h).
+
+    Note: state is process-local. With several workers/instances, route a user to
+    the same instance or move vector data to shared storage.
     """
 
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.db_dir = os.getenv("DOCUMENT_DB_DIR", "temp_db")
-        self.current_db_dir = None
-        self._db_lock = threading.RLock()
-        self._cleanup_timer = None
-        self.active_db = None
-        self.last_error = None
+        self.max_open = max(1, int(os.getenv("DOCUMENT_MAX_OPEN", "20")))
+        self.ttl_seconds = int(os.getenv("DOCUMENT_DB_TTL_SECONDS", "7200"))
+        self._stores: Dict[str, _Store] = {}
+        self._registry_lock = threading.Lock()
         self.llm_vision = ChatOpenAI(model="gpt-4o-mini", temperature=0, max_tokens=3000)
         self.llm_answer = ChatOpenAI(model="gpt-4o", temperature=0.2, max_tokens=2500)
         self.llm_timeline = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=3000)
+        self._remove_legacy_shared_folders()
 
     # ------------------------------------------------------------------
-    # Chroma lifecycle helpers
+    # Owner helpers
     # ------------------------------------------------------------------
     @staticmethod
-    def _reset_chroma_cache():
-        """Clear Chroma's process-wide client cache so no stale handle to a
-        deleted sqlite file survives (cause of 'no such table: tenants')."""
+    def owner_key(owner: str) -> str:
+        if not isinstance(owner, str) or not _OWNER.match(owner):
+            raise ValueError("Invalid document owner.")
+        return hashlib.sha256(owner.encode("utf-8")).hexdigest()[:32]
+
+    def _store(self, owner: str) -> _Store:
+        key = self.owner_key(owner)
+        with self._registry_lock:
+            return self._stores.setdefault(key, _Store())
+
+    def last_error_for(self, owner: str) -> Optional[str]:
+        try:
+            key = self.owner_key(owner)
+        except ValueError:
+            return None
+        store = self._stores.get(key)
+        return store.last_error if store else None
+
+    def _owner_folders(self, owner: str) -> List[str]:
+        prefix = f"doc_{self.owner_key(owner)}_"
+        if not os.path.isdir(self.db_dir):
+            return []
+        return [os.path.join(self.db_dir, entry) for entry in os.listdir(self.db_dir)
+                if entry.startswith(prefix) and os.path.isdir(os.path.join(self.db_dir, entry))]
+
+    def _remove_legacy_shared_folders(self):
+        """Folders from the old single-document design belong to no one; delete them."""
+        if not os.path.isdir(self.db_dir):
+            return
+        for entry in os.listdir(self.db_dir):
+            path = os.path.join(self.db_dir, entry)
+            if _LEGACY_FOLDER.match(entry) and os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+
+    # ------------------------------------------------------------------
+    # Chroma lifecycle helpers (scoped to one store; never process-wide)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _forget_cached_client(folder: Optional[str]):
+        """Drop only this folder's entry from Chroma's client cache. Clearing the
+        whole cache would stop every other user's open database."""
+        if not folder:
+            return
         try:
             try:
                 from chromadb.api.shared_system_client import SharedSystemClient
             except ImportError:
                 from chromadb.api.client import SharedSystemClient
-            SharedSystemClient.clear_system_cache()
+            cache = getattr(SharedSystemClient, "_identifier_to_system", None)
+            if isinstance(cache, dict):
+                for identifier in {folder, os.path.abspath(folder)}:
+                    cache.pop(identifier, None)
         except Exception:
-            logger.debug("Could not clear Chroma system cache", exc_info=True)
+            logger.debug("Could not drop cached Chroma client", exc_info=True)
 
-    def _close_active_db(self):
-        if self.active_db is not None:
+    def _release(self, store: _Store):
+        db, store.db = store.db, None
+        if db is not None:
             try:
-                client = getattr(self.active_db, "_client", None)
+                client = getattr(db, "_client", None)
                 system = getattr(client, "_system", None)
                 if system is not None:
                     system.stop()
             except Exception:
                 logger.debug("Could not stop Chroma system", exc_info=True)
-            self.active_db = None
-        self._reset_chroma_cache()
+        self._forget_cached_client(store.folder)
         gc.collect()
-    def _purge_db_dir(self):
-        """Remove only per-document folders created by this service."""
-        if not os.path.isdir(self.db_dir):
-            return
-        for entry in os.listdir(self.db_dir):
-            path = os.path.join(self.db_dir, entry)
-            if entry.startswith("doc_") and os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
-    def _resolve_db_folder(self) -> Optional[str]:
-        """Return current doc folder; after a restart, fall back to the newest doc_* folder."""
-        if self.current_db_dir and os.path.isdir(self.current_db_dir):
-            return self.current_db_dir
-        if not os.path.isdir(self.db_dir):
-            return None
-        candidates = [
-            os.path.join(self.db_dir, d)
-            for d in os.listdir(self.db_dir)
-            if d.startswith("doc_") and os.path.isdir(os.path.join(self.db_dir, d))
-        ]
-        if not candidates:
-            return None
-        return max(candidates, key=os.path.getmtime)
 
-    def _cleanup_task(self, folder_path: str, delay: int = 7200):
-        if self._cleanup_timer is not None:
-            self._cleanup_timer.cancel()
+    def _schedule_cleanup(self, owner: str, store: _Store, folder: str):
+        if store.timer is not None:
+            store.timer.cancel()
 
         def cleanup():
-            with self._db_lock:
-                # Do not delete a newer database if this timer belongs to an old one.
-                if not self.current_db_dir or \
-                        os.path.abspath(folder_path) != os.path.abspath(self.current_db_dir):
-                    return
-                self._close_active_db()
-                try:
-                    if os.path.exists(folder_path):
-                        shutil.rmtree(folder_path, ignore_errors=True)
-                    self.current_db_dir = None
+            with store.lock:
+                # Never delete a newer document of the same owner.
+                if store.folder and os.path.abspath(folder) == os.path.abspath(store.folder):
+                    self._release(store)
+                    shutil.rmtree(folder, ignore_errors=True)
+                    store.folder = None
                     logger.info("Temporary document database cleaned up.")
-                except Exception:
-                    logger.warning("Database cleanup failed", exc_info=True)
 
-        self._cleanup_timer = threading.Timer(delay, cleanup)
-        self._cleanup_timer.daemon = True
-        self._cleanup_timer.start()
+        store.timer = threading.Timer(self.ttl_seconds, cleanup)
+        store.timer.daemon = True
+        store.timer.start()
+
+    def _enforce_open_limit(self, keep: _Store):
+        """Close (but keep on disk) the least recently used open databases."""
+        with self._registry_lock:
+            open_stores = [s for s in self._stores.values() if s.db is not None and s is not keep]
+        excess = len(open_stores) + 1 - self.max_open
+        for store in sorted(open_stores, key=lambda s: s.last_used)[:max(0, excess)]:
+            if store.lock.acquire(blocking=False):
+                try:
+                    self._release(store)
+                finally:
+                    store.lock.release()
 
     # ------------------------------------------------------------------
     # OCR
@@ -167,11 +215,12 @@ class DocumentService:
         return extracted
 
     # ------------------------------------------------------------------
-    # Indexing
+    # Indexing (per owner)
     # ------------------------------------------------------------------
-    def process_pdf(self, file_path: str):
-        with self._db_lock:
-            self.last_error = None
+    def process_pdf(self, file_path: str, owner: str):
+        store = self._store(owner)
+        with store.lock:
+            store.last_error = None
             try:
                 if not os.path.isfile(file_path):
                     raise FileNotFoundError("Uploaded PDF could not be found on the server.")
@@ -200,82 +249,81 @@ class DocumentService:
                 if not chunks:
                     raise ValueError("No text chunks were created from this PDF.")
 
-                # 1) Release every handle to the old DB and clear Chroma's cache FIRST.
-                self._close_active_db()
-                if self._cleanup_timer is not None:
-                    self._cleanup_timer.cancel()
+                # Replace only THIS owner's previous document.
+                self._release(store)
+                if store.timer is not None:
+                    store.timer.cancel()
+                for folder in self._owner_folders(owner):
+                    shutil.rmtree(folder, ignore_errors=True)
+                store.folder = None
 
-                # 2) Only now delete old folders (best effort).
-                self._purge_db_dir()
-                self.current_db_dir = None
-
-                # 3) Brand-new unique folder: a path is never reused.
                 os.makedirs(self.db_dir, exist_ok=True)
-                new_dir = os.path.join(self.db_dir, f"doc_{uuid.uuid4().hex}")
+                new_dir = os.path.join(self.db_dir, f"doc_{self.owner_key(owner)}_{uuid.uuid4().hex}")
                 os.makedirs(new_dir, exist_ok=True)
 
-                collection_name = f"legal_doc_{uuid.uuid4().hex[:10]}"
-                self.active_db = Chroma.from_documents(
+                store.db = Chroma.from_documents(
                     documents=chunks,
                     embedding=self.embeddings,
                     persist_directory=new_dir,
-                    collection_name=collection_name,
+                    collection_name=f"legal_doc_{uuid.uuid4().hex[:10]}",
                     collection_metadata={"hnsw:space": "cosine"},
                 )
-                # Force a simple DB read to verify that the collection is usable.
-                self.active_db._collection.count()
-
-                self.current_db_dir = new_dir
-                self._cleanup_task(
-                    new_dir,
-                    delay=int(os.getenv("DOCUMENT_DB_TTL_SECONDS", "7200")),
-                )
+                store.db._collection.count()   # verify the collection is usable
+                store.folder = new_dir
+                store.last_used = time.monotonic()
+                self._schedule_cleanup(owner, store, new_dir)
                 logger.info("PDF indexed: %s pages, %s chunks", len(usable_pages), len(chunks))
-                return self.active_db
+                db = store.db
             except Exception as exc:
-                self.last_error = str(exc)
+                store.last_error = str(exc)
                 logger.exception("PDF processing failed: %s", exc)
-                self._close_active_db()
+                self._release(store)
                 return None
+        self._enforce_open_limit(store)
+        return db
 
-    def get_active_db(self):
-        with self._db_lock:
-            if self.active_db is not None:
+    def get_db(self, owner: str):
+        """The owner's analysed document, reloaded from disk after a restart; else None."""
+        store = self._store(owner)
+        with store.lock:
+            if store.db is not None:
                 try:
-                    self.active_db._collection.count()
-                    return self.active_db
+                    store.db._collection.count()
+                    store.last_used = time.monotonic()
+                    return store.db
                 except Exception:
-                    logger.warning("Active document DB is unavailable", exc_info=True)
-                    self._close_active_db()
-
-            folder = self._resolve_db_folder()
-            if not folder:
+                    logger.warning("Document DB is unavailable", exc_info=True)
+                    self._release(store)
+            folders = self._owner_folders(owner)
+            if not folders:
                 return None
+            folder = max(folders, key=os.path.getmtime)
             try:
                 import chromadb
 
                 client = chromadb.PersistentClient(path=folder)
                 collections = client.list_collections()
                 if not collections:
-                    self._close_active_db()
                     return None
                 first = collections[0]
-                collection_name = first if isinstance(first, str) else first.name
-
-                # Reuse the SAME client so no extra dangling client is left in the cache.
-                self.active_db = Chroma(
+                store.folder = folder
+                store.db = Chroma(
                     client=client,
                     embedding_function=self.embeddings,
-                    collection_name=collection_name,
+                    collection_name=first if isinstance(first, str) else first.name,
                 )
-                self.active_db._collection.count()
-                self.current_db_dir = folder
-                return self.active_db
+                store.db._collection.count()
+                store.last_used = time.monotonic()
+                if store.timer is None:
+                    self._schedule_cleanup(owner, store, folder)
+                db = store.db
             except Exception as exc:
-                self.last_error = str(exc)
+                store.last_error = str(exc)
                 logger.exception("Could not reload document database")
-                self._close_active_db()
+                self._release(store)
                 return None
+        self._enforce_open_limit(store)
+        return db
 
     # ------------------------------------------------------------------
     # Analysis
@@ -333,7 +381,7 @@ DOCUMENT EXCERPTS:
             logger.exception("Timeline generation failed")
             return f"Timeline generation failed: {exc}"
 
-    def ask_question(self, vector_db, query: str, history: Optional[List[dict]] = None):
+    def ask_question(self, vector_db, query: str, history: Optional[List[dict]] = None, owner: Optional[str] = None):
         if vector_db is None:
             return "No document database is loaded. Please upload and analyze a PDF first."
         history = history or []
@@ -341,7 +389,7 @@ DOCUMENT EXCERPTS:
             try:
                 vector_db._collection.count()
             except Exception:
-                recovered = self.get_active_db()
+                recovered = self.get_db(owner) if owner else None
                 if recovered is None:
                     return "The document database is unavailable. Please re-upload the PDF."
                 vector_db = recovered
@@ -381,5 +429,5 @@ Give a clear, useful answer with page references for document facts.
             return response.content
         except Exception as exc:
             logger.exception("PDF question answering failed")
-            self.last_error = str(exc)
-            return "Could not answer from the PDF. Please try again, and check the server logs if the problem continues."
+            if owner:
+                self._store(owner).last_error = str(exc)
