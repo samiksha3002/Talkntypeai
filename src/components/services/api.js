@@ -1,5 +1,6 @@
 import { bookmarkRequest } from './bookmarks.js';
 import axios from 'axios';
+import { attachAxiosAuth } from '../../apiAuth.js';
 
 // Auto-detect: production ya local
 // Koi env var ki zaroorat nahi — window.location se pata chalta hai
@@ -15,6 +16,7 @@ const api = axios.create({
   timeout : 20000,
   headers : { 'Content-Type': 'application/json' },
 });
+attachAxiosAuth(api);
 
 api.interceptors.response.use(
   (res) => res.data,

@@ -1,13 +1,14 @@
 import express from 'express';
 import User from '../models/user.js';
 import { issueSession, publicUser } from '../middleware/auth.js';
+import { loginLimiter, registerLimiter } from '../middleware/apiGuard.js';
 import { hashPassword, verifyPassword, passwordProblem, findWithPassword, upgradeLegacyPassword } from '../utils/password.js';
 
 const router = express.Router();
 const optionalText = (value, max) => value === undefined || value === null || (typeof value === 'string' && value.length <= max);
 
 // --- REGISTER ROUTE ---
-router.post('/create-user', async (req, res) => {
+router.post('/create-user', registerLimiter, async (req, res) => {
   try {
     const { fullName, email, state, city, phone, executive, password } = req.body || {};
     if (typeof fullName !== 'string' || !fullName.trim() || fullName.length > 200 ||
@@ -47,7 +48,7 @@ router.post('/create-user', async (req, res) => {
 });
 
 // --- LOGIN ROUTE ---
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password || email.length > 254 || password.length > 1024) {

@@ -34,6 +34,7 @@ import judgementAiRouter from "./routes/judgementAi.js";
 
 // ── Middleware Imports ─────────────────────────────────────────────────────────
 import { apiLimiter } from "./middleware/rateLimiter.js";
+import { createApiGuard } from "./middleware/apiGuard.js";
 
 import searchablePdfRouter from "./routes/searchablePdf.routes.js";
 import draftsRouter        from "./routes/draft.ready.js";
@@ -107,6 +108,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use("/api", apiLimiter);
+// Server-side authentication for every /api route (default deny), before any body is parsed.
+app.use("/api", createApiGuard());
 app.use(createBodyBudget());
 app.use(
   express.json({

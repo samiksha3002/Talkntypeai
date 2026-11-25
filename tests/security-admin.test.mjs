@@ -128,7 +128,7 @@ test('login: no hard-coded admin bypass; response carries a JWT and never the pa
   const { default: Session } = await import('../models/DraftSession.js');
   const { default: router } = await import('../routes/auth.js');
   const original = { findOne: User.findOne, create: Session.create };
-  const handler = router.stack.find(l => l.route?.path === '/login').route.stack[0].handle;
+  const handler = router.stack.find(l => l.route?.path === '/login').route.stack.at(-1).handle;
   const invoke = async body => { const res = { statusCode: 200, status(n) { this.statusCode = n; return this; }, setHeader() {}, json(b) { this.body = b; return this; } }; await handler({ body }, res); return res; };
   try {
     const looked = [];

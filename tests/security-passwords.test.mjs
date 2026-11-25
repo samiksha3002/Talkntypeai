@@ -25,7 +25,7 @@ test('user schema hides the password field by default', async () => {
   assert.equal(User.schema.path('password').options.select, false);
 });
 
-function routeHandler(router, path) { return router.stack.find(l => l.route?.path === path).route.stack[0].handle; }
+function routeHandler(router, path) { return router.stack.find(l => l.route?.path === path).route.stack.at(-1).handle; }
 const invoker = handler => async body => { const res = { statusCode: 200, status(n) { this.statusCode = n; return this; }, setHeader() {}, json(b) { this.body = b; return this; } }; await handler({ body }, res); return res; };
 
 test('login: legacy plain-text account still signs in and is upgraded to bcrypt (compare-and-set)', async () => {
