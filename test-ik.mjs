@@ -1,18 +1,27 @@
 // test-ik.mjs
-// Run this directly to test IK connectivity WITHOUT the full server
-// Command: node test-ik.mjs
+// Checks Indian Kanoon API connectivity WITHOUT the full server.
+// Command: node test-ik.mjs --confirm-paid
 //
-// This tells you EXACTLY what's wrong — token, network, or timeout
-
+// Makes 2 PAID calls (1 search ≈ ₹0.50, 1 document ≈ ₹0.20), hence the flag.
+const PAID_NOTICE = "This makes 2 paid Indian Kanoon calls (~₹0.70). Re-run with --confirm-paid to continue.";
+import "dotenv/config";
 import axios from "axios";
 
-const TOKEN = process.env.INDIAN_KANOON_API_TOKEN || "4334f1067736074cb76ff53f14427adc59e74005";
+// The token is read only from the environment (.env or shell) and is never printed.
+const TOKEN = process.env.INDIAN_KANOON_API_TOKEN;
+if (!TOKEN) {
+  console.error("Set INDIAN_KANOON_API_TOKEN in .env or your shell first.");
+  process.exit(1);
+}
+if (!process.argv.includes("--confirm-paid")) {
+  console.error(PAID_NOTICE);
+  process.exit(1);
+}
 
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 console.log("Indian Kanoon API — Direct Test");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-console.log(`Token (first 10): ${TOKEN.slice(0, 10)}...`);
-console.log(`Token length: ${TOKEN.length}`);
+console.log("Token: set");
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
 const IK = axios.create({

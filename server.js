@@ -398,7 +398,7 @@ app.listen(
     console.log(
       `🇮🇳 Indian Kanoon token: ${
         process.env.INDIAN_KANOON_API_TOKEN
-          ? process.env.INDIAN_KANOON_API_TOKEN.slice(0, 8) + "..."
+          ? "✅ set"
           : "❌ NOT SET"
       }`
     );
