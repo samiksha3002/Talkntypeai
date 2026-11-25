@@ -1,66 +1,44 @@
 import express from 'express';
 import Client from '../models/Client.js';
+import { ownerOf, pick, validObjectId, sendError } from '../utils/ownership.js';
 
-const router = express.Router();
+const CLIENT_FIELDS = ['name', 'phone', 'email', 'address', 'notes'];
 
-// 1. ADD NEW CLIENT
-// POST /api/clients/add
-router.post('/add', async (req, res) => {
-  try {
-    const { userId, name, phone, email, address, notes } = req.body;
+// All queries are scoped to the signed-in user (req.user from the verified JWT).
+export function createClientsRouter({ clients = Client } = {}) {
+  const router = express.Router();
 
-    // Validation
-    if (!userId || !name || !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields (Name and Phone are mandatory)',
-      });
-    }
+  // POST /api/clients/add
+  router.post('/add', async (req, res) => {
+    try {
+      const fields = pick(req.body, CLIENT_FIELDS);
+      if (!fields.name || !fields.phone) {
+        return res.status(400).json({ success: false, message: 'Missing required fields (Name and Phone are mandatory)' });
+      }
+      const created = await clients.create({ ...fields, userId: ownerOf(req) });
+      res.status(201).json({ success: true, message: 'Client added successfully!', client: created });
+    } catch (error) { sendError(res, error); }
+  });
 
-    const newClient = new Client({
-      userId,
-      name,   // ✅ use "name" to match schema
-      phone,
-      email,
-      address,
-      notes,
-    });
+  // GET /api/clients/user/:userId  (:userId ignored; kept for frontend compatibility)
+  router.get('/user/:userId', async (req, res) => {
+    try {
+      const rows = await clients.find({ userId: ownerOf(req) }).sort({ createdAt: -1 });
+      res.json({ success: true, clients: rows });
+    } catch (error) { sendError(res, error); }
+  });
 
-    await newClient.save();
-    res.status(201).json({
-      success: true,
-      message: 'Client added successfully!',
-      client: newClient,
-    });
-  } catch (error) {
-    console.error('Error adding client:', error);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-});
+  // DELETE /api/clients/:clientId
+  router.delete('/:clientId', async (req, res) => {
+    if (!validObjectId(req.params.clientId)) return res.status(400).json({ success: false, message: 'Invalid client ID' });
+    try {
+      const deleted = await clients.findOneAndDelete({ _id: req.params.clientId, userId: ownerOf(req) });
+      if (!deleted) return res.status(404).json({ success: false, message: 'Client not found' });
+      res.json({ success: true, message: 'Client deleted successfully' });
+    } catch (error) { sendError(res, error, 'Error deleting client'); }
+  });
 
-// 2. GET USER'S CLIENTS
-// GET /api/clients/user/:userId
-router.get('/user/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const clients = await Client.find({ userId }).sort({ createdAt: -1 });
-    res.json({ success: true, clients });
-  } catch (error) {
-    console.error('Error fetching clients:', error);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-});
+  return router;
+}
 
-// 3. DELETE CLIENT
-// DELETE /api/clients/:clientId
-router.delete('/:clientId', async (req, res) => {
-  try {
-    await Client.findByIdAndDelete(req.params.clientId);
-    res.json({ success: true, message: 'Client deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting client:', error);
-    res.status(500).json({ success: false, message: 'Error deleting client' });
-  }
-});
-
-export default router;
+export default createClientsRouter();

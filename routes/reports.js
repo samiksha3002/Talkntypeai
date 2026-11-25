@@ -1,24 +1,28 @@
 import express from "express";
 import PDFDocument from "pdfkit";
-import Case from "../models/case.js"; 
+import Case from "../models/case.js";
+import { ownerOf } from "../utils/ownership.js";
 
 const router = express.Router();
 
+// Report of the signed-in user's own cases only (owner from the verified JWT;
+// any userId in the query string is ignored).
 router.get("/", async (req, res) => {
-  const { startDate, endDate, userId } = req.query;
+  const { startDate, endDate } = req.query;
 
-  if (!startDate || !endDate) {
+  if (typeof startDate !== "string" || typeof endDate !== "string" || !startDate || !endDate) {
     return res.status(400).json({ error: "Start and end dates are required" });
   }
 
-  const finalUserId = req.user?.id || userId;
-  if (!finalUserId) {
-    return res.status(400).json({ error: "User ID is required to fetch cases" });
-  }
+  let finalUserId;
+  try { finalUserId = ownerOf(req); } catch { return res.status(401).json({ error: "Sign in to continue." }); }
 
   try {
     const start = new Date(startDate);
     const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(400).json({ error: "Invalid dates" });
+    }
     end.setHours(23, 59, 59, 999);
 
     const cases = await Case.find({
@@ -38,7 +42,7 @@ router.get("/", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=CaseReport_${startDate}.pdf`
+      `attachment; filename=CaseReport_${start.toISOString().slice(0, 10)}.pdf`
     );
 
     doc.pipe(res);
