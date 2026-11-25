@@ -1,6 +1,7 @@
 import { createSpeechSession } from '../../Editor/speech.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+import { apiBase } from '../../apiAuth.js';
 
 // --- LIST OF SUPPORTED LANGUAGES (Moved from Sidebar.jsx) ---
 const languageOptions = [
@@ -18,8 +19,17 @@ const languageOptions = [
     { code: 'bn-IN', label: 'Bengali (বাংলা) 🌐', provider: 'web' },
 ];
 
-// ⚠️ PASTE YOUR DEEPGRAM API KEY HERE
-const DEEPGRAM_API_KEY = "14f6f72c0669b3d0d2457c4f4b27fd75eabb3414"; 
+// Live dictation uses a short-lived Deepgram token issued by our API for the
+// signed-in user (POST /api/deepgram/token). No Deepgram key is ever in the browser.
+async function fetchDeepgramToken() {
+    const response = await fetch(apiBase() + '/api/deepgram/token', { method: 'POST' });
+    if (response.status === 401) throw Object.assign(new Error('Please sign in again to use live dictation.'), { user: true });
+    if (response.status === 403) throw Object.assign(new Error('Live dictation needs an active subscription.'), { user: true });
+    if (response.status === 429) throw Object.assign(new Error('Too many dictation requests. Please wait a minute.'), { user: true });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || typeof data.accessToken !== 'string') throw Object.assign(new Error(data.error || 'Live dictation is unavailable right now.'), { user: true });
+    return data.accessToken;
+}
 
 const StenoCard = ({ onSpeechInput }) => {
     const [isListening, setIsListening] = useState(false);
@@ -40,10 +50,11 @@ const StenoCard = ({ onSpeechInput }) => {
             speechSessionRef.current?.stop();
             const session = createSpeechSession('deepgram', onSpeechInput);
             speechSessionRef.current = session;
+            const accessToken = await fetchDeepgramToken();
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
-            const deepgram = createClient(DEEPGRAM_API_KEY);
+            const deepgram = createClient({ accessToken });
 
             const connection = deepgram.listen.live({
                 model: "nova-2",
@@ -80,7 +91,9 @@ const StenoCard = ({ onSpeechInput }) => {
                 stopSteno();
             });
         } catch (error) {
-            console.error("Mic Access Error:", error);
+            speechSessionRef.current?.stop();
+            if (error?.user) { alert(error.message); return; }
+            console.error("Mic Access Error:", error?.message);
             alert("Could not access microphone.");
         }
     };

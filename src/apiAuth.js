@@ -12,6 +12,13 @@ export const API_ORIGINS = [
   env.VITE_API_URL, env.VITE_DRAFT_API_URL,
 ];
 
+// Base URL of our Node API for new code (existing components still hard-code it).
+export function apiBase() {
+  if (env.VITE_API_URL) return String(env.VITE_API_URL).replace(/\/$/, '').replace(/\/api$/, '');
+  const host = globalThis.location?.hostname;
+  return host === 'localhost' || host === '127.0.0.1' ? 'http://localhost:5000' : 'https://talkntypeai.onrender.com';
+}
+
 function originOf(value) { try { return new URL(value).origin; } catch { return null; } }
 
 export function isOwnApi(url, { origins = API_ORIGINS, pageOrigin = globalThis.location?.origin } = {}) {
