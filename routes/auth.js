@@ -59,9 +59,13 @@ router.post('/login', async (req, res) => {
                             : null;
     
     // Sessions are issued only for database-verified accounts, never static bypasses.
-    let draftSession = null;
-    try { draftSession = await issueDraftSession(user._id); } catch { /* Draft access fails closed. */ }
     res.setHeader('Cache-Control', 'no-store');
+    let draftSession;
+    try {
+      draftSession = await issueDraftSession(user._id);
+    } catch {
+      return res.status(503).json({ message: 'Secure sign-in is temporarily unavailable. Please try again later.' });
+    }
     res.status(200).json({
       draftSession,
       message: 'Login successful!',
